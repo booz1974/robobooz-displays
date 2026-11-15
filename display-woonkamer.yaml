@@ -1581,7 +1581,7 @@ script:
           int nd = (w == "pouring" || w == "rainy" || w == "lightning-rainy") ? 5 : (w == "cloudy" || w == "fog" || w == "snowy" ? 3 : (w == "partlycloudy" ? 2 : 1));
           lv_obj_t *wd[] = {id(r_wdot0), id(r_wdot1), id(r_wdot2), id(r_wdot3), id(r_wdot4)};
           for (int k = 0; k < 5; k++) lv_obj_set_style_bg_color(wd[k], lv_color_hex(k < nd ? id(r_tcol)[6] : id(r_tcol)[9]), 0);
-          float ti = id(room_temp).state, hu = id(room_hum).state;
+          float ti = id(cl_cur).state, hu = id(room_hum).state;   // temperatuur van de thermostaat
           if (!std::isnan(ti)) { char b[12]; snprintf(b, sizeof(b), "%.1f°", ti); for (char *p = b; *p; p++) if (*p == '.') *p = ','; lv_label_set_text(id(r_tin), b); }
           if (!std::isnan(hu)) { char b[24]; snprintf(b, sizeof(b), "VOCHT %.0f%%", hu); lv_label_set_text(id(r_hum), b); }
           float pw = id(e_power).state, pv = id(zs_pv).state, gr = id(zs_grid).state;
