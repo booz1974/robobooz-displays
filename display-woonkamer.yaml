@@ -39,6 +39,10 @@ esphome:
   platformio_options:
     board_build.flash_mode: dio
   on_boot:
+    - priority: -200
+      then:
+        - delay: 45s
+        - script.execute: fav_fetch
     # grote beeldbuffers direct bij het opstarten reserveren, voordat het PSRAM versnipperd raakt
     - priority: 800
       then:
@@ -536,6 +540,35 @@ http_request:
   buffer_size_tx: 2048
 
 image:
+  # favorieten: hoesjes worden een voor een opgehaald en daarna in een eigen buffer bewaard
+  - platform: online_image
+    id: favart_ma
+    url: "${ma_url}/favicon.png"
+    format: AUTO
+    type: RGB565
+    resize: 54x54
+    update_interval: never
+    request_headers:
+      Authorization: "Bearer ${ma_token}"
+    on_download_finished:
+      then:
+        - lambda: 'id(qimg_busy) = false; id(fav_art_done).execute(0);'
+    on_error:
+      then:
+        - lambda: 'id(qimg_busy) = false; id(fav_art_done).execute(-1);'
+  - platform: online_image
+    id: favart_ext
+    url: "${ma_url}/favicon.png"
+    format: AUTO
+    type: RGB565
+    resize: 54x54
+    update_interval: never
+    on_download_finished:
+      then:
+        - lambda: 'id(qimg_busy) = false; id(fav_art_done).execute(1);'
+    on_error:
+      then:
+        - lambda: 'id(qimg_busy) = false; id(fav_art_done).execute(-1);'
   - platform: online_image
     id: r_art
     url: "${ma_url}/favicon.png"
@@ -773,56 +806,6 @@ image:
     id: scimg_fairfax
     type: RGB565
     resize: 222x84
-  - platform: file
-    file: "https://cdn-profiles.tunein.com/s74982/images/logoq.jpg?t=1764775504000"
-    id: favimg_r10_80
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://cdn-profiles.tunein.com/s88604/images/logoq.jpg?t=639003723440000000"
-    id: favimg_r10_90
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://cdn-profiles.tunein.com/s308764/images/logoq.jpg?t=1"
-    id: favimg_joe
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://cdn-profiles.tunein.com/s26717/images/logoq.png?t=161713"
-    id: favimg_bigbuck
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://cdn-profiles.tunein.com/s6702/images/logoq.jpg?t=1"
-    id: favimg_arrow
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://mosaic.scdn.co/640/ab67616d00001e0231da7660e873dae006a45a1eab67616d00001e02345122bca3d32395d28b5cf9ab67616d00001e028d1570a03b9354518f0b618bab67616d00001e02a2bce1c979df5f4858c9bb59"
-    id: favimg_pl_rock
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://i.scdn.co/image/ab67706f00000002e74386008431921fe33a3fa9"
-    id: favimg_pl_country
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://mosaic.scdn.co/640/ab67616d00001e0270f7a1b35d5165c85b95a0e0ab67616d00001e0292d0747a634fcc351c6ac3c2ab67616d00001e02aa22899360d8ba6704732decab67616d00001e02dc65d5638a3de4a0bdf3c05f"
-    id: favimg_pl_meezing
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://mosaic.scdn.co/640/ab67616d00001e022d5f1b6409a579c6b09d074dab67616d00001e025f76af1382a1e6d5b12a7adfab67616d00001e026f54747fa3403cd6b2133310ab67616d00001e02cd1e319b591879d4da67bb5d"
-    id: favimg_pl_rustig
-    type: RGB565
-    resize: 54x54
-  - platform: file
-    file: "https://mosaic.scdn.co/640/ab67616d00001e024e6b2430b4a5907b1abfa529ab67616d00001e026ea0141acf5e91ac9621f816ab67616d00001e0275604f7ad3e346858d5df00eab67616d00001e027add74ffc3b2877a4d6c4c7a"
-    id: favimg_pl_bruiloft
-    type: RGB565
-    resize: 54x54
   # animaties klimaatpagina: bestanden in /config/esphome/display/
   # (152x82, 24 frames; het display vergroot ze zelf 3x). Kleiner = veel minder geheugen:
   # alle frames staan in het PSRAM (228x124 kostte 2,7 MB, dit 1,2 MB)
@@ -1132,6 +1115,37 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # ---- favorieten (volledige lijsten uit Music Assistant)
+  - id: fav_names
+    type: std::vector<std::string>
+  - id: fav_uris
+    type: std::vector<std::string>
+  - id: fav_urls
+    type: std::vector<std::string>
+  - id: fav_new
+    type: std::vector<std::string>
+  - id: fav_btns
+    type: std::vector<lv_obj_t *>
+  - id: fav_dsc
+    type: std::vector<lv_image_dsc_t *>
+  - id: fav_sel
+    type: std::string
+  - id: fav_sig
+    type: std::string
+  - id: fav_live_url
+    type: std::string
+  - id: fav_click
+    type: int
+    initial_value: '-1'
+  - id: fav_act
+    type: int
+    initial_value: '0'
+  - id: fav_ok
+    type: bool
+    initial_value: 'false'
+  - id: fav_loaded_ms
+    type: uint32_t
+    initial_value: '0'
   # @zon-begin
   - id: zs_flow
     type: std::array<float, 3>
@@ -2674,6 +2688,8 @@ script:
             case 26: id(ma_img_5)->update(); break;
             case 20: id(pv_img)->update(); break;
             case 28: id(mp_big_img)->update(); break;
+            case 29: id(favart_ma)->update(); break;
+            case 30: id(favart_ext)->update(); break;
             default: id(qimg_busy) = false; break;
           }
 
@@ -2985,24 +3001,425 @@ script:
           lv_display_trigger_activity(nullptr);
       - script.execute: mp_render
 
-  # favorieten: laatst gekozen tegel blijft gemarkeerd (mint + groene rand)
-  - id: fav_mark
-    parameters:
-      idx: int
+  # ---- favorieten: lijsten ophalen uit Music Assistant (meest gespeeld bovenaan)
+  - id: fav_fetch
+    mode: single
+    then:
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 60s
+      - lambda: 'id(fav_new).clear(); id(fav_ok) = true;'
+      - http_request.post:
+          url: "${ma_url}/api"
+          request_headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${ma_token}"
+          body: '{"message_id": "fav_radio", "command": "music/radios/library_items", "args": {"favorite": true, "order_by": "play_count_desc", "limit": 150}}'
+          capture_response: true
+          max_response_buffer_size: 262144
+          on_response:
+            then:
+                - lambda: |-
+                    if (response->status_code != 200) {
+                      ESP_LOGW("fav", "radio: HTTP %d", response->status_code);
+                      id(fav_ok) = false;
+                      return;
+                    }
+                    bool arr = false;
+                    for (char c : body) {
+                      if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
+                      arr = (c == '[');
+                      break;
+                    }
+                    JsonDocument filter;
+                    JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
+                    ef["name"] = true;
+                    ef["uri"] = true;
+                    ef["item_id"] = true;
+                    ef["image"]["path"] = true;
+                    ef["image"]["provider"] = true;
+                    ef["image"]["proxy_id"] = true;
+                    ef["metadata"]["images"][0]["path"] = true;
+                    ef["metadata"]["images"][0]["provider"] = true;
+                    ef["metadata"]["images"][0]["proxy_id"] = true;
+                    JsonDocument doc;
+                    if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
+                      ESP_LOGW("fav", "radio: JSON-fout");
+                      id(fav_ok) = false;
+                      return;
+                    }
+                    JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
+                    int k = 0;
+                    for (JsonObject it : lst) {
+                      std::string uri = it["uri"] | "";
+                      if (uri.empty()) {
+                        std::string iid = it["item_id"] | "";
+                        if (iid.empty()) continue;
+                        uri = std::string("library://radio/") + iid;
+                      }
+                      std::string pxid, pth;
+                      JsonObject cands[2] = {it["image"], it["metadata"]["images"][0]};
+                      for (auto &c : cands) {
+                        if (c.isNull()) continue;
+                        std::string px = c["proxy_id"] | "";
+                        std::string p = c["path"] | "";
+                        if (px.empty() && p.empty()) continue;
+                        pxid = px;
+                        pth = p;
+                        break;
+                      }
+                      std::string img;
+                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=64&fmt=jpeg";
+                      else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
+                      else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
+                      else if (pth.rfind("http", 0) == 0) img = pth;
+                      id(fav_new).push_back(it["name"] | "");
+                      id(fav_new).push_back(uri);
+                      id(fav_new).push_back(img);
+                      k++;
+                    }
+                    ESP_LOGI("fav", "radio: %d favorieten", k);
+          on_error:
+            then:
+              - lambda: 'id(fav_ok) = false;'
+      - http_request.post:
+          url: "${ma_url}/api"
+          request_headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${ma_token}"
+          body: '{"message_id": "fav_playlist", "command": "music/playlists/library_items", "args": {"favorite": true, "order_by": "play_count_desc", "limit": 150}}'
+          capture_response: true
+          max_response_buffer_size: 262144
+          on_response:
+            then:
+                - lambda: |-
+                    if (response->status_code != 200) {
+                      ESP_LOGW("fav", "playlist: HTTP %d", response->status_code);
+                      id(fav_ok) = false;
+                      return;
+                    }
+                    bool arr = false;
+                    for (char c : body) {
+                      if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
+                      arr = (c == '[');
+                      break;
+                    }
+                    JsonDocument filter;
+                    JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
+                    ef["name"] = true;
+                    ef["uri"] = true;
+                    ef["item_id"] = true;
+                    ef["image"]["path"] = true;
+                    ef["image"]["provider"] = true;
+                    ef["image"]["proxy_id"] = true;
+                    ef["metadata"]["images"][0]["path"] = true;
+                    ef["metadata"]["images"][0]["provider"] = true;
+                    ef["metadata"]["images"][0]["proxy_id"] = true;
+                    JsonDocument doc;
+                    if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
+                      ESP_LOGW("fav", "playlist: JSON-fout");
+                      id(fav_ok) = false;
+                      return;
+                    }
+                    JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
+                    int k = 0;
+                    for (JsonObject it : lst) {
+                      std::string uri = it["uri"] | "";
+                      if (uri.empty()) {
+                        std::string iid = it["item_id"] | "";
+                        if (iid.empty()) continue;
+                        uri = std::string("library://playlist/") + iid;
+                      }
+                      std::string pxid, pth;
+                      JsonObject cands[2] = {it["image"], it["metadata"]["images"][0]};
+                      for (auto &c : cands) {
+                        if (c.isNull()) continue;
+                        std::string px = c["proxy_id"] | "";
+                        std::string p = c["path"] | "";
+                        if (px.empty() && p.empty()) continue;
+                        pxid = px;
+                        pth = p;
+                        break;
+                      }
+                      std::string img;
+                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=64&fmt=jpeg";
+                      else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
+                      else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
+                      else if (pth.rfind("http", 0) == 0) img = pth;
+                      id(fav_new).push_back(it["name"] | "");
+                      id(fav_new).push_back(uri);
+                      id(fav_new).push_back(img);
+                      k++;
+                    }
+                    ESP_LOGI("fav", "playlist: %d favorieten", k);
+          on_error:
+            then:
+              - lambda: 'id(fav_ok) = false;'
+      - if:
+          condition:
+            lambda: 'return id(fav_ok) && !id(fav_new).empty();'
+          then:
+            - script.execute: fav_build
+          else:
+            - lambda: 'id(fav_new).clear();'
+
+  # ---- favorieten: knoppen (opnieuw) opbouwen; hoesjes die al binnen zijn blijven bewaard
+  - id: fav_build
     then:
       - lambda: |-
-          lv_obj_t *favs[] = {id(fav_r10_80), id(fav_r10_90), id(fav_joe), id(fav_bigbuck), id(fav_arrow), id(fav_pl_rock), id(fav_pl_country), id(fav_pl_meezing), id(fav_pl_rustig), id(fav_pl_bruiloft)};
-          const int n = sizeof(favs) / sizeof(favs[0]);
-          for (int i = 0; i < n; i++) {
-            if (i == idx) lv_obj_add_state(favs[i], LV_STATE_CHECKED);
-            else lv_obj_remove_state(favs[i], LV_STATE_CHECKED);
+          auto &nw = id(fav_new);
+          id(fav_loaded_ms) = millis();
+          std::string sig;
+          for (auto &x : nw) { sig += x; sig += '\x1f'; }
+          if (sig == id(fav_sig)) { nw.clear(); id(fav_art_kick).execute(); return; }
+          id(fav_sig) = sig;
+          size_t cnt = nw.size() / 3;
+          std::vector<lv_image_dsc_t *> keep(cnt, nullptr);
+          for (size_t j = 0; j < id(fav_uris).size(); j++) {
+            lv_image_dsc_t *d = id(fav_dsc)[j];
+            if (d == nullptr) continue;
+            bool used = false;
+            for (size_t k = 0; k < cnt; k++) {
+              if (keep[k] == nullptr && nw[k * 3 + 1] == id(fav_uris)[j] && nw[k * 3 + 2] == id(fav_urls)[j]) {
+                keep[k] = d;
+                used = true;
+                break;
+              }
+            }
+            if (!used) {
+              heap_caps_free((void *) d->data);
+              delete d;
+            }
           }
-          if (idx >= 0 && idx < n) {
-            std::string t = std::string("NU: ") + lv_label_get_text(lv_obj_get_child(favs[idx], 1));
-            for (auto &ch : t) ch = toupper((unsigned char) ch);
-            lv_label_set_text(id(r_fav_now), t.c_str());
-          } else lv_label_set_text(id(r_fav_now), "");
+          static const uint32_t L[] = {0xE6E8EC, 0xECEEF1, 0x9BE6CC, 0x2B2F36, 0x8B9099, 0x1F3A33, 0x3FAE8E, 0xA7ADB8, 0xFFFFFF, 0xC9CDD4, 0xDDE0E5, 0xD9DCE2, 0xB0B8C0, 0xA1A6AF, 0xF6B8B0, 0x7A1F17, 0xDCEBFF, 0x1E4D3C, 0x19403A, 0x245C48, 0xE8745C, 0x46201A};
+          auto col = [](int sl) -> lv_color_t {
+            uint32_t v = id(r_tcol)[sl];
+            return lv_color_hex(v ? v : L[sl]);
+          };
+          // alleen tekens die het r_mono-lettertype heeft (hoofdletters)
+          auto clean = [](const std::string &in) -> std::string {
+            static const char *OKA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:,.-/% ()+!?'&#=;";
+            static const unsigned char OKU[] = {0x89, 0x88, 0x8B, 0x9C, 0x96, 0x84, 0x8F, 0x81, 0x93, 0x9A, 0x82, 0x8A, 0x8E, 0x94, 0x9B, 0x87, 0x91, 0x80, 0x99, 0x8C, 0x92};
+            std::string o;
+            size_t i = 0;
+            while (i < in.size()) {
+              unsigned char c = in[i];
+              if (c < 0x80) {
+                char u = toupper(c);
+                o += (u != 0 && strchr(OKA, u)) ? u : ' ';
+                i++;
+                continue;
+              }
+              int len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+              if (c == 0xC3 && i + 1 < in.size()) {
+                unsigned char d = in[i + 1];
+                if (d >= 0xA0 && d <= 0xBE && d != 0xB7) d -= 0x20;
+                for (auto okc : OKU) if (okc == d) { o += (char) 0xC3; o += (char) d; break; }
+              } else if (c == 0xC2 && i + 1 < in.size() && ((unsigned char) in[i + 1] == 0xB7 || (unsigned char) in[i + 1] == 0xB0)) {
+                o += in.substr(i, 2);
+              } else if (len == 3 && i + 2 < in.size() && (unsigned char) in[i + 1] == 0x80 && (unsigned char) in[i + 2] == 0x93) {
+                o += in.substr(i, 3);
+              } else if (len == 3 && i + 2 < in.size() && (unsigned char) in[i + 1] == 0x82 && (unsigned char) in[i + 2] == 0xAC) {
+                o += in.substr(i, 3);
+              }
+              i += len;
+            }
+            std::string r;
+            for (char ch : o) {
+              if (ch == ' ' && (r.empty() || r.back() == ' ')) continue;
+              r += ch;
+            }
+            while (!r.empty() && r.back() == ' ') r.pop_back();
+            return r.empty() ? std::string("?") : r;
+          };
+          const lv_font_t *fmono = lv_obj_get_style_text_font(id(r_fav_now), LV_PART_MAIN);
+          const lv_font_t *ficon = lv_obj_get_style_text_font(id(fav_vol_ico), LV_PART_MAIN);
+          lv_obj_t *cols[2] = {id(fav_list_r), id(fav_list_p)};
+          for (auto c : cols) {
+            lv_obj_clean(c);
+            lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
+            lv_obj_set_style_pad_row(c, 8, 0);
+            lv_obj_set_scroll_dir(c, LV_DIR_VER);
+            lv_obj_set_scrollbar_mode(c, LV_SCROLLBAR_MODE_ACTIVE);
+            lv_obj_set_style_width(c, 3, LV_PART_SCROLLBAR);
+            lv_obj_set_style_bg_color(c, col(4), LV_PART_SCROLLBAR);
+            lv_obj_scroll_to_y(c, 0, LV_ANIM_OFF);
+          }
+          id(fav_names).clear();
+          id(fav_uris).clear();
+          id(fav_urls).clear();
+          id(fav_btns).clear();
+          id(fav_dsc) = keep;
+          for (size_t k = 0; k < cnt; k++) {
+            std::string nm = clean(nw[k * 3]);
+            const std::string &uri = nw[k * 3 + 1];
+            bool radio = uri.find("://radio/") != std::string::npos;
+            id(fav_names).push_back(nm);
+            id(fav_uris).push_back(uri);
+            id(fav_urls).push_back(nw[k * 3 + 2]);
+            lv_obj_t *b = lv_button_create(radio ? cols[0] : cols[1]);
+            lv_obj_set_size(b, 222, 54);
+            lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_style_radius(b, 12, 0);
+            lv_obj_set_style_pad_all(b, 0, 0);
+            lv_obj_set_style_clip_corner(b, true, 0);
+            lv_obj_set_style_border_width(b, 0, 0);
+            lv_obj_set_style_shadow_width(b, 0, 0);
+            lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(b, col(1), LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(b, col(2), LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(b, col(20), LV_STATE_CHECKED);
+            lv_obj_set_style_bg_color(b, col(20), (lv_style_selector_t) (LV_STATE_CHECKED | LV_STATE_PRESSED));
+            // 0: hoesje, 1: muzieknoot als er (nog) geen hoesje is, 2: naam
+            lv_obj_t *im = lv_image_create(b);
+            lv_obj_align(im, LV_ALIGN_LEFT_MID, 0, 0);
+            lv_obj_remove_flag(im, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_t *ic = lv_label_create(b);
+            lv_obj_set_style_text_font(ic, ficon, 0);
+            lv_obj_set_style_text_color(ic, col(4), 0);
+            lv_label_set_text(ic, "${mdi_music}");
+            lv_obj_align(ic, LV_ALIGN_LEFT_MID, 13, 0);
+            if (keep[k] != nullptr) {
+              lv_image_set_src(im, keep[k]);
+              lv_obj_add_flag(ic, LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_add_flag(im, LV_OBJ_FLAG_HIDDEN);
+            }
+            lv_obj_t *lb = lv_label_create(b);
+            lv_obj_set_style_text_font(lb, fmono, 0);
+            lv_obj_set_style_text_color(lb, col(3), 0);
+            lv_obj_set_width(lb, 148);
+            lv_label_set_long_mode(lb, LV_LABEL_LONG_WRAP);
+            lv_label_set_text(lb, nm.c_str());
+            lv_obj_align(lb, LV_ALIGN_LEFT_MID, 66, 0);
+            lv_obj_add_event_cb(b, [](lv_event_t *e) {
+              id(fav_click) = (int) (intptr_t) lv_event_get_user_data(e);
+              id(fav_tap).execute();
+            }, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) k);
+            id(fav_btns).push_back(b);
+          }
+          nw.clear();
+          ESP_LOGI("fav", "%u favorieten op het scherm", (unsigned) cnt);
+      - script.execute: fav_mark
+      - script.execute: fav_art_kick
 
+  # ---- favorieten: volgende hoes ophalen (via de gedeelde download-wachtrij)
+  - id: fav_art_kick
+    then:
+      - lambda: |-
+          if (id(qimg_pending) & ((1u << 29) | (1u << 30))) return;
+          if (id(qimg_busy) && (id(qimg_cur) == 29 || id(qimg_cur) == 30)) return;
+          for (size_t i = 0; i < id(fav_btns).size(); i++) {
+            if (id(fav_dsc)[i] != nullptr || id(fav_urls)[i].empty()) continue;
+            const std::string &u = id(fav_urls)[i];
+            id(fav_live_url) = u;
+            if (u.rfind("${ma_url}", 0) == 0) {
+              id(favart_ma)->set_url(u);
+              id(qimg_pending) |= (1u << 29);
+            } else {
+              id(favart_ext)->set_url(u);
+              id(qimg_pending) |= (1u << 30);
+            }
+            id(qimg_next).execute();
+            return;
+          }
+
+  # ---- favorieten: hoes binnen (src 0/1) of mislukt (-1)
+  - id: fav_art_done
+    parameters:
+      src: int
+    then:
+      - lambda: |-
+          std::string u = id(fav_live_url);
+          id(fav_live_url) = "";
+          online_image::OnlineImage *img = src == 1 ? id(favart_ext) : id(favart_ma);
+          const lv_image_dsc_t *sd = src >= 0 ? img->get_lv_image_dsc() : nullptr;
+          bool ok = sd != nullptr && sd->data != nullptr && sd->header.cf == LV_COLOR_FORMAT_RGB565 && sd->header.w > 0 && sd->header.h > 0;
+          for (size_t i = 0; i < id(fav_btns).size(); i++) {
+            if (id(fav_dsc)[i] != nullptr || id(fav_urls)[i] != u || u.empty()) continue;
+            if (!ok) { id(fav_urls)[i] = ""; continue; }   // mislukt: muzieknoot laten staan
+            int w = sd->header.w, h = sd->header.h;
+            int st = sd->header.stride ? sd->header.stride : w * 2;
+            uint8_t *buf = (uint8_t *) heap_caps_malloc(w * h * 2, MALLOC_CAP_SPIRAM);
+            if (buf == nullptr) { id(fav_urls)[i] = ""; continue; }
+            for (int y = 0; y < h; y++) memcpy(buf + y * w * 2, sd->data + y * st, w * 2);
+            auto *d = new lv_image_dsc_t();
+            memset(d, 0, sizeof(*d));
+            d->header.magic = LV_IMAGE_HEADER_MAGIC;
+            d->header.cf = LV_COLOR_FORMAT_RGB565;
+            d->header.w = w;
+            d->header.h = h;
+            d->header.stride = w * 2;
+            d->data = buf;
+            d->data_size = w * h * 2;
+            id(fav_dsc)[i] = d;
+            lv_obj_t *b = id(fav_btns)[i];
+            lv_obj_t *im = lv_obj_get_child(b, 0);
+            lv_image_set_src(im, d);
+            lv_obj_remove_flag(im, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(lv_obj_get_child(b, 1), LV_OBJ_FLAG_HIDDEN);
+          }
+          if (src >= 0) img->release();
+      - script.execute: fav_art_kick
+      - script.execute: qimg_next
+
+  # ---- favorieten: getikt (nog een keer tikken op de gekozen tegel = pauze)
+  - id: fav_tap
+    then:
+      - lambda: |-
+          int i = id(fav_click);
+          id(fav_act) = 0;
+          if (i < 0 || i >= (int) id(fav_uris).size()) return;
+          const std::string &u = id(fav_uris)[i];
+          if (u == id(fav_sel)) { id(fav_act) = 1; return; }
+          id(fav_sel) = u;
+          id(fav_act) = (u.find("://playlist/") != std::string::npos) ? 3 : 2;
+      - script.execute: fav_mark
+      - if:
+          condition:
+            lambda: 'return id(fav_act) == 1;'
+          then:
+            - homeassistant.action:
+                action: media_player.media_play_pause
+                data:
+                  entity_id: media_player.yamaha_living_2
+      - if:
+          condition:
+            lambda: 'return id(fav_act) == 3;'
+          then:
+            # playlists altijd in willekeurige volgorde starten
+            - homeassistant.action:
+                action: media_player.shuffle_set
+                data:
+                  entity_id: media_player.yamaha_living_2
+                  shuffle: "true"
+      - if:
+          condition:
+            lambda: 'return id(fav_act) >= 2;'
+          then:
+            - homeassistant.action:
+                action: music_assistant.play_media
+                data:
+                  entity_id: media_player.yamaha_living_2
+                  media_id: !lambda 'return id(fav_sel);'
+                  media_type: !lambda 'return std::string(id(fav_act) == 3 ? "playlist" : "radio");'
+                  enqueue: replace
+
+  # favorieten: gekozen tegel blijft gemarkeerd
+  - id: fav_mark
+    then:
+      - lambda: |-
+          std::string t;
+          for (size_t i = 0; i < id(fav_btns).size(); i++) {
+            if (id(fav_uris)[i] == id(fav_sel)) {
+              lv_obj_add_state(id(fav_btns)[i], LV_STATE_CHECKED);
+              t = "NU: " + id(fav_names)[i];
+            } else {
+              lv_obj_remove_state(id(fav_btns)[i], LV_STATE_CHECKED);
+            }
+          }
+          lv_label_set_text(id(r_fav_now), t.c_str());
   - id: bell_hide
     then:
       - lambda: |-
@@ -3699,6 +4116,10 @@ script:
             return std::string("Verwarming aan");
 
 interval:
+  # favorieten opnieuw ophalen (volgorde = meest gespeeld)
+  - interval: 15min
+    then:
+      - script.execute: fav_fetch
   # hoesscherm: tijd / buitentemperatuur / woonkamertemperatuur afwisselen (alleen het grote getal)
   - interval: 5s
     then:
@@ -8672,6 +9093,12 @@ lvgl:
       # @nav-boven
       styles: pl_page
       scrollable: false
+      on_load:
+        - if:
+            condition:
+              lambda: 'return id(fav_loaded_ms) == 0 || millis() - id(fav_loaded_ms) > 300000;'
+            then:
+              - script.execute: fav_fetch
       on_swipe_left:
         - lambda: 'lv_indev_wait_release(lv_indev_active());'
         - lvgl.page.next:
@@ -8768,536 +9195,42 @@ lvgl:
             text: ""
             text_font: r_mono
             text_color: 0xE8745C
-        - button:
-            id: fav_r10_80
-            x: 14
-            y: 56
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
+        - obj:
+            id: fav_list_r
+            x: 10
+            y: 52
+            width: 230
+            height: 316
+            pad_all: 4
+            radius: 0
+            bg_opa: TRANSP
             border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
+            scrollbar_mode: ACTIVE
             widgets:
-              - image:
-                  src: favimg_r10_80
-                  align: LEFT_MID
-                  clickable: false
               - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "RADIO 10 80'S"
+                  x: 8
+                  y: 8
+                  text: "LADEN..."
                   text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_r10_80), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 0
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://radio/9"
-                          media_type: radio
-                          enqueue: replace
-        - button:
-            id: fav_r10_90
-            x: 14
-            y: 118
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
+                  text_color: 0x8B9099
+        - obj:
+            id: fav_list_p
+            x: 240
+            y: 52
+            width: 230
+            height: 316
+            pad_all: 4
+            radius: 0
+            bg_opa: TRANSP
             border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
+            scrollbar_mode: ACTIVE
             widgets:
-              - image:
-                  src: favimg_r10_90
-                  align: LEFT_MID
-                  clickable: false
               - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "RADIO 10 90'S"
+                  x: 8
+                  y: 8
+                  text: "LADEN..."
                   text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_r10_90), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 1
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://radio/31"
-                          media_type: radio
-                          enqueue: replace
-        - button:
-            id: fav_joe
-            x: 14
-            y: 180
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_joe
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "JOE 80S & 90S"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_joe), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 2
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://radio/17"
-                          media_type: radio
-                          enqueue: replace
-        - button:
-            id: fav_bigbuck
-            x: 14
-            y: 242
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_bigbuck
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "THE RANCH"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_bigbuck), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 3
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://radio/40"
-                          media_type: radio
-                          enqueue: replace
-        - button:
-            id: fav_arrow
-            x: 14
-            y: 304
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_arrow
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "ARROW CLASSIC ROCK"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_arrow), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 4
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://radio/11"
-                          media_type: radio
-                          enqueue: replace
-        - button:
-            id: fav_pl_rock
-            x: 244
-            y: 56
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_pl_rock
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "60S & 70S ROCK"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_pl_rock), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 5
-                    # playlists altijd in willekeurige volgorde starten
-                    - homeassistant.action:
-                        action: media_player.shuffle_set
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          shuffle: "true"
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://playlist/115"
-                          media_type: playlist
-                          enqueue: replace
-        - button:
-            id: fav_pl_country
-            x: 244
-            y: 118
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_pl_country
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "80S COUNTRY"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_pl_country), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 6
-                    # playlists altijd in willekeurige volgorde starten
-                    - homeassistant.action:
-                        action: media_player.shuffle_set
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          shuffle: "true"
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://playlist/25"
-                          media_type: playlist
-                          enqueue: replace
-        - button:
-            id: fav_pl_meezing
-            x: 244
-            y: 180
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_pl_meezing
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "MEEZING LIEDJES"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_pl_meezing), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 7
-                    # playlists altijd in willekeurige volgorde starten
-                    - homeassistant.action:
-                        action: media_player.shuffle_set
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          shuffle: "true"
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://playlist/68"
-                          media_type: playlist
-                          enqueue: replace
-        - button:
-            id: fav_pl_rustig
-            x: 244
-            y: 242
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_pl_rustig
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "MOOI & RUSTIG"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_pl_rustig), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 8
-                    # playlists altijd in willekeurige volgorde starten
-                    - homeassistant.action:
-                        action: media_player.shuffle_set
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          shuffle: "true"
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://playlist/77"
-                          media_type: playlist
-                          enqueue: replace
-        - button:
-            id: fav_pl_bruiloft
-            x: 244
-            y: 304
-            width: 222
-            height: 54
-            radius: 12
-            pad_all: 0
-            clip_corner: true
-            bg_color: ${c_tile}
-            border_width: 0
-            bg_opa: COVER
-            pressed:
-              bg_color: ${c_tile_on}
-            checked:
-              bg_color: 0xE8745C
-            widgets:
-              - image:
-                  src: favimg_pl_bruiloft
-                  align: LEFT_MID
-                  clickable: false
-              - label:
-                  align: LEFT_MID
-                  x: 66
-                  width: 148
-                  long_mode: WRAP
-                  text: "BRUILOFT 2016"
-                  text_font: r_mono
-                  text_color: ${c_text}
-            on_short_click:
-              - if:
-                  condition:
-                    lambda: 'return lv_obj_has_state(id(fav_pl_bruiloft), LV_STATE_CHECKED);'
-                  then:
-                    # al geselecteerd: nog een keer tikken = pauze, daarna weer verder waar hij was
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                  else:
-                    - script.execute:
-                        id: fav_mark
-                        idx: 9
-                    # playlists altijd in willekeurige volgorde starten
-                    - homeassistant.action:
-                        action: media_player.shuffle_set
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          shuffle: "true"
-                    - homeassistant.action:
-                        action: music_assistant.play_media
-                        data:
-                          entity_id: media_player.yamaha_living_2
-                          media_id: "library://playlist/75"
-                          media_type: playlist
-                          enqueue: replace
+                  text_color: 0x8B9099
         - obj:
             x: 14
             y: 372
@@ -9326,6 +9259,7 @@ lvgl:
             text_font: r_val
             text_color: 0x2B2F36
         - label:
+            id: fav_vol_ico
             x: 28
             y: 410
             text: "${mdi_vol_high}"
