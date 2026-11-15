@@ -1834,19 +1834,19 @@ script:
       anim: bool
     then:
       - lambda: |-
-          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10)};
-          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10)};
-          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10)};
-          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10)};
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10)};
-          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10)};
+          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10), id(r_card11)};
+          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10), id(r_ci11)};
+          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10), id(r_cn11)};
+          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10), id(r_cs11)};
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11)};
+          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10), id(r_ch11)};
           lv_obj_t *sw[] = {id(r_sw0), id(r_sw1), id(r_sw2), id(r_sw3), id(r_sw4), id(r_sw5), id(r_sw6), id(r_sw7)};
           static int last_sel = -2; static uint32_t last_col = 0;
           if (!anim && last_sel == id(r_sel) && last_col == id(r_tcol)[20]) return;
           last_sel = id(r_sel); last_col = id(r_tcol)[20];
-          for (int k = 0; k < 11; k++) {
+          for (int k = 0; k < 12; k++) {
             bool open = k == id(r_sel);
-            int h = open ? (k == 10 ? 240 : 152) : 44;
+            int h = open ? (k == 11 ? 240 : 152) : 44;
             if (anim) {
               lv_anim_t a; lv_anim_init(&a); lv_anim_set_var(&a, cd[k]);
               lv_anim_set_values(&a, lv_obj_get_height(cd[k]), h); lv_anim_set_duration(&a, 260);
@@ -1855,9 +1855,9 @@ script:
             } else lv_obj_set_height(cd[k], h);
             lv_obj_set_style_bg_color(cd[k], lv_color_hex(open ? id(r_tcol)[20] : (k % 2 ? id(r_tcol)[18] : id(r_tcol)[17])), 0);
             auto vis = [](lv_obj_t *o, bool v) { if (v) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); };
-            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 10); vis(ch[k], open);
+            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 11); vis(ch[k], open);
           }
-          for (int t = 0; t < 8; t++) { if (id(r_sel) == 10) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
+          for (int t = 0; t < 8; t++) { if (id(r_sel) == 11) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
           if (anim) { id(r_glitch) = 8; }
           if (anim) lv_obj_scroll_to_view(cd[id(r_sel)], LV_ANIM_ON);
   - id: r_tap
@@ -1865,10 +1865,10 @@ script:
       k: int
     then:
       - lambda: |-
-          static const int NP = 11;
+          static const int NP = 12;
           if (k == id(r_sel)) {
             // open kaart nog eens tikken = pagina openen (Thema: niets, kies een kleur)
-            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), nullptr};
+            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), id(page_nacht), nullptr};
             if (k >= 0 && k < NP && pg[k] != nullptr) id(lvgl_main)->show_page(pg[k]->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 200);
             return;
           }
@@ -1901,8 +1901,9 @@ script:
           snprintf(b, sizeof(b), "%d VAN 3 THUIS", th); lv_label_set_text(id(r_cs7), b);
           snprintf(b, sizeof(b), "VOOR %s · ACHTER %s", id(relay1).state ? "AAN" : "UIT", id(relay2).state ? "AAN" : "UIT"); lv_label_set_text(id(r_cs8), b);
           lv_label_set_text(id(r_cs9), id(lt_tv_on).state ? "AAN" : "UIT");
+          lv_label_set_text(id(r_cs10), "DIMME KLOK MET STERREN");
           static const char *tn[] = {"A · NACHTBLAUW", "B · PAARS & NEON", "C · ANTRACIET & MINT", "D · ESPRESSO & KORAAL", "E · NEC", "F · ORANJE", "G · NMHC", "H · DISCO"};
-          lv_label_set_text(id(r_cs10), tn[std::max(0, std::min(7, id(theme_idx)))]);
+          lv_label_set_text(id(r_cs11), tn[std::max(0, std::min(7, id(theme_idx)))]);
       - script.execute:
           id: r_layout
           anim: false
@@ -4448,8 +4449,8 @@ interval:
             return;
           }
           int k = id(r_sel);
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10)};
-          lv_obj_t *o = ct[std::max(0, std::min(10, k))];
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11)};
+          lv_obj_t *o = ct[std::max(0, std::min(11, k))];
           if (id(r_glitch) == 0) { lv_obj_set_style_translate_x(o, 0, 0); lv_obj_set_style_text_opa(o, LV_OPA_COVER, 0); return; }
           lv_obj_set_style_translate_x(o, (int) (random_uint32() % 17) - 8, 0);
           lv_obj_set_style_text_opa(o, (lv_opa_t) (120 + random_uint32() % 136), 0);
@@ -6670,14 +6671,14 @@ lvgl:
                         id: r_ci10
                         align: LEFT_MID
                         x: 16
-                        text: "${mdi_theme}"
+                        text: "${mdi_night}"
                         text_font: pl_icon28
                         text_color: 0x2B2F36
                     - label:
                         id: r_cn10
                         align: LEFT_MID
                         x: 52
-                        text: "THEMA"
+                        text: "NACHTSTAND"
                         text_font: r_mono
                         text_color: 0x2B2F36
                     - label:
@@ -6692,12 +6693,64 @@ lvgl:
                         id: r_ct10
                         x: 14
                         y: 44
-                        text: "THEMA"
+                        text: "NACHTSTAND"
                         text_font: r_title
                         text_color: 0x46201A
                         hidden: true
                     - label:
                         id: r_ch10
+                        align: BOTTOM_LEFT
+                        x: 16
+                        y: -10
+                        text: "TIK OM TE OPENEN"
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+              - obj:
+                  id: r_card11
+                  width: 452
+                  height: 44
+                  radius: 12
+                  bg_color: 0x19403A
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  on_click:
+                    - lambda: 'id(r_tap).execute(11);'
+                  widgets:
+                    - label:
+                        id: r_ci11
+                        align: LEFT_MID
+                        x: 16
+                        text: "${mdi_theme}"
+                        text_font: pl_icon28
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cn11
+                        align: LEFT_MID
+                        x: 52
+                        text: "THEMA"
+                        text_font: r_mono
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cs11
+                        x: 16
+                        y: 12
+                        text: ""
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ct11
+                        x: 14
+                        y: 44
+                        text: "THEMA"
+                        text_font: r_title
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ch11
                         align: BOTTOM_LEFT
                         x: 16
                         y: -10
