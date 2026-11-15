@@ -4601,7 +4601,7 @@ switch:
           text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
       - lvgl.label.update:
           id: rl1_state
-          text: !lambda 'return id(relay1).state ? std::string("Aan") : std::string("Uit");'
+          text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
   - platform: gpio
     id: relay2
     name: "Schakelaar achter"
@@ -4624,7 +4624,7 @@ switch:
           text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
       - lvgl.label.update:
           id: rl2_state
-          text: !lambda 'return id(relay2).state ? std::string("Aan") : std::string("Uit");'
+          text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
 
 lvgl:
   id: lvgl_main
@@ -15198,10 +15198,10 @@ lvgl:
       on_load:
         - lvgl.label.update:
             id: rl1_state
-            text: !lambda 'return id(relay1).state ? std::string("Aan") : std::string("Uit");'
+            text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
         - lvgl.label.update:
             id: rl2_state
-            text: !lambda 'return id(relay2).state ? std::string("Aan") : std::string("Uit");'
+            text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
       widgets:
         # RETRO: altijd terug naar THUIS of het MENU
         - button:
