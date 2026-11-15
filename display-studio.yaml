@@ -35,6 +35,9 @@ esphome:
   name: display-studio
   friendly_name: Display studio
   min_version: 2025.7.0
+  # grote LVGL-config: anders "dangerous relocation: l32r: literal target out of range" bij het linken
+  build_flags:
+    - -mtext-section-literals
   platformio_options:
     board_build.flash_mode: dio
   on_boot:
