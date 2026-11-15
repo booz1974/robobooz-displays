@@ -4043,7 +4043,7 @@ interval:
           char b[16];
           float v = NAN;
           if (step == 1) v = id(info_out_temp).state;
-          if (step == 2) v = id(room_temp).state;
+          if (step == 2) v = id(cl_cur).state;   // binnen: thermostaat
           if (step > 0 && !std::isnan(v)) {
             snprintf(b, sizeof(b), "%.1f°", v);
             for (char *c = b; *c; c++) if (*c == '.') *c = ',';
