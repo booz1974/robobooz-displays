@@ -3327,6 +3327,7 @@ script:
 
   # ---- favorieten: hoes binnen (src 0/1) of mislukt (-1)
   - id: fav_art_done
+    mode: queued
     parameters:
       src: int
     then:
@@ -3361,6 +3362,8 @@ script:
             lv_obj_add_flag(lv_obj_get_child(b, 1), LV_OBJ_FLAG_HIDDEN);
           }
           if (src >= 0) img->release();
+      # niet binnen de download-callback van hetzelfde plaatje een nieuwe download starten
+      - delay: 100ms
       - script.execute: fav_art_kick
       - script.execute: qimg_next
 
@@ -4157,9 +4160,17 @@ interval:
       - lambda: |-
           if (id(qimg_busy) && millis() - id(qimg_busy_t) > 9000) {
             if (id(qimg_cur) == 28) { id(mp_big_fails)++; id(mp_big_url) = ""; }
+            if (id(qimg_cur) == 29 || id(qimg_cur) == 30) {
+              // favorietenhoes hangt: overslaan (muzieknoot blijft staan)
+              for (size_t i = 0; i < id(fav_urls).size(); i++)
+                if (id(fav_dsc)[i] == nullptr && id(fav_urls)[i] == id(fav_live_url)) id(fav_urls)[i] = "";
+              id(fav_live_url) = "";
+            }
             id(qimg_busy) = false;
             id(qimg_next).execute();
           }
+          // fav: keten bewaken (start de volgende favorietenhoes als er niets loopt)
+          id(fav_art_kick).execute();
   - interval: 1s
     then:
       - if:
