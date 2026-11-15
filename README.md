@@ -25,7 +25,8 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 
 ## Installeren
 
-1. Zet de bestanden in je ESPHome-configmap (HA: `/config/esphome/`), inclusief de map `display/`.
+1. Zet de bestanden in je ESPHome-configmap (HA: `/config/esphome/`), inclusief de mappen `display/` en `components/`.
+   `components/robobooz_build` is een klein lokaal component dat een compileroptie aanzet; zonder die optie faalt het linken van deze grote configuratie (`l32r: literal target out of range`).
 2. Kopieer `secrets.example.yaml` naar `secrets.yaml` en vul je waarden in.
 3. De afbeeldingen in `display/` (`oranje.jpg`, `vuur.gif`, `sneeuw.gif`) staan al in deze repo.
 4. Installeer via ESPHome Device Builder (draadloos). Bouw één display tegelijk: het compileren vraagt ~2,5 GB RAM.

@@ -35,9 +35,6 @@ esphome:
   name: display-studio
   friendly_name: Display studio
   min_version: 2025.7.0
-  # grote LVGL-config: anders "dangerous relocation: l32r: literal target out of range" bij het linken
-  build_flags:
-    - -mtext-section-literals
   platformio_options:
     board_build.flash_mode: dio
   on_boot:
@@ -59,6 +56,17 @@ esphome:
                      (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
             // klok/temperatuur over de hoes: wit + zwarte rand samen ~65% dekkend (0-255)
             lv_obj_set_style_opa_layered(id(mp_big_clock_box), 166, 0);
+
+# grote LVGL-config: zonder dit faalt het linken met
+# "dangerous relocation: l32r: literal target out of range".
+# Vereist de map components/ (uit de repo) naast deze yaml.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [robobooz_build]
+
+robobooz_build:
 
 # ---------------------------------------------------------------- hardware
 # Guition ESP32-S3-4848S040 (overgenomen uit esphome-modular-lvgl-buttons)
@@ -1307,24 +1315,6 @@ globals:
     type: std::string
     initial_value: '""'
   - id: qimg_url_5
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_6
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_7
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_8
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_9
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_10
-    type: std::string
-    initial_value: '""'
-  - id: qimg_url_11
     type: std::string
     initial_value: '""'
   - id: tp_id_0
@@ -2873,152 +2863,14 @@ script:
             wifi.connected:
           timeout: 60s
       - lambda: 'id(fav_new).clear(); id(fav_ok) = true;'
-      - http_request.post:
-          url: "${ma_url}/api"
-          request_headers:
-            Content-Type: application/json
-            Authorization: "Bearer ${ma_token}"
-          body: '{"message_id": "fav_radio", "command": "music/radios/library_items", "args": {"favorite": true, "order_by": "play_count_desc", "limit": 150}}'
-          capture_response: true
-          max_response_buffer_size: 262144
-          on_response:
-            then:
-                - lambda: |-
-                    if (response->status_code != 200) {
-                      ESP_LOGW("fav", "radio: HTTP %d", response->status_code);
-                      id(fav_ok) = false;
-                      return;
-                    }
-                    bool arr = false;
-                    for (char c : body) {
-                      if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
-                      arr = (c == '[');
-                      break;
-                    }
-                    JsonDocument filter;
-                    JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
-                    ef["name"] = true;
-                    ef["uri"] = true;
-                    ef["item_id"] = true;
-                    ef["image"]["path"] = true;
-                    ef["image"]["provider"] = true;
-                    ef["image"]["proxy_id"] = true;
-                    ef["metadata"]["images"][0]["path"] = true;
-                    ef["metadata"]["images"][0]["provider"] = true;
-                    ef["metadata"]["images"][0]["proxy_id"] = true;
-                    JsonDocument doc;
-                    if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
-                      ESP_LOGW("fav", "radio: JSON-fout");
-                      id(fav_ok) = false;
-                      return;
-                    }
-                    JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
-                    int k = 0;
-                    for (JsonObject it : lst) {
-                      std::string uri = it["uri"] | "";
-                      if (uri.empty()) {
-                        std::string iid = it["item_id"] | "";
-                        if (iid.empty()) continue;
-                        uri = std::string("library://radio/") + iid;
-                      }
-                      std::string pxid, pth;
-                      JsonObject cands[2] = {it["image"], it["metadata"]["images"][0]};
-                      for (auto &c : cands) {
-                        if (c.isNull()) continue;
-                        std::string px = c["proxy_id"] | "";
-                        std::string p = c["path"] | "";
-                        if (px.empty() && p.empty()) continue;
-                        pxid = px;
-                        pth = p;
-                        break;
-                      }
-                      std::string img;
-                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=80&fmt=jpeg";
-                      else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
-                      else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
-                      else if (pth.rfind("http", 0) == 0) img = pth;
-                      id(fav_new).push_back(it["name"] | "");
-                      id(fav_new).push_back(uri);
-                      id(fav_new).push_back(img);
-                      k++;
-                    }
-                    ESP_LOGI("fav", "radio: %d favorieten", k);
-          on_error:
-            then:
-              - lambda: 'id(fav_ok) = false;'
-      - http_request.post:
-          url: "${ma_url}/api"
-          request_headers:
-            Content-Type: application/json
-            Authorization: "Bearer ${ma_token}"
-          body: '{"message_id": "fav_playlist", "command": "music/playlists/library_items", "args": {"favorite": true, "order_by": "play_count_desc", "limit": 150}}'
-          capture_response: true
-          max_response_buffer_size: 262144
-          on_response:
-            then:
-                - lambda: |-
-                    if (response->status_code != 200) {
-                      ESP_LOGW("fav", "playlist: HTTP %d", response->status_code);
-                      id(fav_ok) = false;
-                      return;
-                    }
-                    bool arr = false;
-                    for (char c : body) {
-                      if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
-                      arr = (c == '[');
-                      break;
-                    }
-                    JsonDocument filter;
-                    JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
-                    ef["name"] = true;
-                    ef["uri"] = true;
-                    ef["item_id"] = true;
-                    ef["image"]["path"] = true;
-                    ef["image"]["provider"] = true;
-                    ef["image"]["proxy_id"] = true;
-                    ef["metadata"]["images"][0]["path"] = true;
-                    ef["metadata"]["images"][0]["provider"] = true;
-                    ef["metadata"]["images"][0]["proxy_id"] = true;
-                    JsonDocument doc;
-                    if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
-                      ESP_LOGW("fav", "playlist: JSON-fout");
-                      id(fav_ok) = false;
-                      return;
-                    }
-                    JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
-                    int k = 0;
-                    for (JsonObject it : lst) {
-                      std::string uri = it["uri"] | "";
-                      if (uri.empty()) {
-                        std::string iid = it["item_id"] | "";
-                        if (iid.empty()) continue;
-                        uri = std::string("library://playlist/") + iid;
-                      }
-                      std::string pxid, pth;
-                      JsonObject cands[2] = {it["image"], it["metadata"]["images"][0]};
-                      for (auto &c : cands) {
-                        if (c.isNull()) continue;
-                        std::string px = c["proxy_id"] | "";
-                        std::string p = c["path"] | "";
-                        if (px.empty() && p.empty()) continue;
-                        pxid = px;
-                        pth = p;
-                        break;
-                      }
-                      std::string img;
-                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=80&fmt=jpeg";
-                      else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
-                      else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
-                      else if (pth.rfind("http", 0) == 0) img = pth;
-                      id(fav_new).push_back(it["name"] | "");
-                      id(fav_new).push_back(uri);
-                      id(fav_new).push_back(img);
-                      k++;
-                    }
-                    ESP_LOGI("fav", "playlist: %d favorieten", k);
-          on_error:
-            then:
-              - lambda: 'id(fav_ok) = false;'
+      - script.execute:
+          id: fav_get
+          kind: radio
+      - script.wait: fav_get
+      - script.execute:
+          id: fav_get
+          kind: playlist
+      - script.wait: fav_get
       - if:
           condition:
             lambda: 'return id(fav_ok) && !id(fav_new).empty();'
@@ -3026,6 +2878,86 @@ script:
             - script.execute: fav_build
           else:
             - lambda: 'id(fav_new).clear();'
+
+  # ---- favorieten: één lijst ophalen (kind = radio of playlist)
+  - id: fav_get
+    parameters:
+      kind: string
+    then:
+      - http_request.post:
+            url: "${ma_url}/api"
+            request_headers:
+              Content-Type: application/json
+              Authorization: "Bearer ${ma_token}"
+            body: !lambda |-
+              return std::string("{\"message_id\": \"fav_") + kind + "\", \"command\": \"music/" + kind + "s/library_items\", \"args\": {\"favorite\": true, \"order_by\": \"play_count_desc\", \"limit\": 150}}";
+            capture_response: true
+            max_response_buffer_size: 262144
+            on_response:
+              then:
+                  - lambda: |-
+                      if (response->status_code != 200) {
+                        ESP_LOGW("fav", "%s: HTTP %d", kind.c_str(), response->status_code);
+                        id(fav_ok) = false;
+                        return;
+                      }
+                      bool arr = false;
+                      for (char c : body) {
+                        if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
+                        arr = (c == '[');
+                        break;
+                      }
+                      JsonDocument filter;
+                      JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
+                      ef["name"] = true;
+                      ef["uri"] = true;
+                      ef["item_id"] = true;
+                      ef["image"]["path"] = true;
+                      ef["image"]["provider"] = true;
+                      ef["image"]["proxy_id"] = true;
+                      ef["metadata"]["images"][0]["path"] = true;
+                      ef["metadata"]["images"][0]["provider"] = true;
+                      ef["metadata"]["images"][0]["proxy_id"] = true;
+                      JsonDocument doc;
+                      if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
+                        ESP_LOGW("fav", "%s: JSON-fout", kind.c_str());
+                        id(fav_ok) = false;
+                        return;
+                      }
+                      JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
+                      int k = 0;
+                      for (JsonObject it : lst) {
+                        std::string uri = it["uri"] | "";
+                        if (uri.empty()) {
+                          std::string iid = it["item_id"] | "";
+                          if (iid.empty()) continue;
+                          uri = std::string("library://") + kind + "/" + iid;
+                        }
+                        std::string pxid, pth;
+                        JsonObject cands[2] = {it["image"], it["metadata"]["images"][0]};
+                        for (auto &c : cands) {
+                          if (c.isNull()) continue;
+                          std::string px = c["proxy_id"] | "";
+                          std::string p = c["path"] | "";
+                          if (px.empty() && p.empty()) continue;
+                          pxid = px;
+                          pth = p;
+                          break;
+                        }
+                        std::string img;
+                        if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=80&fmt=jpeg";
+                        else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
+                        else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
+                        else if (pth.rfind("http", 0) == 0) img = pth;
+                        id(fav_new).push_back(it["name"] | "");
+                        id(fav_new).push_back(uri);
+                        id(fav_new).push_back(img);
+                        k++;
+                      }
+                      ESP_LOGI("fav", "%s: %d favorieten", kind.c_str(), k);
+            on_error:
+              then:
+                - lambda: 'id(fav_ok) = false;'
 
   # ---- favorieten: knoppen (opnieuw) opbouwen; hoesjes die al binnen zijn blijven bewaard
   - id: fav_build
@@ -3819,28 +3751,6 @@ script:
   # vulling in de tegel tonen (v = 0..255)
   # vulling gelijkzetten met Home Assistant (niet tijdens het vegen)
   # na het loslaten: nieuwe helderheid naar Home Assistant sturen
-  - id: dim_apply
-    parameters:
-      idx: int
-    then:
-      - if:
-          condition:
-            lambda: 'return id(dim_val) <= 0;'
-          then:
-            - homeassistant.action:
-                action: light.turn_off
-                data:
-                  entity_id: !lambda |-
-                    static const char *e[] = {"light.studio", "light.extended_color_light_1_3", "light.extended_color_light_1_4", "light.burolamp"};
-                    return std::string(e[idx < 0 || idx > 3 ? 0 : idx]);
-          else:
-            - homeassistant.action:
-                action: light.turn_on
-                data:
-                  entity_id: !lambda |-
-                    static const char *e[] = {"light.studio", "light.extended_color_light_1_3", "light.extended_color_light_1_4", "light.burolamp"};
-                    return std::string(e[idx < 0 || idx > 3 ? 0 : idx]);
-                  brightness: !lambda 'return id(dim_val);'
 
   # ---- sfeertegels: vegen in een tegel = dimmen van de lampen van die scène
   # idx: 0 Studio fel, 1 Studio dim, 2 Oranje, 3 Lezen, 4 Concentreren, 5 Space ship
