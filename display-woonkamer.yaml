@@ -4237,7 +4237,7 @@ interval:
           lv_image_set_src(o, &dsc);
           lv_obj_invalidate(o);
   # na 2 minuten niets aanraken: het juiste rustscherm kiezen
-  #   wedstrijd (woonkamer) > muziek > nachtstand (23-07) > goedemorgen (06:30-09:30) > thuispagina
+  #   wedstrijd (woonkamer) > muziek > nachtstand (23-06, niet als er lampen aan zijn) > goedemorgen (06:30-09:30) > thuispagina
   - interval: 5s
     then:
       - lambda: |-
@@ -4253,7 +4253,9 @@ interval:
           };
           auto t = id(system_time).now();
           int hm = t.is_valid() ? t.hour * 60 + t.minute : -1;
-          bool nacht = hm >= 0 && (hm >= 23 * 60 || hm < 7 * 60);
+          // nachtstand 23:00-06:00, maar niet zolang er nog lampen aan zijn (muziek gaat hieronder al voor)
+          bool lampen_aan = (id(lt_all_on).has_state() && id(lt_all_on).state) || (id(lt_eettafel_on).has_state() && id(lt_eettafel_on).state) || (id(lt_keuken_on).has_state() && id(lt_keuken_on).state);
+          bool nacht = hm >= 0 && (hm >= 23 * 60 || hm < 6 * 60) && !lampen_aan;
           bool ochtend = hm >= 6 * 60 + 30 && hm < 9 * 60 + 30;
           // @wedstrijd-begin
           if (id(wd_active)) { show(id(page_wedstrijd)); return; }
