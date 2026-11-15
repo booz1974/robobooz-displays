@@ -3070,7 +3070,7 @@ script:
                         break;
                       }
                       std::string img;
-                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=64&fmt=jpeg";
+                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=80&fmt=jpeg";
                       else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
                       else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
                       else if (pth.rfind("http", 0) == 0) img = pth;
@@ -3143,7 +3143,7 @@ script:
                         break;
                       }
                       std::string img;
-                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=64&fmt=jpeg";
+                      if (!pxid.empty()) img = std::string("${ma_url}/imageproxy/") + pxid + "?size=80&fmt=jpeg";
                       else if (pth.rfind("https://i.scdn.co/image/ab67616d0000b273", 0) == 0) { img = pth; img.replace(24, 16, "ab67616d00004851"); }
                       else if (pth.rfind("https://mosaic.scdn.co/640/", 0) == 0) { img = pth; img.replace(23, 3, "300"); }
                       else if (pth.rfind("http", 0) == 0) img = pth;
@@ -4116,10 +4116,6 @@ script:
             return std::string("Verwarming aan");
 
 interval:
-  # favorieten opnieuw ophalen (volgorde = meest gespeeld)
-  - interval: 15min
-    then:
-      - script.execute: fav_fetch
   # hoesscherm: tijd / buitentemperatuur / woonkamertemperatuur afwisselen (alleen het grote getal)
   - interval: 5s
     then:
