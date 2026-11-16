@@ -85,10 +85,16 @@ esp32:
       CONFIG_SPIRAM_RODATA: y
       # gewone malloc/new mag PSRAM gebruiken (anders loopt het interne RAM vol bij het decoderen van hoesjes)
       CONFIG_SPIRAM_USE_MALLOC: y
-      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "4096"
+      # alleen allocaties tot 512 bytes intern; de rest (strings, JSON, favorieten) naar PSRAM.
+      # Bij 4096 liep het interne RAM vol (9-16 KB vrij) en faalde elke https-download (esp-aes).
+      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "512"
       CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL: "49152"
       # https (iTunes-hoesjes e.d.) mag zijn geheugen uit het PSRAM halen; anders faalt TLS bij krap intern RAM
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: y
+      # AES in software: hardware-AES vraagt een intern DMA-buffer en faalde met "esp-aes: Failed to allocate memory"
+      CONFIG_MBEDTLS_HARDWARE_AES: n
+      # TLS-buffers alleen vasthouden zolang een verbinding ze nodig heeft
+      CONFIG_MBEDTLS_DYNAMIC_BUFFER: y
 
 psram:
   mode: octal
@@ -1570,7 +1576,7 @@ script:
           else if (u != id(r_art_url) && !id(qimg_busy) && (u != id(art_bad_r) || millis() >= id(art_retry_r))) {
             if (u != id(art_bad_r)) id(art_fail_r) = 0;
             id(r_art_url) = u; id(qimg_busy) = true; id(qimg_busy_t) = millis(); id(qimg_cur) = 31;
-            { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(r_art).set_url(u); id(r_art).update();
+            { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  /* art_thumb_fix */ id(r_art).set_url(u); id(r_art).update();
           }
   # ---- RETRO 2: lampen
   - id: r_lamp_render
@@ -2821,7 +2827,7 @@ script:
               // oude hoes verbergen terwijl de nieuwe binnenkomt (buffer wordt vervangen)
               lv_obj_add_flag(id(mp_big), LV_OBJ_FLAG_HIDDEN);
               showo(id(mp_big_icon));
-              { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(mp_big_img)->set_url(u);
+              { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  /* art_thumb_fix */ id(mp_big_img)->set_url(u);
               id(qimg_pending) |= (1u << 28); id(qimg_next).execute();
             }
           }
@@ -3466,7 +3472,7 @@ script:
                           lv_obj_add_flag(id(pv_cover), LV_OBJ_FLAG_HIDDEN);
                           showo(id(pv_icon));
                         } else {
-                          { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(pv_img)->set_url(u);
+                          { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  /* art_thumb_fix */ id(pv_img)->set_url(u);
                           id(qimg_pending) |= (1u << 20); id(qimg_next).execute();
                         }
                       }
@@ -10657,11 +10663,13 @@ lvgl:
                         text_font: r_mono
                         text_color: 0x46201A
                   on_click:
-                    - lvgl.widget.hide: mp_full
+                    # mpnav_fix: eerst wisselen, daarna verbergen (anders flitst de wachtrij)
                     - lvgl.page.show:
                         id: page_rhome
                         animation: FADE_IN
                         time: 200ms
+                    - delay: 300ms
+                    - lvgl.widget.hide: mp_full
               - button:
                   x: 244
                   y: 408
@@ -10679,11 +10687,13 @@ lvgl:
                         text_font: r_mono
                         text_color: 0x2B2F36
                   on_click:
-                    - lvgl.widget.hide: mp_full
+                    # mpnav_fix: eerst wisselen, daarna verbergen (anders flitst de wachtrij)
                     - lvgl.page.show:
                         id: page_rmenu
                         animation: FADE_IN
                         time: 200ms
+                    - delay: 300ms
+                    - lvgl.widget.hide: mp_full
               # titel / artiest + vorige / afspelen-pauze / volgende
               - obj:
                   x: 14
