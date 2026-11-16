@@ -1719,6 +1719,44 @@ script:
             for (int c = 0; c < 5; c++) vis(ch[k][c], o);
           }
           if (open >= 0) { lv_obj_scroll_to_view(cd[open], LV_ANIM_ON); id(r_glitch_obj) = (void *) id(r_t2); id(r_glitch) = 6; }
+  # ---- RETRO 2: weer – regen komend uur (12 x 5 min)
+  - id: r_regen_render
+    then:
+      - lambda: |-
+          // Buienradar-waarde 0..255; mm/u = 10^((v-109)/32): 77 = 0,1  109 = 1  131 = 5 mm/u
+          std::string s = id(wx_regen).state;
+          int val[12]; std::string tm[12]; int n = 0;
+          size_t a = 0;
+          while (n < 12 && a < s.size()) {
+            size_t b = s.find(' ', a); std::string e = s.substr(a, b == std::string::npos ? std::string::npos : b - a);
+            size_t p = e.find('|');
+            if (p != std::string::npos) { val[n] = atoi(e.substr(0, p).c_str()); tm[n] = e.substr(p + 1); n++; }
+            if (b == std::string::npos) break;
+            a = b + 1;
+          }
+          lv_obj_t *rb[] = {id(r_rb_0), id(r_rb_1), id(r_rb_2), id(r_rb_3), id(r_rb_4), id(r_rb_5), id(r_rb_6), id(r_rb_7), id(r_rb_8), id(r_rb_9), id(r_rb_10), id(r_rb_11)};
+          auto col = [](int sl, uint32_t def) -> lv_color_t { uint32_t v = id(r_tcol)[sl]; return lv_color_hex(v ? v : def); };
+          for (int k = 0; k < 12; k++) {
+            int v = k < n ? val[k] : 0;
+            int h = v <= 0 ? 0 : std::max(3, std::min(40, (v - 60) * 40 / 100));
+            lv_obj_set_height(rb[k], h);
+            lv_obj_set_style_bg_color(rb[k], v < 109 ? col(6, 0x3FAE8E) : (v < 131 ? col(20, 0xE8745C) : lv_color_hex(0xE5534B)), 0);
+          }
+          if (n == 0) { lv_label_set_text(id(r_wx_tip), "GEEN REGENDATA"); return; }
+          std::string t;
+          if (val[0] > 0) {
+            int e = -1; for (int k = 1; k < n; k++) if (val[k] <= 0) { e = k; break; }
+            t = e < 0 ? std::string("REGEN · HOUDT HET UUR AAN") : "REGEN NU · DROOG OM " + tm[e];
+          } else {
+            int b = -1; for (int k = 1; k < n; k++) if (val[k] > 0) { b = k; break; }
+            if (b < 0) t = "DROOG KOMEND UUR";
+            else {
+              int e = -1; for (int k = b + 1; k < n; k++) if (val[k] <= 0) { e = k; break; }
+              char m[48]; snprintf(m, sizeof(m), "REGEN OVER %d MIN", b * 5);
+              t = std::string(m) + (e < 0 ? std::string(" · HOUDT AAN") : " · TOT " + tm[e]);
+            }
+          }
+          lv_label_set_text(id(r_wx_tip), t.c_str());
   # ---- RETRO 2: weer
   - id: r_weer_render
     then:
@@ -1743,8 +1781,7 @@ script:
             auto f = split(id(am_info).state, '|');
             if (f.size() >= 4) {
               lv_label_set_text(id(r_wx_mm), ("MIN " + f[1] + "° · MAX " + f[2] + "°").c_str());
-              std::string tip = f[3]; for (auto &ch : tip) ch = toupper((unsigned char) ch);
-              lv_label_set_text(id(r_wx_tip), tip.c_str());
+              lv_label_set_text(id(r_wx_cond), (std::string(x->nl) + " · " + f[1] + "°/" + f[2] + "°").c_str());
             }
           }
           // uren: staafjes naar temperatuur
@@ -4770,6 +4807,14 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # regen komend uur: "VVV|HH:MM VVV|HH:MM ..." per 5 minuten (Neerslag-app, bron Buienradar)
+  - platform: homeassistant
+    id: wx_regen
+    entity_id: sensor.neerslag_buienradar_regen_data
+    attribute: data
+    internal: true
+    on_value:
+      - script.execute: r_regen_render
   # nieuws voor het klokvak (automatisering 'Displays - NOS-nieuws bijwerken')
   - platform: homeassistant
     id: ha_nieuws
@@ -8109,6 +8154,7 @@ lvgl:
       scrollable: false
       on_load:
         - script.execute: r_weer_render
+        - script.execute: r_regen_render
         - script.execute: r_weer_grow
       widgets:
         # RETRO: altijd terug naar THUIS of het MENU
@@ -8205,12 +8251,13 @@ lvgl:
         - label:
             id: r_wx_cond
             x: 276
-            y: 62
+            y: 50
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_wx_mm
+            hidden: true
             x: 276
             y: 84
             text: ""
@@ -8219,10 +8266,334 @@ lvgl:
         - label:
             id: r_wx_tip
             x: 276
-            y: 106
+            y: 132
             text: ""
             text_font: r_mono
             text_color: 0x3FAE8E
+        - obj:
+            id: r_rbg_0
+            x: 276
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_0
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_1
+            x: 290
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_1
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_2
+            x: 304
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_2
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_3
+            x: 318
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_3
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_4
+            x: 332
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_4
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_5
+            x: 346
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_5
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_6
+            x: 360
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_6
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_7
+            x: 374
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_7
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_8
+            x: 388
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_8
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_9
+            x: 402
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_9
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_10
+            x: 416
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_10
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - obj:
+            id: r_rbg_11
+            x: 430
+            y: 72
+            width: 10
+            height: 40
+            radius: 2
+            bg_color: 0x245C48
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  id: r_rb_11
+                  align: BOTTOM_MID
+                  width: 10
+                  height: 0
+                  radius: 2
+                  bg_color: 0x3FAE8E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+        - label:
+            x: 276
+            y: 115
+            text: "NU"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            x: 418
+            y: 115
+            text: "+60"
+            text_font: r_mono
+            text_color: 0x8B9099
         - obj:
             x: 14
             y: 166
