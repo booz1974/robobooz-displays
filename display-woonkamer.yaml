@@ -255,6 +255,10 @@ substitutions:
   mdi_vol_low:         "\U000F057F"
   mdi_vol_high:        "\U000F057E"
   mdi_music:           "\U000F075A"
+  mdi_vpn:             "\U000F0582"
+  mdi_lan:             "\U000F0317"
+  mdi_robot:           "\U000F06A9"
+  mdi_server:          "\U000F048B"
   mdi_chev_left:       "\U000F0141"
   mdi_chev_right:      "\U000F0142"
   mdi_minus:           "\U000F0374"
@@ -317,6 +321,10 @@ font:
     size: 28
     bpp: 4
     glyphs: &mdi_glyphs
+      - "${mdi_vpn}"
+      - "${mdi_lan}"
+      - "${mdi_robot}"
+      - "${mdi_server}"
       - "${mdi_lightbulb_group}"
       - "${mdi_sofa}"
       - "${mdi_sofa_single}"
@@ -523,7 +531,7 @@ font:
     id: r_mono
     size: 12
     bpp: 4
-    glyphs: ["ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:,.°-·/% ()+€!?'&–ÉÈËÜÖÄÏÁÓÚ#=ÂÊÎÔÛÇÑÀÙÌÒ;"]
+    glyphs: ["ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:,.°-·/% ()+€!?'&–ÉÈËÜÖÄÏÁÓÚ#=ÂÊÎÔÛÇÑÀÙÌÒ;>"]
   - file:
       type: gfonts
       family: Montserrat
@@ -1138,6 +1146,13 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # ---- serverkamer
+  - id: srv_needle
+    type: std::array<lv_obj_t *, 3>
+  - id: srv_trace
+    type: std::array<lv_obj_t *, 2>
+  - id: srv_red
+    type: std::array<bool, 4>
   # ---- hoesjes opnieuw proberen (r_art = thuis, pv = spelerpagina, mp_big = groot scherm)
   - id: art_retry_r
     type: uint32_t
@@ -1870,6 +1885,164 @@ script:
             lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_height((lv_obj_t *) o, v); lv_obj_set_y((lv_obj_t *) o, 124 - v); });
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out); lv_anim_start(&a);
           }
+  # ---- SERVERKAMER: eenmalig wijzers, schaal en raster tekenen
+  - id: r_srv_init
+    then:
+      - lambda: |-
+          static bool klaar = false;
+          if (klaar) return;
+          klaar = true;
+          auto col = [](int sl, uint32_t def) -> lv_color_t { uint32_t v = id(r_tcol)[sl]; return lv_color_hex(v ? v : def); };
+          lv_obj_t *pg = lv_obj_get_parent(id(srv_term));
+          // drie wijzermeters
+          static lv_point_precise_t tick[3][11][2];
+          for (int g = 0; g < 3; g++) {
+            int cx = 66 + g * 102, cy = 198, R = 40;
+            const int seg[3][2] = {{180, 306}, {306, 342}, {342, 360}};
+            const uint32_t sc[3] = {0x245C48, 0xE8745C, 0xE5534B};
+            for (int z = 0; z < 3; z++) {
+              lv_obj_t *a = lv_arc_create(pg);
+              lv_obj_set_size(a, R * 2, R * 2);
+              lv_obj_set_pos(a, cx - R, cy - R);
+              lv_arc_set_bg_angles(a, seg[z][0], seg[z][1]);
+              lv_obj_set_style_arc_width(a, z == 0 ? 2 : 4, LV_PART_MAIN);
+              lv_obj_set_style_arc_color(a, z == 0 ? col(19, sc[0]) : (z == 1 ? col(20, sc[1]) : lv_color_hex(sc[2])), LV_PART_MAIN);
+              lv_obj_set_style_arc_rounded(a, false, LV_PART_MAIN);
+              lv_obj_set_style_arc_opa(a, LV_OPA_TRANSP, LV_PART_INDICATOR);
+              lv_obj_set_style_bg_opa(a, LV_OPA_TRANSP, LV_PART_KNOB);
+              lv_obj_set_style_pad_all(a, 0, LV_PART_KNOB);
+              lv_obj_remove_flag(a, LV_OBJ_FLAG_CLICKABLE);
+            }
+            for (int k = 0; k <= 10; k++) {
+              float an = (180 - k * 18) * 3.14159265f / 180.0f;
+              int r2 = R - (k % 5 == 0 ? 11 : 7);
+              tick[g][k][0] = {(float) (cx + (R - 3) * cosf(an)), (float) (cy - (R - 3) * sinf(an))};
+              tick[g][k][1] = {(float) (cx + r2 * cosf(an)), (float) (cy - r2 * sinf(an))};
+              lv_obj_t *l = lv_line_create(pg);
+              lv_line_set_points(l, tick[g][k], 2);
+              lv_obj_set_style_line_width(l, 2, 0);
+              lv_obj_set_style_line_color(l, k < 7 ? col(19, 0x245C48) : (k < 9 ? col(20, 0xE8745C) : lv_color_hex(0xE5534B)), 0);
+            }
+            lv_obj_t *nd = lv_line_create(pg);
+            lv_obj_set_style_line_width(nd, 3, 0);
+            lv_obj_set_style_line_rounded(nd, true, 0);
+            lv_obj_set_style_line_color(nd, col(3, 0x2B2F36), 0);
+            id(srv_needle)[g] = nd;
+            lv_obj_t *dot = lv_obj_create(pg);
+            lv_obj_set_size(dot, 10, 10); lv_obj_set_pos(dot, cx - 5, cy - 5);
+            lv_obj_set_style_radius(dot, 5, 0); lv_obj_set_style_border_width(dot, 0, 0);
+            lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0); lv_obj_set_style_bg_color(dot, col(20, 0xE8745C), 0);
+            lv_obj_remove_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+          }
+          // raster van de grafiek
+          static lv_point_precise_t gr[15][2];
+          int n = 0;
+          for (int x = 28; x <= 452 && n < 9; x += 53, n++) { gr[n][0] = {(float) x, 274}; gr[n][1] = {(float) x, 344}; }
+          for (int y = 274; y <= 344 && n < 15; y += 14, n++) { gr[n][0] = {28, (float) y}; gr[n][1] = {452, (float) y}; }
+          for (int k = 0; k < n; k++) {
+            lv_obj_t *l = lv_line_create(pg);
+            lv_line_set_points(l, gr[k], 2);
+            lv_obj_set_style_line_width(l, 1, 0);
+            lv_obj_set_style_line_color(l, col(19, 0x245C48), 0);
+          }
+          for (int t = 0; t < 2; t++) {
+            lv_obj_t *l = lv_line_create(pg);
+            lv_obj_set_style_line_width(l, 2, 0);
+            lv_obj_set_style_line_rounded(l, true, 0);
+            lv_obj_set_style_line_color(l, t == 0 ? lv_color_hex(0x5E9BE0) : col(20, 0xE8745C), 0);
+            id(srv_trace)[t] = l;
+          }
+          // terminal en titel boven de grafieklijnen houden
+          lv_obj_move_foreground(id(srv_term));
+          lv_obj_move_foreground(id(srv_v0)); lv_obj_move_foreground(id(srv_v1));
+          lv_obj_move_foreground(id(srv_prompt)); lv_obj_move_foreground(id(srv_cur));
+      - script.execute: r_srv_render
+
+  # ---- SERVERKAMER: alles bijwerken
+  - id: r_srv_render
+    then:
+      - lambda: |-
+          auto split = [](const std::string &v, char d) { std::vector<std::string> o; size_t a = 0;
+            while (true) { size_t b = v.find(d, a); o.push_back(v.substr(a, b == std::string::npos ? std::string::npos : b - a)); if (b == std::string::npos) break; a = b + 1; } return o; };
+          auto fmt1 = [](float v) { char b[16]; snprintf(b, sizeof(b), "%.1f", v); std::string r = b; for (auto &c : r) if (c == '.') c = ','; return r; };
+          // diensten
+          std::string info = id(srv_info).has_state() ? id(srv_info).state : "";
+          auto f = split(info, '|');
+          auto code = split(f.size() > 0 ? f[0] : "", ';');
+          int bad = 0; std::string badname;
+          const char *names[4] = {"OPENVPN", "TAILSCALE", "MCP", "MUSIC ASS."};
+          lv_obj_t *lamp[4] = {id(srv_l0), id(srv_l1), id(srv_l2), id(srv_l3)};
+          lv_obj_t *st[4] = {id(srv_s0), id(srv_s1), id(srv_s2), id(srv_s3)};
+          for (int k = 0; k < 4; k++) {
+            std::string c = k < (int) code.size() ? code[k] : "";
+            char ch = c.empty() ? 'O' : c[0];
+            uint32_t cl = ch == 'G' ? 0x5AC878 : (ch == 'R' ? 0xE5534B : 0xE8A33C);
+            lv_obj_set_style_bg_color(lamp[k], lv_color_hex(cl), 0);
+            lv_obj_set_style_shadow_color(lamp[k], lv_color_hex(cl), 0);
+            std::string t = ch == 'G' ? "ACTIEF" : (ch == 'R' ? "UIT" : "LET OP");
+            if (k == 0 && ch == 'G' && c.size() > 1) { int n = atoi(c.c_str() + 1); if (n > 0) { char b[24]; snprintf(b, sizeof(b), "%d SESSIE%s", n, n == 1 ? "" : "S"); t = b; } }
+            lv_label_set_text(st[k], t.c_str());
+            lv_obj_set_style_text_color(st[k], lv_color_hex(cl), 0);
+            id(srv_red)[k] = ch == 'R';
+            if (ch != 'G') { bad++; if (badname.empty()) badname = std::string(names[k]) + (ch == 'R' ? " UIT" : " LET OP"); }
+          }
+          // titel met HAOS-versie, uptime
+          if (f.size() > 2) lv_label_set_text(id(srv_title), ("HOME ASSISTANT SERVER · HAOS " + f[2]).c_str());
+          int dg = f.size() > 3 ? atoi(f[3].c_str()) : 0; if (dg > 99) dg = 99;
+          char d2[4]; snprintf(d2, sizeof(d2), "%02d", dg);
+          char u0[2] = {d2[0], 0}, u1[2] = {d2[1], 0};
+          lv_label_set_text(id(srv_u0), u0); lv_label_set_text(id(srv_u1), u1);
+          // wijzers
+          float vals[3] = {id(srv_cpu).state, id(srv_mem).state, id(srv_disk).state};
+          lv_obj_t *vl[3] = {id(srv_m0), id(srv_m1), id(srv_m2)};
+          static lv_point_precise_t nd[3][2];
+          for (int g = 0; g < 3; g++) {
+            float v = std::isnan(vals[g]) ? 0 : std::max(0.0f, std::min(100.0f, vals[g]));
+            int cx = 66 + g * 102, cy = 198;
+            float an = (180 - v * 1.8f) * 3.14159265f / 180.0f;
+            nd[g][0] = {(float) cx, (float) cy};
+            nd[g][1] = {(float) (cx + 26 * cosf(an)), (float) (cy - 26 * sinf(an))};
+            if (id(srv_needle)[g]) lv_line_set_points(id(srv_needle)[g], nd[g], 2);
+            lv_label_set_text(vl[g], std::isnan(vals[g]) ? "--" : ((g == 0 ? std::to_string((int) lroundf(v)) : fmt1(v)) + "%").c_str());
+          }
+          // temperatuur
+          float tc = id(srv_temp).state;
+          if (!std::isnan(tc)) {
+            lv_bar_set_value(id(srv_tbar), std::max(30, std::min(80, (int) lroundf(tc))), LV_ANIM_ON);
+            lv_label_set_text(id(srv_tv), (std::to_string((int) lroundf(tc)) + "°").c_str());
+          }
+          // grafiek 24 uur
+          static lv_point_precise_t tr[2][48];
+          std::string hs[2] = {id(srv_hc).has_state() ? id(srv_hc).state : "", id(srv_ht).has_state() ? id(srv_ht).state : ""};
+          for (int t = 0; t < 2; t++) {
+            auto p = split(hs[t], ',');
+            int n = std::min((int) p.size(), 48);
+            float lo = t == 0 ? 0 : 30, hi = t == 0 ? 100 : 70;
+            for (int i = 0; i < n; i++) {
+              float v = atof(p[p.size() - n + i].c_str());
+              v = std::max(lo, std::min(hi, v));
+              tr[t][i] = {(float) (28 + (n > 1 ? i * 424.0f / (n - 1) : 0)), (float) (344 - (v - lo) / (hi - lo) * 70)};
+            }
+            if (id(srv_trace)[t] && n > 1) lv_line_set_points(id(srv_trace)[t], tr[t], n);
+          }
+          // terminal
+          auto vp = split(f.size() > 1 ? f[1] : "", '~');
+          bool vpn = !vp.empty() && !vp[0].empty();
+          lv_label_set_text(id(srv_v0), vpn ? vp[0].c_str() : "GEEN VPN-VERBINDINGEN");
+          std::string l2;
+          if (vpn && vp.size() > 1) l2 = vp[1];
+          else {
+            float fr = id(srv_free).state, mm = id(srv_mem).state;
+            l2 = "SCHIJF VRIJ " + (std::isnan(fr) ? std::string("--") : fmt1(fr)) + " GB   ·   RAM " + (std::isnan(mm) ? std::string("--") : fmt1(mm)) + "%";
+          }
+          lv_label_set_text(id(srv_v1), l2.c_str());
+          // menukaart
+          lv_obj_t *cs = id(r_cs11);
+          if (cs) {
+            std::string t = bad == 0 ? std::string("ALLES DRAAIT") : (bad == 1 ? badname : std::to_string(bad) + " DIENSTEN LET OP");
+            if (!std::isnan(id(srv_cpu).state)) t += " · CPU " + std::to_string((int) lroundf(id(srv_cpu).state)) + "%";
+            lv_label_set_text(cs, t.c_str());
+          }
   # ---- RETRO 2: LIVE-balk
   - id: r_ticker
     then:
@@ -1900,19 +2073,19 @@ script:
       anim: bool
     then:
       - lambda: |-
-          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10), id(r_card11)};
-          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10), id(r_ci11)};
-          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10), id(r_cn11)};
-          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10), id(r_cs11)};
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11)};
-          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10), id(r_ch11)};
+          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10), id(r_card11), id(r_card12)};
+          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10), id(r_ci11), id(r_ci12)};
+          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10), id(r_cn11), id(r_cn12)};
+          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10), id(r_cs11), id(r_cs12)};
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12)};
+          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10), id(r_ch11), id(r_ch12)};
           lv_obj_t *sw[] = {id(r_sw0), id(r_sw1), id(r_sw2), id(r_sw3), id(r_sw4), id(r_sw5), id(r_sw6), id(r_sw7)};
           static int last_sel = -2; static uint32_t last_col = 0;
           if (!anim && last_sel == id(r_sel) && last_col == id(r_tcol)[20]) return;
           last_sel = id(r_sel); last_col = id(r_tcol)[20];
-          for (int k = 0; k < 12; k++) {
+          for (int k = 0; k < 13; k++) {
             bool open = k == id(r_sel);
-            int h = open ? (k == 11 ? 240 : 152) : 44;
+            int h = open ? (k == 12 ? 240 : 152) : 44;
             if (anim) {
               lv_anim_t a; lv_anim_init(&a); lv_anim_set_var(&a, cd[k]);
               lv_anim_set_values(&a, lv_obj_get_height(cd[k]), h); lv_anim_set_duration(&a, 260);
@@ -1921,9 +2094,9 @@ script:
             } else lv_obj_set_height(cd[k], h);
             lv_obj_set_style_bg_color(cd[k], lv_color_hex(open ? id(r_tcol)[20] : (k % 2 ? id(r_tcol)[18] : id(r_tcol)[17])), 0);
             auto vis = [](lv_obj_t *o, bool v) { if (v) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); };
-            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 11); vis(ch[k], open);
+            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 12); vis(ch[k], open);
           }
-          for (int t = 0; t < 8; t++) { if (id(r_sel) == 11) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
+          for (int t = 0; t < 8; t++) { if (id(r_sel) == 12) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
           if (anim) { id(r_glitch) = 8; }
           if (anim) lv_obj_scroll_to_view(cd[id(r_sel)], LV_ANIM_ON);
   - id: r_tap
@@ -1931,10 +2104,10 @@ script:
       k: int
     then:
       - lambda: |-
-          static const int NP = 12;
+          static const int NP = 13;
           if (k == id(r_sel)) {
             // open kaart nog eens tikken = pagina openen (Thema: niets, kies een kleur)
-            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), id(page_nacht), nullptr};
+            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), id(page_nacht), id(page_server), nullptr};
             if (k >= 0 && k < NP && pg[k] != nullptr) id(lvgl_main)->show_page(pg[k]->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 200);
             return;
           }
@@ -1969,7 +2142,7 @@ script:
           lv_label_set_text(id(r_cs9), id(lt_tv_on).state ? "AAN" : "UIT");
           lv_label_set_text(id(r_cs10), "DIMME KLOK MET STERREN");
           static const char *tn[] = {"A · NACHTBLAUW", "B · PAARS & NEON", "C · ANTRACIET & MINT", "D · ESPRESSO & KORAAL", "E · NEC", "F · ORANJE", "G · NMHC", "H · DISCO"};
-          lv_label_set_text(id(r_cs11), tn[std::max(0, std::min(7, id(theme_idx)))]);
+          lv_label_set_text(id(r_cs12), tn[std::max(0, std::min(7, id(theme_idx)))]);
       - script.execute:
           id: r_layout
           anim: false
@@ -4107,6 +4280,15 @@ script:
             return std::string("Verwarming aan");
 
 interval:
+  # serverkamer: rode lampjes en de terminalcursor knipperen
+  - interval: 600ms
+    then:
+      - lambda: |-
+          if (!id(page_server)->is_showing()) return;
+          static bool aan = false; aan = !aan;
+          lv_obj_t *lamp[4] = {id(srv_l0), id(srv_l1), id(srv_l2), id(srv_l3)};
+          for (int k = 0; k < 4; k++) lv_obj_set_style_opa(lamp[k], (id(srv_red)[k] && !aan) ? LV_OPA_20 : LV_OPA_COVER, 0);
+          lv_obj_set_style_opa(id(srv_cur), aan ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
   # hoesscherm: tijd / buitentemperatuur / woonkamertemperatuur afwisselen (alleen het grote getal)
   - interval: 5s
     then:
@@ -4440,8 +4622,8 @@ interval:
             return;
           }
           int k = id(r_sel);
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11)};
-          lv_obj_t *o = ct[std::max(0, std::min(11, k))];
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12)};
+          lv_obj_t *o = ct[std::max(0, std::min(12, k))];
           if (id(r_glitch) == 0) { lv_obj_set_style_translate_x(o, 0, 0); lv_obj_set_style_text_opa(o, LV_OPA_COVER, 0); return; }
           lv_obj_set_style_translate_x(o, (int) (random_uint32() % 17) - 8, 0);
           lv_obj_set_style_text_opa(o, (lv_opa_t) (120 + random_uint32() % 136), 0);
@@ -4624,6 +4806,37 @@ binary_sensor:
           id: info_regen_icon
           text_color: !lambda 'return x ? lv_color_hex(0xE5736A) : lv_color_hex(id(r_tcol)[4]);'
 sensor:
+  # ---- serverkamer
+  - platform: homeassistant
+    id: srv_cpu
+    entity_id: sensor.processor_use
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_temp
+    entity_id: sensor.processor_temperature
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_mem
+    entity_id: sensor.memory_use_percent
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_disk
+    entity_id: sensor.disk_use_percent
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_free
+    entity_id: sensor.disk_free
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
   # @zon-begin
   # zonnestroom live: zonnepanelen (omvormer) en P1 (+ = van het net, - = teruglevering)
   - platform: homeassistant
@@ -4846,6 +5059,25 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # ---- serverkamer
+  - platform: homeassistant
+    id: srv_info
+    entity_id: input_text.server_info_display
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_hc
+    entity_id: input_text.server_hist_cpu
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
+  - platform: homeassistant
+    id: srv_ht
+    entity_id: input_text.server_hist_temp
+    internal: true
+    on_value:
+      - script.execute: r_srv_render
   # ROBOBOOZ-commentaar (AI) voor de LIVE-balk
   - platform: homeassistant
     id: ai_roast
@@ -6729,14 +6961,14 @@ lvgl:
                         id: r_ci11
                         align: LEFT_MID
                         x: 16
-                        text: "${mdi_theme}"
+                        text: "${mdi_server}"
                         text_font: pl_icon28
                         text_color: 0x2B2F36
                     - label:
                         id: r_cn11
                         align: LEFT_MID
                         x: 52
-                        text: "THEMA"
+                        text: "SERVER"
                         text_font: r_mono
                         text_color: 0x2B2F36
                     - label:
@@ -6751,12 +6983,64 @@ lvgl:
                         id: r_ct11
                         x: 14
                         y: 44
-                        text: "THEMA"
+                        text: "SERVER"
                         text_font: r_title
                         text_color: 0x46201A
                         hidden: true
                     - label:
                         id: r_ch11
+                        align: BOTTOM_LEFT
+                        x: 16
+                        y: -10
+                        text: "TIK OM TE OPENEN"
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+              - obj:
+                  id: r_card12
+                  width: 452
+                  height: 44
+                  radius: 12
+                  bg_color: 0x1E4D3C
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  on_click:
+                    - lambda: 'id(r_tap).execute(12);'
+                  widgets:
+                    - label:
+                        id: r_ci12
+                        align: LEFT_MID
+                        x: 16
+                        text: "${mdi_theme}"
+                        text_font: pl_icon28
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cn12
+                        align: LEFT_MID
+                        x: 52
+                        text: "THEMA"
+                        text_font: r_mono
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cs12
+                        x: 16
+                        y: 12
+                        text: ""
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ct12
+                        x: 14
+                        y: 44
+                        text: "THEMA"
+                        text_font: r_title
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ch12
                         align: BOTTOM_LEFT
                         x: 16
                         y: -10
@@ -8194,6 +8478,652 @@ lvgl:
                   text_font: r_mono
                   text_color: 0x2B2F36
     # ================= RETRO: weer =================
+    - id: page_server
+      skip: true
+      styles: pl_page
+      scrollable: false
+      on_load:
+        - script.execute: r_srv_init
+        - script.execute: r_srv_render
+      widgets:
+        # RETRO: altijd terug naar THUIS of het MENU
+        - button:
+            align: TOP_RIGHT
+            x: -10
+            y: 6
+            width: 78
+            height: 28
+            radius: 14
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "THUIS"
+                  text_font: r_mono
+                  text_color: 0x46201A
+            on_click:
+              - lvgl.page.show:
+                  id: page_rhome
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            align: TOP_RIGHT
+            x: -92
+            y: 6
+            width: 74
+            height: 28
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "MENU"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+            on_click:
+              - lvgl.page.show:
+                  id: page_rmenu
+                  animation: FADE_IN
+                  time: 200ms
+        - label:
+            x: 18
+            y: 12
+            text: "14 / SERVERKAMER"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            x: 18
+            y: 30
+            width: 120
+            height: 3
+            radius: 0
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - obj:
+            x: 14
+            y: 42
+            width: 106
+            height: 80
+            radius: 12
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  x: 6
+                  y: 8
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - obj:
+                  x: 6
+                  y: 16
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 10
+                  width: 102
+                  text_align: CENTER
+                  text: "${mdi_vpn}"
+                  text_font: pl_icon28
+                  text_color: 0xE8745C
+              - obj:
+                  id: srv_l0
+                  x: 82
+                  y: 8
+                  width: 11
+                  height: 11
+                  radius: 6
+                  bg_color: 0xE8A33C
+                  bg_opa: COVER
+                  border_width: 0
+                  shadow_width: 14
+                  shadow_spread: 1
+                  shadow_opa: 70%
+                  shadow_color: 0xE8A33C
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 44
+                  width: 102
+                  text_align: CENTER
+                  text: "OPENVPN"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  id: srv_s0
+                  x: 0
+                  y: 58
+                  width: 102
+                  text_align: CENTER
+                  text: "..."
+                  text_font: r_mono
+                  text_color: 0xE8A33C
+        - obj:
+            x: 128
+            y: 42
+            width: 106
+            height: 80
+            radius: 12
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  x: 6
+                  y: 8
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - obj:
+                  x: 6
+                  y: 16
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 10
+                  width: 102
+                  text_align: CENTER
+                  text: "${mdi_lan}"
+                  text_font: pl_icon28
+                  text_color: 0xE8745C
+              - obj:
+                  id: srv_l1
+                  x: 82
+                  y: 8
+                  width: 11
+                  height: 11
+                  radius: 6
+                  bg_color: 0xE8A33C
+                  bg_opa: COVER
+                  border_width: 0
+                  shadow_width: 14
+                  shadow_spread: 1
+                  shadow_opa: 70%
+                  shadow_color: 0xE8A33C
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 44
+                  width: 102
+                  text_align: CENTER
+                  text: "TAILSCALE"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  id: srv_s1
+                  x: 0
+                  y: 58
+                  width: 102
+                  text_align: CENTER
+                  text: "..."
+                  text_font: r_mono
+                  text_color: 0xE8A33C
+        - obj:
+            x: 242
+            y: 42
+            width: 106
+            height: 80
+            radius: 12
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  x: 6
+                  y: 8
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - obj:
+                  x: 6
+                  y: 16
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 10
+                  width: 102
+                  text_align: CENTER
+                  text: "${mdi_robot}"
+                  text_font: pl_icon28
+                  text_color: 0xE8745C
+              - obj:
+                  id: srv_l2
+                  x: 82
+                  y: 8
+                  width: 11
+                  height: 11
+                  radius: 6
+                  bg_color: 0xE8A33C
+                  bg_opa: COVER
+                  border_width: 0
+                  shadow_width: 14
+                  shadow_spread: 1
+                  shadow_opa: 70%
+                  shadow_color: 0xE8A33C
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 44
+                  width: 102
+                  text_align: CENTER
+                  text: "MCP"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  id: srv_s2
+                  x: 0
+                  y: 58
+                  width: 102
+                  text_align: CENTER
+                  text: "..."
+                  text_font: r_mono
+                  text_color: 0xE8A33C
+        - obj:
+            x: 356
+            y: 42
+            width: 106
+            height: 80
+            radius: 12
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - obj:
+                  x: 6
+                  y: 8
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - obj:
+                  x: 6
+                  y: 16
+                  width: 3
+                  height: 3
+                  radius: 2
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 10
+                  width: 102
+                  text_align: CENTER
+                  text: "${mdi_music}"
+                  text_font: pl_icon28
+                  text_color: 0xE8745C
+              - obj:
+                  id: srv_l3
+                  x: 82
+                  y: 8
+                  width: 11
+                  height: 11
+                  radius: 6
+                  bg_color: 0xE8A33C
+                  bg_opa: COVER
+                  border_width: 0
+                  shadow_width: 14
+                  shadow_spread: 1
+                  shadow_opa: 70%
+                  shadow_color: 0xE8A33C
+                  clickable: false
+              - label:
+                  x: 0
+                  y: 44
+                  width: 102
+                  text_align: CENTER
+                  text: "MUSIC ASS."
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  id: srv_s3
+                  x: 0
+                  y: 58
+                  width: 102
+                  text_align: CENTER
+                  text: "..."
+                  text_font: r_mono
+                  text_color: 0xE8A33C
+        # belasting (wijzermeters worden in r_srv_init getekend)
+        - obj:
+            x: 14
+            y: 130
+            width: 306
+            height: 110
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            scrollable: false
+            clickable: false
+        - label:
+            x: 28
+            y: 138
+            text: "BELASTING"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: srv_m0
+            x: 26
+            y: 204
+            width: 80
+            text_align: CENTER
+            text: "--"
+            text_font: r_mono
+            text_color: 0x2B2F36
+        - label:
+            x: 26
+            y: 220
+            width: 80
+            text_align: CENTER
+            text: "CPU"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: srv_m1
+            x: 128
+            y: 204
+            width: 80
+            text_align: CENTER
+            text: "--"
+            text_font: r_mono
+            text_color: 0x2B2F36
+        - label:
+            x: 128
+            y: 220
+            width: 80
+            text_align: CENTER
+            text: "GEHEUGEN"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: srv_m2
+            x: 230
+            y: 204
+            width: 80
+            text_align: CENTER
+            text: "--"
+            text_font: r_mono
+            text_color: 0x2B2F36
+        - label:
+            x: 230
+            y: 220
+            width: 80
+            text_align: CENTER
+            text: "SCHIJF"
+            text_font: r_mono
+            text_color: 0x8B9099
+        # temperatuur + uptime
+        - obj:
+            x: 328
+            y: 130
+            width: 138
+            height: 110
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            scrollable: false
+            clickable: false
+        - label:
+            x: 342
+            y: 138
+            text: "CPU-TEMP"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - bar:
+            id: srv_tbar
+            x: 344
+            y: 158
+            width: 12
+            height: 60
+            min_value: 30
+            max_value: 80
+            value: 40
+            bg_color: 0x245C48
+            bg_opa: COVER
+            radius: 6
+            indicator:
+              bg_color: 0xE8745C
+              radius: 6
+        - obj:
+            x: 340
+            y: 212
+            width: 20
+            height: 20
+            radius: 10
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            id: srv_tv
+            x: 368
+            y: 158
+            text: "--"
+            text_font: r_val
+            text_color: 0x2B2F36
+        - label:
+            x: 368
+            y: 196
+            text: "UPTIME"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            x: 368
+            y: 212
+            width: 18
+            height: 22
+            radius: 3
+            bg_color: 0x2B2F36
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: srv_u0
+                  align: CENTER
+                  text: "0"
+                  text_font: r_mono
+                  text_color: 0xE8745C
+        - obj:
+            x: 390
+            y: 212
+            width: 18
+            height: 22
+            radius: 3
+            bg_color: 0x2B2F36
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: srv_u1
+                  align: CENTER
+                  text: "0"
+                  text_font: r_mono
+                  text_color: 0xE8745C
+        - obj:
+            x: 412
+            y: 212
+            width: 18
+            height: 22
+            radius: 3
+            bg_color: 0x2B2F36
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "D"
+                  text_font: r_mono
+                  text_color: 0xE8745C
+        # grafiek 24 uur (raster en lijnen worden in r_srv_init/r_srv_render getekend)
+        - obj:
+            x: 14
+            y: 248
+            width: 452
+            height: 106
+            radius: 14
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            scrollable: false
+            clickable: false
+        - label:
+            id: srv_title
+            x: 28
+            y: 256
+            text: "HOME ASSISTANT SERVER"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            x: 356
+            y: 259
+            width: 8
+            height: 8
+            radius: 4
+            bg_color: 0x5E9BE0
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            x: 368
+            y: 256
+            text: "CPU"
+            text_font: r_mono
+            text_color: 0x2B2F36
+        - obj:
+            x: 404
+            y: 259
+            width: 8
+            height: 8
+            radius: 4
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            x: 416
+            y: 256
+            text: "TEMP"
+            text_font: r_mono
+            text_color: 0x2B2F36
+        # VPN-terminal
+        - obj:
+            id: srv_term
+            x: 14
+            y: 362
+            width: 452
+            height: 84
+            radius: 14
+            bg_color: 0x0A0C10
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            scrollable: false
+            clickable: false
+        - label:
+            id: srv_prompt
+            x: 28
+            y: 370
+            text: "> VPN-BEZOEKERS"
+            text_font: r_mono
+            text_color: 0x5AC878
+        - label:
+            id: srv_v0
+            x: 28
+            y: 390
+            text: "..."
+            text_font: r_mono
+            text_color: 0xD8DCE2
+        - label:
+            id: srv_v1
+            x: 28
+            y: 408
+            text: ""
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            id: srv_cur
+            x: 28
+            y: 428
+            width: 9
+            height: 11
+            radius: 0
+            bg_color: 0x5AC878
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
     - id: page_rweer
       skip: true
       styles: pl_page
