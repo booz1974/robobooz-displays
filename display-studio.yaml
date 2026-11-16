@@ -599,7 +599,7 @@ image:
       Authorization: "Bearer ${ma_token}"
     on_download_finished:
       then:
-        - lambda: 'id(qimg_busy) = false;'
+        - lambda: 'id(qimg_busy) = false; id(art_fail_r) = 0;'
         - script.execute: qimg_next
         - lvgl.image.update:
             id: r_art_img
@@ -608,7 +608,9 @@ image:
         - lvgl.widget.hide: r_art_ico
     on_error:
       then:
-        - lambda: 'id(qimg_busy) = false;'
+        - lambda: |-
+            id(qimg_busy) = false;
+            id(art_bad_r) = id(r_art_url); id(r_art_url) = ""; id(art_fail_r)++; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
         - script.execute: qimg_next
   - platform: online_image
     id: pv_img
@@ -621,7 +623,7 @@ image:
       Authorization: "Bearer ${ma_token}"
     on_download_finished:
       then:
-        - lambda: 'id(qimg_busy) = false;'
+        - lambda: 'id(qimg_busy) = false; id(art_fail_pv) = 0;'
         - script.execute: qimg_next
         - lvgl.image.update:
             id: pv_cover
@@ -630,7 +632,9 @@ image:
         - lvgl.widget.hide: pv_icon
     on_error:
       then:
-        - lambda: 'id(qimg_busy) = false;'
+        - lambda: |-
+            id(qimg_busy) = false;
+            id(art_bad_pv) = id(pv_url); id(pv_url) = ""; id(art_fail_pv)++; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
         - script.execute: qimg_next
         - lvgl.widget.hide: pv_cover
         - lvgl.widget.show: pv_icon
@@ -869,6 +873,7 @@ image:
                     // "klaar" maar zonder beeld: als fout behandelen, volgende ronde opnieuw
                     ESP_LOGW("hoes", "download klaar maar geen beelddata; opnieuw proberen");
                     id(mp_big_fails)++;
+                    id(mp_big_retry_at) = millis() + (uint32_t) (id(mp_big_fails) < 3 ? 5000 : (id(mp_big_fails) < 6 ? 60000 : 300000));
                     id(mp_big_url) = "";
                     return;
                   }
@@ -944,8 +949,9 @@ image:
         - lambda: |-
             id(qimg_busy) = false;
             id(mp_big_fails)++;
-            id(mp_big_url) = "";   // volgende ronde (binnen ~3 s) opnieuw proberen
-            ESP_LOGW("hoes", "groot hoesje niet geladen (poging %d)", id(mp_big_fails));
+            id(mp_big_retry_at) = millis() + (uint32_t) (id(mp_big_fails) < 3 ? 5000 : (id(mp_big_fails) < 6 ? 60000 : 300000));   // art_backoff
+            ESP_LOGW("hoes", "groot hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(mp_big_fails), id(mp_big_url).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
+            id(mp_big_url) = "";   // volgende ronde opnieuw proberen (na de wachttijd)
         - script.execute: qimg_next
         - lvgl.widget.hide: mp_big
         - lvgl.widget.show: mp_big_icon
@@ -1122,6 +1128,26 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # ---- hoesjes opnieuw proberen (r_art = thuis, pv = spelerpagina, mp_big = groot scherm)
+  - id: art_retry_r
+    type: uint32_t
+    initial_value: '0'
+  - id: art_fail_r
+    type: int
+    initial_value: '0'
+  - id: art_bad_r
+    type: std::string
+  - id: art_retry_pv
+    type: uint32_t
+    initial_value: '0'
+  - id: art_fail_pv
+    type: int
+    initial_value: '0'
+  - id: art_bad_pv
+    type: std::string
+  - id: mp_big_retry_at
+    type: uint32_t
+    initial_value: '0'
   # ---- favorieten (volledige lijsten uit Music Assistant)
   - id: fav_names
     type: std::vector<std::string>
@@ -1541,8 +1567,9 @@ script:
           // kleine albumhoes: zelfde plaatje als de eerste speler (ma_url_0), via de gedeelde downloadrij
           std::string u = id(mp_any) ? id(ma_url_0) : std::string("");
           if (u.empty()) { lv_obj_add_flag(id(r_art_img), LV_OBJ_FLAG_HIDDEN); lv_obj_remove_flag(id(r_art_ico), LV_OBJ_FLAG_HIDDEN); id(r_art_url) = ""; }
-          else if (u != id(r_art_url) && !id(qimg_busy)) {
-            id(r_art_url) = u; id(qimg_busy) = true; id(qimg_busy_t) = millis();
+          else if (u != id(r_art_url) && !id(qimg_busy) && (u != id(art_bad_r) || millis() >= id(art_retry_r))) {
+            if (u != id(art_bad_r)) id(art_fail_r) = 0;
+            id(r_art_url) = u; id(qimg_busy) = true; id(qimg_busy_t) = millis(); id(qimg_cur) = 31;
             id(r_art).set_url(u); id(r_art).update();
           }
   # ---- RETRO 2: lampen
@@ -2787,9 +2814,9 @@ script:
             if (u.empty()) {
               lv_obj_add_flag(id(mp_big), LV_OBJ_FLAG_HIDDEN);
               showo(id(mp_big_icon));
-            } else if (id(mp_big_fails) >= 3) {
-              // 3x mislukt: niet blijven proberen tot er een ander nummer komt
-              ESP_LOGW("hoes", "groot hoesje opgegeven: %s", u.c_str());
+            } else if (id(mp_big_fails) >= 3 && millis() < id(mp_big_retry_at)) {
+              // 3x of vaker mislukt: wachten (1 min, daarna 5 min) en dan opnieuw proberen
+              id(mp_big_url) = "";
             } else {
               // oude hoes verbergen terwijl de nieuwe binnenkomt (buffer wordt vervangen)
               lv_obj_add_flag(id(mp_big), LV_OBJ_FLAG_HIDDEN);
@@ -3432,7 +3459,8 @@ script:
                       // Music Assistant-plaatjes altijd verkleind opvragen (zonder size= kwam soms het origineel van ~850 KB)
                       if (u.find("/imageproxy") != std::string::npos) { size_t f = u.find("fmt=jpg"); if (f != std::string::npos && u.compare(f, 8, "fmt=jpeg") != 0) u.replace(f, 7, "fmt=jpeg"); size_t q = u.find("size="); if (q == std::string::npos) u += (u.find('?') == std::string::npos ? "?size=256" : "&size=256"); else { size_t e = u.find('&', q); u.replace(q, (e == std::string::npos ? u.size() : e) - q, "size=256"); } }
                       // alleen laden als de spelerpagina open is (anders houdt dit het grote hoesje op)
-                      if (u != id(pv_url) && id(page_player)->is_showing()) {
+                      if (u != id(pv_url) && id(page_player)->is_showing() && (u != id(art_bad_pv) || millis() >= id(art_retry_pv))) {
+                        if (u != id(art_bad_pv)) id(art_fail_pv) = 0;
                         id(pv_url) = u;
                         if (u.empty()) {
                           lv_obj_add_flag(id(pv_cover), LV_OBJ_FLAG_HIDDEN);
@@ -3929,7 +3957,9 @@ interval:
     then:
       - lambda: |-
           if (id(qimg_busy) && millis() - id(qimg_busy_t) > 9000) {
-            if (id(qimg_cur) == 28) { id(mp_big_fails)++; id(mp_big_url) = ""; }
+            if (id(qimg_cur) == 28) { id(mp_big_fails)++; id(mp_big_retry_at) = millis() + (uint32_t) (id(mp_big_fails) < 3 ? 5000 : (id(mp_big_fails) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "groot hoesje hangt: %s", id(mp_big_url).c_str()); id(mp_big_url) = ""; }
+            if (id(qimg_cur) == 31) { id(art_bad_r) = id(r_art_url); id(r_art_url) = ""; id(art_fail_r)++; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
+            if (id(qimg_cur) == 20) { id(art_bad_pv) = id(pv_url); id(pv_url) = ""; id(art_fail_pv)++; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
             if (id(qimg_cur) == 29 || id(qimg_cur) == 30) {
               // favorietenhoes hangt: overslaan (muzieknoot blijft staan)
               for (size_t i = 0; i < id(fav_urls).size(); i++)
