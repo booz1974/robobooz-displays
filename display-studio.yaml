@@ -616,7 +616,7 @@ image:
       then:
         - lambda: |-
             id(qimg_busy) = false;
-            id(art_bad_r) = id(r_art_url); id(r_art_url) = ""; id(art_fail_r)++; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
+            if (!id(r_art_url).empty()) { id(art_bad_r) = id(r_art_url); id(art_fail_r)++; } id(r_art_url) = ""; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
         - script.execute: qimg_next
   - platform: online_image
     id: pv_img
@@ -640,7 +640,7 @@ image:
       then:
         - lambda: |-
             id(qimg_busy) = false;
-            id(art_bad_pv) = id(pv_url); id(pv_url) = ""; id(art_fail_pv)++; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
+            if (!id(pv_url).empty()) { id(art_bad_pv) = id(pv_url); id(art_fail_pv)++; } id(pv_url) = ""; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
         - script.execute: qimg_next
         - lvgl.widget.hide: pv_cover
         - lvgl.widget.show: pv_icon
@@ -1576,7 +1576,7 @@ script:
           else if (u != id(r_art_url) && !id(qimg_busy) && (u != id(art_bad_r) || millis() >= id(art_retry_r))) {
             if (u != id(art_bad_r)) id(art_fail_r) = 0;
             id(r_art_url) = u; id(qimg_busy) = true; id(qimg_busy_t) = millis(); id(qimg_cur) = 31;
-            id(r_art).set_url(u); id(r_art).update();
+            { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(r_art).set_url(u); id(r_art).update();
           }
   # ---- RETRO 2: lampen
   - id: r_lamp_render
@@ -2827,7 +2827,7 @@ script:
               // oude hoes verbergen terwijl de nieuwe binnenkomt (buffer wordt vervangen)
               lv_obj_add_flag(id(mp_big), LV_OBJ_FLAG_HIDDEN);
               showo(id(mp_big_icon));
-              id(mp_big_img)->set_url(u);
+              { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(mp_big_img)->set_url(u);
               id(qimg_pending) |= (1u << 28); id(qimg_next).execute();
             }
           }
@@ -3472,7 +3472,7 @@ script:
                           lv_obj_add_flag(id(pv_cover), LV_OBJ_FLAG_HIDDEN);
                           showo(id(pv_icon));
                         } else {
-                          id(pv_img)->set_url(u);
+                          { size_t q = u.find("_thumb1200"); if (q != std::string::npos) u.replace(q, 10, "_thumb250"); q = u.find("_thumb500"); if (q != std::string::npos) u.replace(q, 9, "_thumb250"); }  // art_thumb_fix id(pv_img)->set_url(u);
                           id(qimg_pending) |= (1u << 20); id(qimg_next).execute();
                         }
                       }
@@ -3964,8 +3964,8 @@ interval:
       - lambda: |-
           if (id(qimg_busy) && millis() - id(qimg_busy_t) > 9000) {
             if (id(qimg_cur) == 28) { id(mp_big_fails)++; id(mp_big_retry_at) = millis() + (uint32_t) (id(mp_big_fails) < 3 ? 5000 : (id(mp_big_fails) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "groot hoesje hangt: %s", id(mp_big_url).c_str()); id(mp_big_url) = ""; }
-            if (id(qimg_cur) == 31) { id(art_bad_r) = id(r_art_url); id(r_art_url) = ""; id(art_fail_r)++; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
-            if (id(qimg_cur) == 20) { id(art_bad_pv) = id(pv_url); id(pv_url) = ""; id(art_fail_pv)++; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
+            if (id(qimg_cur) == 31) { if (!id(r_art_url).empty()) { id(art_bad_r) = id(r_art_url); id(art_fail_r)++; } id(r_art_url) = ""; id(art_retry_r) = millis() + (uint32_t) (id(art_fail_r) < 3 ? 5000 : (id(art_fail_r) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "thuis-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_r), id(art_bad_r).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
+            if (id(qimg_cur) == 20) { if (!id(pv_url).empty()) { id(art_bad_pv) = id(pv_url); id(art_fail_pv)++; } id(pv_url) = ""; id(art_retry_pv) = millis() + (uint32_t) (id(art_fail_pv) < 3 ? 5000 : (id(art_fail_pv) < 6 ? 60000 : 300000)); ESP_LOGW("hoes", "speler-hoesje mislukt (poging %d): %s | intern vrij %u KB (blok %u KB), PSRAM vrij %u KB (blok %u KB)", id(art_fail_pv), id(art_bad_pv).c_str(), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) / 1024), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024), (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024)); }
             if (id(qimg_cur) == 29 || id(qimg_cur) == 30) {
               // favorietenhoes hangt: overslaan (muzieknoot blijft staan)
               for (size_t i = 0; i < id(fav_urls).size(); i++)
