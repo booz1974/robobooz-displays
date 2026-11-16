@@ -1771,10 +1771,12 @@ script:
           auto col = [](int sl, uint32_t def) -> lv_color_t { uint32_t v = id(r_tcol)[sl]; return lv_color_hex(v ? v : def); };
           for (int k = 0; k < 12; k++) {
             int v = k < n ? val[k] : 0;
-            int h = v <= 0 ? 0 : std::max(3, std::min(40, (v - 60) * 40 / 100));
+            int h = v <= 0 ? 0 : std::max(4, std::min(90, (v - 60) * 90 / 100));
             lv_obj_set_height(rb[k], h);
             lv_obj_set_style_bg_color(rb[k], v < 109 ? col(6, 0x3FAE8E) : (v < 131 ? col(20, 0xE8745C) : lv_color_hex(0xE5534B)), 0);
           }
+          lv_obj_t *rt[] = {id(r_rt_0), id(r_rt_1), id(r_rt_2)};
+          for (int i = 0; i < 3; i++) lv_label_set_text(rt[i], (3 + i * 3) < n ? tm[3 + i * 3].c_str() : "");
           if (n == 0) { lv_label_set_text(id(r_wx_tip), "GEEN REGENDATA"); return; }
           std::string t;
           if (val[0] > 0) {
@@ -1831,14 +1833,14 @@ script:
               if (f.size() < 3) { lv_obj_add_flag(hb[k], LV_OBJ_FLAG_HIDDEN); lv_label_set_text(hv[k], ""); lv_label_set_text(ht[k], ""); continue; }
               lv_obj_remove_flag(hb[k], LV_OBJ_FLAG_HIDDEN);
               float t = atof(f[2].c_str());
-              int h = 24 + (int) ((t - mn) / span * 56);
+              int h = 6 + (int) ((t - mn) / span * 24);   // wxswap: klein in het bovenblok
               id(r_wx_h)[k] = h;
-              if (lv_anim_get(hb[k], nullptr) == nullptr && lv_obj_get_height(hb[k]) != h) { lv_obj_set_height(hb[k], h); lv_obj_set_y(hb[k], 290 - h); }
+              if (lv_anim_get(hb[k], nullptr) == nullptr && lv_obj_get_height(hb[k]) != h) { lv_obj_set_height(hb[k], h); lv_obj_set_y(hb[k], 124 - h); }
               bool nat = f[1].find("rain") != std::string::npos || f[1] == "pouring";
               lv_obj_set_style_bg_color(hb[k], lv_color_hex(nat ? 0x5E9BE0 : id(r_tcol)[20]), 0);
               lv_label_set_text(hv[k], (f[2] + "°").c_str());
-              lv_label_set_text(ht[k], (f[0] + "U").c_str());
-              lv_obj_set_y(hv[k], 290 - h - 18);
+              lv_label_set_text(ht[k], f[0].c_str());
+              lv_obj_set_y(hv[k], 124 - h - 15);
             }
           }
           // dagen
@@ -1865,7 +1867,7 @@ script:
             int h = id(r_wx_h)[k]; if (h <= 0) continue;
             lv_anim_t a; lv_anim_init(&a); lv_anim_set_var(&a, hb[k]);
             lv_anim_set_values(&a, 0, h); lv_anim_set_duration(&a, 380); lv_anim_set_delay(&a, 120 + k * 60);
-            lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_height((lv_obj_t *) o, v); lv_obj_set_y((lv_obj_t *) o, 290 - v); });
+            lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_height((lv_obj_t *) o, v); lv_obj_set_y((lv_obj_t *) o, 124 - v); });
             lv_anim_set_path_cb(&a, lv_anim_path_ease_out); lv_anim_start(&a);
           }
   # ---- RETRO 2: LIVE-balk
@@ -8309,17 +8311,19 @@ lvgl:
             text_color: 0x8B9099
         - label:
             id: r_wx_tip
-            x: 276
-            y: 132
+            x: 190
+            y: 178
+            width: 262
+            text_align: RIGHT
             text: ""
             text_font: r_mono
             text_color: 0x3FAE8E
         - obj:
             id: r_rbg_0
-            x: 276
-            y: 72
-            width: 10
-            height: 40
+            x: 30
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8331,7 +8335,7 @@ lvgl:
               - obj:
                   id: r_rb_0
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8342,10 +8346,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_1
-            x: 290
-            y: 72
-            width: 10
-            height: 40
+            x: 66
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8357,7 +8361,7 @@ lvgl:
               - obj:
                   id: r_rb_1
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8368,10 +8372,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_2
-            x: 304
-            y: 72
-            width: 10
-            height: 40
+            x: 102
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8383,7 +8387,7 @@ lvgl:
               - obj:
                   id: r_rb_2
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8394,10 +8398,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_3
-            x: 318
-            y: 72
-            width: 10
-            height: 40
+            x: 138
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8409,7 +8413,7 @@ lvgl:
               - obj:
                   id: r_rb_3
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8420,10 +8424,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_4
-            x: 332
-            y: 72
-            width: 10
-            height: 40
+            x: 174
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8435,7 +8439,7 @@ lvgl:
               - obj:
                   id: r_rb_4
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8446,10 +8450,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_5
-            x: 346
-            y: 72
-            width: 10
-            height: 40
+            x: 210
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8461,7 +8465,7 @@ lvgl:
               - obj:
                   id: r_rb_5
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8472,10 +8476,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_6
-            x: 360
-            y: 72
-            width: 10
-            height: 40
+            x: 246
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8487,7 +8491,7 @@ lvgl:
               - obj:
                   id: r_rb_6
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8498,10 +8502,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_7
-            x: 374
-            y: 72
-            width: 10
-            height: 40
+            x: 282
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8513,7 +8517,7 @@ lvgl:
               - obj:
                   id: r_rb_7
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8524,10 +8528,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_8
-            x: 388
-            y: 72
-            width: 10
-            height: 40
+            x: 318
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8539,7 +8543,7 @@ lvgl:
               - obj:
                   id: r_rb_8
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8550,10 +8554,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_9
-            x: 402
-            y: 72
-            width: 10
-            height: 40
+            x: 354
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8565,7 +8569,7 @@ lvgl:
               - obj:
                   id: r_rb_9
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8576,10 +8580,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_10
-            x: 416
-            y: 72
-            width: 10
-            height: 40
+            x: 390
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8591,7 +8595,7 @@ lvgl:
               - obj:
                   id: r_rb_10
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8602,10 +8606,10 @@ lvgl:
                   clickable: false
         - obj:
             id: r_rbg_11
-            x: 430
-            y: 72
-            width: 10
-            height: 40
+            x: 426
+            y: 200
+            width: 28
+            height: 90
             radius: 2
             bg_color: 0x245C48
             bg_opa: COVER
@@ -8617,7 +8621,7 @@ lvgl:
               - obj:
                   id: r_rb_11
                   align: BOTTOM_MID
-                  width: 10
+                  width: 28
                   height: 0
                   radius: 2
                   bg_color: 0x3FAE8E
@@ -8627,15 +8631,36 @@ lvgl:
                   scrollable: false
                   clickable: false
         - label:
-            x: 276
-            y: 115
+            x: 36
+            y: 300
             text: "NU"
             text_font: r_mono
             text_color: 0x8B9099
         - label:
-            x: 418
-            y: 115
+            x: 428
+            y: 300
             text: "+60"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: r_rt_0
+            x: 132
+            y: 300
+            text: ""
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: r_rt_1
+            x: 240
+            y: 300
+            text: ""
+            text_font: r_mono
+            text_color: 0x8B9099
+        - label:
+            id: r_rt_2
+            x: 348
+            y: 300
+            text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
@@ -8653,14 +8678,14 @@ lvgl:
         - label:
             x: 30
             y: 178
-            text: "KOMENDE UREN"
+            text: "REGEN · KOMEND UUR"
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_0
-            x: 30
-            y: 290
-            width: 34
+            x: 276
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8669,23 +8694,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_0
-            x: 32
+            x: 275
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_0
-            x: 34
-            y: 300
+            x: 276
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_1
-            x: 84
-            y: 290
-            width: 34
+            x: 298
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8694,23 +8719,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_1
-            x: 86
+            x: 297
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_1
-            x: 88
-            y: 300
+            x: 298
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_2
-            x: 138
-            y: 290
-            width: 34
+            x: 320
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8719,23 +8744,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_2
-            x: 140
+            x: 319
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_2
-            x: 142
-            y: 300
+            x: 320
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_3
-            x: 192
-            y: 290
-            width: 34
+            x: 342
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8744,23 +8769,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_3
-            x: 194
+            x: 341
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_3
-            x: 196
-            y: 300
+            x: 342
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_4
-            x: 246
-            y: 290
-            width: 34
+            x: 364
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8769,23 +8794,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_4
-            x: 248
+            x: 363
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_4
-            x: 250
-            y: 300
+            x: 364
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_5
-            x: 300
-            y: 290
-            width: 34
+            x: 386
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8794,23 +8819,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_5
-            x: 302
+            x: 385
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_5
-            x: 304
-            y: 300
+            x: 386
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_6
-            x: 354
-            y: 290
-            width: 34
+            x: 408
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8819,23 +8844,23 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_6
-            x: 356
+            x: 407
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_6
-            x: 358
-            y: 300
+            x: 408
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
         - obj:
             id: r_hb_7
-            x: 408
-            y: 290
-            width: 34
+            x: 430
+            y: 124
+            width: 15
             height: 0
             radius: 3
             border_width: 0
@@ -8844,15 +8869,15 @@ lvgl:
             clickable: false
         - label:
             id: r_hv_7
-            x: 410
+            x: 429
             y: 0
             text: ""
             text_font: r_mono
             text_color: 0x2B2F36
         - label:
             id: r_ht_7
-            x: 412
-            y: 300
+            x: 430
+            y: 126
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
