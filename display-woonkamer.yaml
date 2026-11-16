@@ -1910,17 +1910,21 @@ script:
             int cx = 66 + g * 102, cy = 198, R = 40;
             const int seg[3][2] = {{180, 306}, {306, 342}, {342, 360}};
             const uint32_t sc[3] = {0x245C48, 0xE8745C, 0xE5534B};
+            // schaalboog als polylijn (geen lv_arc nodig)
+            static lv_point_precise_t bo[3][3][24];
             for (int z = 0; z < 3; z++) {
-              lv_obj_t *a = lv_arc_create(pg);
-              lv_obj_set_size(a, R * 2, R * 2);
-              lv_obj_set_pos(a, cx - R, cy - R);
-              lv_arc_set_bg_angles(a, seg[z][0], seg[z][1]);
-              lv_obj_set_style_arc_width(a, z == 0 ? 2 : 4, LV_PART_MAIN);
-              lv_obj_set_style_arc_color(a, z == 0 ? col(19, sc[0]) : (z == 1 ? col(20, sc[1]) : lv_color_hex(sc[2])), LV_PART_MAIN);
-              lv_obj_set_style_arc_rounded(a, false, LV_PART_MAIN);
-              lv_obj_set_style_arc_opa(a, LV_OPA_TRANSP, LV_PART_INDICATOR);
-              lv_obj_set_style_bg_opa(a, LV_OPA_TRANSP, LV_PART_KNOB);
-              lv_obj_set_style_pad_all(a, 0, LV_PART_KNOB);
+              int a0 = seg[z][0], a1 = seg[z][1], np = 0;
+              int rr = z == 0 ? R - 1 : R - 2;
+              for (int a = a0; np < 24; a += 6) {
+                if (a > a1) a = a1;
+                float an = a * 3.14159265f / 180.0f;
+                bo[g][z][np++] = {(lv_value_precise_t) lroundf(cx + rr * cosf(an)), (lv_value_precise_t) lroundf(cy + rr * sinf(an))};
+                if (a == a1) break;
+              }
+              lv_obj_t *a = lv_line_create(pg);
+              lv_line_set_points(a, bo[g][z], np);
+              lv_obj_set_style_line_width(a, z == 0 ? 2 : 4, 0);
+              lv_obj_set_style_line_color(a, z == 0 ? col(19, sc[0]) : (z == 1 ? col(20, sc[1]) : lv_color_hex(sc[2])), 0);
               lv_obj_remove_flag(a, LV_OBJ_FLAG_CLICKABLE);
             }
             for (int k = 0; k <= 10; k++) {
@@ -8699,14 +8703,6 @@ lvgl:
             text: "14 / HOME ASSISTANT"
             text_font: r_mono
             text_color: 0x8B9099
-        # verborgen boog: zorgt dat LVGL de arc-widget meebouwt (meters)
-        - arc:
-            x: 0
-            y: 0
-            width: 10
-            height: 10
-            hidden: true
-            clickable: false
         - obj:
             x: 18
             y: 30
