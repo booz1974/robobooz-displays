@@ -76,6 +76,8 @@ esp32:
   board: esp32-s3-devkitc-1
   variant: esp32s3
   flash_size: 16MB
+  # opstarten (alle LVGL-pagina's aanmaken) duurt langer dan de standaard 5 s
+  watchdog_timeout: 30s
   framework:
     type: esp-idf
     sdkconfig_options:
