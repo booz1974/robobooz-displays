@@ -1873,6 +1873,7 @@ script:
     then:
       - lambda: |-
           std::string t;
+          if (id(ai_roast).has_state() && id(ai_roast).state.size() > 3) t = "ROBOBOOZ: " + id(ai_roast).state + "   ///   ";
           float ot = id(info_out_temp).state, pw = id(e_power).state, pv = id(zs_pv).state;
           char b[64];
           if (!std::isnan(ot)) { snprintf(b, sizeof(b), "BUITEN %d°", (int) lroundf(ot)); t += b; }
@@ -4843,6 +4844,13 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # ROBOBOOZ-commentaar (AI) voor de LIVE-balk
+  - platform: homeassistant
+    id: ai_roast
+    entity_id: input_text.display_roast
+    internal: true
+    on_value:
+      - script.execute: r_ticker
   # regen komend uur: "VVV|HH:MM VVV|HH:MM ..." per 5 minuten (Neerslag-app, bron Buienradar)
   - platform: homeassistant
     id: wx_regen
