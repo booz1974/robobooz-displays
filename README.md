@@ -22,6 +22,9 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Menu met kaarten, ook Nachtstand (dimme klok met sterren)
 - Dimmen: 1 min → 65 %, 2 min → 35 %, 30 min → nachtstand; eerste tik maakt alleen wakker
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
+- Woonkamer: pagina Serverkamer (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
+- Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)
+- LIVE-ticker: AI-roast plus bijzonderheden van server (service uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij bijna leeg)
 
 ## Installeren
 
@@ -37,6 +40,8 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - `input_select.display_thema` (A–H) en `input_text.display_thema_eigen_keuze`
 - `script.lampen_random_kleuren`
 - Music Assistant (app) op `http://<ha-ip>:8095` met API-token (`ma_api_token`); favorieten worden rechtstreeks uit Music Assistant gehaald
+- Woonkamer: `input_text.server_info_display`, `input_text.server_hist_cpu`, `input_text.server_hist_temp` (automatiseringen *Displays - serverinfo* en *servergeschiedenis*) en System Monitor-sensoren
+- Woonkamer: `input_text.planten_display` (automatisering *Displays - planten*)
 - Optioneel: Team Tracker-sensoren voor NEC/Oranje en een agenda voor NMHC (automatisch wedstrijdthema)
 
 ## Screenshots
@@ -48,3 +53,5 @@ De afbeeldingen in `screenshots/` zijn ontwerp-mockups.
 ![Studio](screenshots/studio-retro.png)
 ![TV](screenshots/tv-pagina.png)
 ![Thema's](screenshots/nieuwe-themas.png)
+![Serverkamer](screenshots/serverkamer.png)
+![Plantenkas](screenshots/plantenkas.png)

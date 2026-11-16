@@ -255,6 +255,11 @@ substitutions:
   mdi_vol_low:         "\U000F057F"
   mdi_vol_high:        "\U000F057E"
   mdi_music:           "\U000F075A"
+  mdi_sprout:          "\U000F0E66"
+  mdi_leaf:            "\U000F032A"
+  mdi_flower:          "\U000F024A"
+  mdi_tree:            "\U000F0531"
+  mdi_battery:         "\U000F0079"
   mdi_vpn:             "\U000F0582"
   mdi_lan:             "\U000F0317"
   mdi_robot:           "\U000F06A9"
@@ -321,6 +326,11 @@ font:
     size: 28
     bpp: 4
     glyphs: &mdi_glyphs
+      - "${mdi_sprout}"
+      - "${mdi_leaf}"
+      - "${mdi_flower}"
+      - "${mdi_tree}"
+      - "${mdi_battery}"
       - "${mdi_vpn}"
       - "${mdi_lan}"
       - "${mdi_robot}"
@@ -2043,12 +2053,101 @@ script:
             if (!std::isnan(id(srv_cpu).state)) t += " · CPU " + std::to_string((int) lroundf(id(srv_cpu).state)) + "%";
             lv_label_set_text(cs, t.c_str());
           }
+  # ---- PLANTENKAS: bijwerken
+  - id: r_pl_render
+    then:
+      - lambda: |-
+          auto split = [](const std::string &v, char d) { std::vector<std::string> o; size_t a = 0;
+            while (true) { size_t b = v.find(d, a); o.push_back(v.substr(a, b == std::string::npos ? std::string::npos : b - a)); if (b == std::string::npos) break; a = b + 1; } return o; };
+          if (!id(pl_data).has_state()) return;
+          auto pl = split(id(pl_data).state, '~');
+          lv_obj_t *fill[4] = {id(pl_f0), id(pl_f1), id(pl_f2), id(pl_f3)};
+          lv_obj_t *pct[4] = {id(pl_p0), id(pl_p1), id(pl_p2), id(pl_p3)};
+          lv_obj_t *lmin[4] = {id(pl_lo0), id(pl_lo1), id(pl_lo2), id(pl_lo3)};
+          lv_obj_t *lmax[4] = {id(pl_hi0), id(pl_hi1), id(pl_hi2), id(pl_hi3)};
+          lv_obj_t *chip[4] = {id(pl_c0), id(pl_c1), id(pl_c2), id(pl_c3)};
+          lv_obj_t *chipt[4] = {id(pl_ct0), id(pl_ct1), id(pl_ct2), id(pl_ct3)};
+          lv_obj_t *rng[4] = {id(pl_r0), id(pl_r1), id(pl_r2), id(pl_r3)};
+          lv_obj_t *tv[4] = {id(pl_t0), id(pl_t1), id(pl_t2), id(pl_t3)};
+          lv_obj_t *tb[4] = {id(pl_tb0), id(pl_tb1), id(pl_tb2), id(pl_tb3)};
+          lv_obj_t *bi[4] = {id(pl_bi0), id(pl_bi1), id(pl_bi2), id(pl_bi3)};
+          lv_obj_t *bt[4] = {id(pl_bt0), id(pl_bt1), id(pl_bt2), id(pl_bt3)};
+          int nat = 0, dorst = 0, temp = 0;
+          for (int k = 0; k < 4 && k < (int) pl.size(); k++) {
+            auto f = split(pl[k], '|');
+            if (f.size() < 7) continue;
+            int m = atoi(f[0].c_str()), lo = atoi(f[1].c_str()), hi = atoi(f[2].c_str());
+            float t = atof(f[3].c_str()); int tlo = atoi(f[4].c_str()), thi = atoi(f[5].c_str()), b = atoi(f[6].c_str());
+            int st = 0;   // 0 top, 1 te nat, 2 dorst, 3 te koud, 4 te warm
+            if (m >= 0 && m < lo) st = 2; else if (t > -90 && t < tlo) st = 3; else if (t > -90 && t > thi) st = 4; else if (m > hi) st = 1;
+            if (st == 1) nat++; else if (st == 2) dorst++; else if (st >= 3) temp++;
+            const char *txt[5] = {"TOP", "TE NAT", "DORST", "TE KOUD", "TE WARM"};
+            const uint32_t cl[5] = {0x5AC878, 0x5E9BE0, 0xE5534B, 0x5E9BE0, 0xE8A33C};
+            int mm = std::max(0, std::min(100, m));
+            lv_obj_set_height(fill[k], std::max(2, mm * 80 / 100));
+            lv_obj_set_style_bg_color(fill[k], lv_color_hex(m > hi ? 0x5E9BE0 : (m < lo ? 0xE5534B : 0x5AC878)), 0);
+            lv_obj_set_y(lmin[k], 80 - lo * 80 / 100);
+            lv_obj_set_y(lmax[k], 80 - std::min(100, hi) * 80 / 100);
+            lv_label_set_text(pct[k], m < 0 ? "--" : (std::to_string(m) + "%").c_str());
+            lv_obj_set_style_bg_color(chip[k], lv_color_hex(cl[st]), 0);
+            lv_label_set_text(chipt[k], txt[st]);
+            lv_label_set_text(rng[k], (std::to_string(lo) + "-" + std::to_string(hi) + "%").c_str());
+            if (t > -90) {
+              char b2[16]; snprintf(b2, sizeof(b2), "%.1f°", t); for (char *c = b2; *c; c++) if (*c == '.') *c = ',';
+              lv_label_set_text(tv[k], b2);
+              lv_bar_set_value(tb[k], std::max(5, std::min(35, (int) lroundf(t))), LV_ANIM_ON);
+            }
+            uint32_t bc = b < 0 ? 0x8B9099 : (b < 15 ? 0xE5534B : 0x5AC878);
+            lv_obj_set_style_text_color(bi[k], lv_color_hex(bc), 0);
+            lv_label_set_text(bt[k], b < 0 ? "BATTERIJ ?" : (b < 15 ? ("BATTERIJ " + std::to_string(b) + "%").c_str() : "BATTERIJ OK"));
+          }
+          std::string sum;
+          if (nat) sum += std::to_string(nat) + " TE NAT";
+          if (dorst) sum += (sum.empty() ? "" : " · ") + std::to_string(dorst) + " DORST";
+          if (temp) sum += (sum.empty() ? "" : " · ") + std::to_string(temp) + " TEMP";
+          if (sum.empty()) sum = "ALLES TOP";
+          lv_label_set_text(id(pl_sum), sum.c_str());
+          lv_obj_t *cs = id(r_cs12);
+          if (cs) lv_label_set_text(cs, sum.c_str());
   # ---- RETRO 2: LIVE-balk
   - id: r_ticker
     then:
       - lambda: |-
           std::string t;
           if (id(ai_roast).has_state() && id(ai_roast).state.size() > 3) t = "ROBOBOOZ: " + id(ai_roast).state + "   ///   ";
+          {
+            // bijzonderheden serverkamer en plantenkas
+            auto split = [](const std::string &v, char d) { std::vector<std::string> o; size_t a = 0;
+              while (true) { size_t b = v.find(d, a); o.push_back(v.substr(a, b == std::string::npos ? std::string::npos : b - a)); if (b == std::string::npos) break; a = b + 1; } return o; };
+            std::string bz;
+            if (id(srv_info).has_state()) {
+              auto c = split(split(id(srv_info).state, '|')[0], ';');
+              const char *nm[4] = {"OPENVPN", "TAILSCALE", "MCP", "MUSIC ASSISTANT"};
+              for (int k = 0; k < 4 && k < (int) c.size(); k++) if (!c[k].empty() && c[k][0] != 'G')
+                bz += std::string(bz.empty() ? "" : " · ") + nm[k] + (c[k][0] == 'R' ? " UIT" : " LET OP");
+            }
+            float stc = id(srv_temp).state, scp = id(srv_cpu).state;
+            if (!std::isnan(stc) && stc >= 70) bz += std::string(bz.empty() ? "" : " · ") + "CPU " + std::to_string((int) lroundf(stc)) + "°";
+            if (!std::isnan(scp) && scp >= 85) bz += std::string(bz.empty() ? "" : " · ") + "CPU " + std::to_string((int) lroundf(scp)) + "%";
+            if (!bz.empty()) t += "SERVER: " + bz + "   ///   ";
+            if (id(pl_data).has_state()) {
+              const char *pn[4] = {"PANNENKOEKENPLANT", "FICUS AMSTEL KING", "LEPELPLANT", "FICUS"};
+              auto pl = split(id(pl_data).state, '~');
+              std::string pz;
+              for (int k = 0; k < 4 && k < (int) pl.size(); k++) {
+                auto f = split(pl[k], '|'); if (f.size() < 7) continue;
+                int m = atoi(f[0].c_str()), lo = atoi(f[1].c_str()), b = atoi(f[6].c_str());
+                float tt = atof(f[3].c_str()); int tlo = atoi(f[4].c_str()), thi = atoi(f[5].c_str());
+                std::string w;
+                if (m >= 0 && m < lo) w = " HEEFT DORST";
+                else if (tt > -90 && tt < tlo) w = " HEEFT HET KOUD";
+                else if (tt > -90 && tt > thi) w = " HEEFT HET WARM";
+                if (b >= 0 && b < 15) w += std::string(w.empty() ? "" : ",") + " BATTERIJ BIJNA LEEG";
+                if (!w.empty()) pz += std::string(pz.empty() ? "" : " · ") + pn[k] + w;
+              }
+              if (!pz.empty()) t += "PLANTEN: " + pz + "   ///   ";
+            }
+          }
           float ot = id(info_out_temp).state, pw = id(e_power).state, pv = id(zs_pv).state;
           char b[64];
           if (!std::isnan(ot)) { snprintf(b, sizeof(b), "BUITEN %d°", (int) lroundf(ot)); t += b; }
@@ -2073,19 +2172,19 @@ script:
       anim: bool
     then:
       - lambda: |-
-          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10), id(r_card11), id(r_card12)};
-          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10), id(r_ci11), id(r_ci12)};
-          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10), id(r_cn11), id(r_cn12)};
-          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10), id(r_cs11), id(r_cs12)};
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12)};
-          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10), id(r_ch11), id(r_ch12)};
+          lv_obj_t *cd[] = {id(r_card0), id(r_card1), id(r_card2), id(r_card3), id(r_card4), id(r_card5), id(r_card6), id(r_card7), id(r_card8), id(r_card9), id(r_card10), id(r_card11), id(r_card12), id(r_card13)};
+          lv_obj_t *ci[] = {id(r_ci0), id(r_ci1), id(r_ci2), id(r_ci3), id(r_ci4), id(r_ci5), id(r_ci6), id(r_ci7), id(r_ci8), id(r_ci9), id(r_ci10), id(r_ci11), id(r_ci12), id(r_ci13)};
+          lv_obj_t *cn[] = {id(r_cn0), id(r_cn1), id(r_cn2), id(r_cn3), id(r_cn4), id(r_cn5), id(r_cn6), id(r_cn7), id(r_cn8), id(r_cn9), id(r_cn10), id(r_cn11), id(r_cn12), id(r_cn13)};
+          lv_obj_t *cs[] = {id(r_cs0), id(r_cs1), id(r_cs2), id(r_cs3), id(r_cs4), id(r_cs5), id(r_cs6), id(r_cs7), id(r_cs8), id(r_cs9), id(r_cs10), id(r_cs11), id(r_cs12), id(r_cs13)};
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12), id(r_ct13)};
+          lv_obj_t *ch[] = {id(r_ch0), id(r_ch1), id(r_ch2), id(r_ch3), id(r_ch4), id(r_ch5), id(r_ch6), id(r_ch7), id(r_ch8), id(r_ch9), id(r_ch10), id(r_ch11), id(r_ch12), id(r_ch13)};
           lv_obj_t *sw[] = {id(r_sw0), id(r_sw1), id(r_sw2), id(r_sw3), id(r_sw4), id(r_sw5), id(r_sw6), id(r_sw7)};
           static int last_sel = -2; static uint32_t last_col = 0;
           if (!anim && last_sel == id(r_sel) && last_col == id(r_tcol)[20]) return;
           last_sel = id(r_sel); last_col = id(r_tcol)[20];
-          for (int k = 0; k < 13; k++) {
+          for (int k = 0; k < 14; k++) {
             bool open = k == id(r_sel);
-            int h = open ? (k == 12 ? 240 : 152) : 44;
+            int h = open ? (k == 13 ? 240 : 152) : 44;
             if (anim) {
               lv_anim_t a; lv_anim_init(&a); lv_anim_set_var(&a, cd[k]);
               lv_anim_set_values(&a, lv_obj_get_height(cd[k]), h); lv_anim_set_duration(&a, 260);
@@ -2094,9 +2193,9 @@ script:
             } else lv_obj_set_height(cd[k], h);
             lv_obj_set_style_bg_color(cd[k], lv_color_hex(open ? id(r_tcol)[20] : (k % 2 ? id(r_tcol)[18] : id(r_tcol)[17])), 0);
             auto vis = [](lv_obj_t *o, bool v) { if (v) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); };
-            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 12); vis(ch[k], open);
+            vis(ci[k], !open); vis(cn[k], !open); vis(cs[k], open); vis(ct[k], open && k != 13); vis(ch[k], open);
           }
-          for (int t = 0; t < 8; t++) { if (id(r_sel) == 12) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
+          for (int t = 0; t < 8; t++) { if (id(r_sel) == 13) lv_obj_remove_flag(sw[t], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(sw[t], LV_OBJ_FLAG_HIDDEN); }
           if (anim) { id(r_glitch) = 8; }
           if (anim) lv_obj_scroll_to_view(cd[id(r_sel)], LV_ANIM_ON);
   - id: r_tap
@@ -2104,10 +2203,10 @@ script:
       k: int
     then:
       - lambda: |-
-          static const int NP = 13;
+          static const int NP = 14;
           if (k == id(r_sel)) {
             // open kaart nog eens tikken = pagina openen (Thema: niets, kies een kleur)
-            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), id(page_nacht), id(page_server), nullptr};
+            esphome::lvgl::LvPageType *pg[] = {id(page_rlamp), id(page_favs), id(page_music), id(page_scenes), id(page_climate), id(page_rweer), id(page_energy), id(page_info), id(page_relais), id(page_rtv), id(page_nacht), id(page_server), id(page_planten), nullptr};
             if (k >= 0 && k < NP && pg[k] != nullptr) id(lvgl_main)->show_page(pg[k]->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 200);
             return;
           }
@@ -2142,7 +2241,7 @@ script:
           lv_label_set_text(id(r_cs9), id(lt_tv_on).state ? "AAN" : "UIT");
           lv_label_set_text(id(r_cs10), "DIMME KLOK MET STERREN");
           static const char *tn[] = {"A · NACHTBLAUW", "B · PAARS & NEON", "C · ANTRACIET & MINT", "D · ESPRESSO & KORAAL", "E · NEC", "F · ORANJE", "G · NMHC", "H · DISCO"};
-          lv_label_set_text(id(r_cs12), tn[std::max(0, std::min(7, id(theme_idx)))]);
+          lv_label_set_text(id(r_cs13), tn[std::max(0, std::min(7, id(theme_idx)))]);
       - script.execute:
           id: r_layout
           anim: false
@@ -4622,8 +4721,8 @@ interval:
             return;
           }
           int k = id(r_sel);
-          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12)};
-          lv_obj_t *o = ct[std::max(0, std::min(12, k))];
+          lv_obj_t *ct[] = {id(r_ct0), id(r_ct1), id(r_ct2), id(r_ct3), id(r_ct4), id(r_ct5), id(r_ct6), id(r_ct7), id(r_ct8), id(r_ct9), id(r_ct10), id(r_ct11), id(r_ct12), id(r_ct13)};
+          lv_obj_t *o = ct[std::max(0, std::min(13, k))];
           if (id(r_glitch) == 0) { lv_obj_set_style_translate_x(o, 0, 0); lv_obj_set_style_text_opa(o, LV_OPA_COVER, 0); return; }
           lv_obj_set_style_translate_x(o, (int) (random_uint32() % 17) - 8, 0);
           lv_obj_set_style_text_opa(o, (lv_opa_t) (120 + random_uint32() % 136), 0);
@@ -5059,6 +5158,14 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # ---- plantenkas
+  - platform: homeassistant
+    id: pl_data
+    entity_id: input_text.planten_display
+    internal: true
+    on_value:
+      - script.execute: r_pl_render
+      - script.execute: r_ticker
   # ---- serverkamer
   - platform: homeassistant
     id: srv_info
@@ -5066,6 +5173,7 @@ text_sensor:
     internal: true
     on_value:
       - script.execute: r_srv_render
+      - script.execute: r_ticker
   - platform: homeassistant
     id: srv_hc
     entity_id: input_text.server_hist_cpu
@@ -7013,14 +7121,14 @@ lvgl:
                         id: r_ci12
                         align: LEFT_MID
                         x: 16
-                        text: "${mdi_theme}"
+                        text: "${mdi_flower}"
                         text_font: pl_icon28
                         text_color: 0x2B2F36
                     - label:
                         id: r_cn12
                         align: LEFT_MID
                         x: 52
-                        text: "THEMA"
+                        text: "PLANTEN"
                         text_font: r_mono
                         text_color: 0x2B2F36
                     - label:
@@ -7035,12 +7143,64 @@ lvgl:
                         id: r_ct12
                         x: 14
                         y: 44
-                        text: "THEMA"
+                        text: "PLANTEN"
                         text_font: r_title
                         text_color: 0x46201A
                         hidden: true
                     - label:
                         id: r_ch12
+                        align: BOTTOM_LEFT
+                        x: 16
+                        y: -10
+                        text: "TIK OM TE OPENEN"
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+              - obj:
+                  id: r_card13
+                  width: 452
+                  height: 44
+                  radius: 12
+                  bg_color: 0x19403A
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  on_click:
+                    - lambda: 'id(r_tap).execute(13);'
+                  widgets:
+                    - label:
+                        id: r_ci13
+                        align: LEFT_MID
+                        x: 16
+                        text: "${mdi_theme}"
+                        text_font: pl_icon28
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cn13
+                        align: LEFT_MID
+                        x: 52
+                        text: "THEMA"
+                        text_font: r_mono
+                        text_color: 0x2B2F36
+                    - label:
+                        id: r_cs13
+                        x: 16
+                        y: 12
+                        text: ""
+                        text_font: r_mono
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ct13
+                        x: 14
+                        y: 44
+                        text: "THEMA"
+                        text_font: r_title
+                        text_color: 0x46201A
+                        hidden: true
+                    - label:
+                        id: r_ch13
                         align: BOTTOM_LEFT
                         x: 16
                         y: -10
@@ -9124,6 +9284,783 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             clickable: false
+    - id: page_planten
+      skip: true
+      styles: pl_page
+      scrollable: false
+      on_load:
+        - script.execute: r_pl_render
+      widgets:
+        # RETRO: altijd terug naar THUIS of het MENU
+        - button:
+            align: TOP_RIGHT
+            x: -10
+            y: 6
+            width: 78
+            height: 28
+            radius: 14
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "THUIS"
+                  text_font: r_mono
+                  text_color: 0x46201A
+            on_click:
+              - lvgl.page.show:
+                  id: page_rhome
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            align: TOP_RIGHT
+            x: -92
+            y: 6
+            width: 74
+            height: 28
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "MENU"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+            on_click:
+              - lvgl.page.show:
+                  id: page_rmenu
+                  animation: FADE_IN
+                  time: 200ms
+        - label:
+            x: 18
+            y: 12
+            text: "15 / PLANTENKAS"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            x: 18
+            y: 30
+            width: 120
+            height: 3
+            radius: 0
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            id: pl_sum
+            x: 150
+            y: 12
+            text: ""
+            text_font: r_mono
+            text_color: 0xE8745C
+        - obj:
+            x: 14
+            y: 42
+            width: 222
+            height: 196
+            radius: 16
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text: "PANNENKOEKENPLANT"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  x: 10
+                  y: 24
+                  text: "PILEA PEPEROMIOIDES"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 14
+                  y: 40
+                  width: 78
+                  text_align: CENTER
+                  text: "${mdi_sprout}"
+                  text_font: pl_icon40
+                  text_color: 0x5AC878
+              # potrand
+              - obj:
+                  x: 8
+                  y: 84
+                  width: 90
+                  height: 8
+                  radius: 3
+                  bg_color: 0xE8745C
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              # pot = vochtmeter
+              - obj:
+                  x: 14
+                  y: 92
+                  width: 78
+                  height: 80
+                  radius: 10
+                  bg_color: 0x3A2A1E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clip_corner: true
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - obj:
+                        id: pl_f0
+                        align: BOTTOM_MID
+                        width: 78
+                        height: 2
+                        radius: 0
+                        bg_color: 0x5AC878
+                        bg_opa: COVER
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_lo0
+                        x: 0
+                        y: 64
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_hi0
+                        x: 0
+                        y: 32
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - label:
+                        id: pl_p0
+                        align: CENTER
+                        text: "--"
+                        text_font: r_mono
+                        text_color: 0xFFFFFF
+              # status
+              - obj:
+                  id: pl_c0
+                  x: 110
+                  y: 46
+                  width: 100
+                  height: 26
+                  radius: 13
+                  bg_color: 0x5AC878
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clickable: false
+                  widgets:
+                    - label:
+                        id: pl_ct0
+                        align: CENTER
+                        text: "..."
+                        text_font: r_mono
+                        text_color: 0x1A1D22
+              - label:
+                  x: 110
+                  y: 84
+                  text: "VOCHT"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_r0
+                  x: 150
+                  y: 84
+                  width: 60
+                  text_align: RIGHT
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 110
+                  y: 108
+                  text: "TEMPERATUUR"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_t0
+                  x: 110
+                  y: 122
+                  text: "--"
+                  text_font: r_val
+                  text_color: 0x2B2F36
+              - bar:
+                  id: pl_tb0
+                  x: 110
+                  y: 156
+                  width: 100
+                  height: 6
+                  min_value: 5
+                  max_value: 35
+                  value: 15
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  radius: 3
+                  indicator:
+                    bg_color: 0xE8745C
+                    radius: 3
+              - label:
+                  id: pl_bt0
+                  x: 110
+                  y: 172
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_bi0
+                  x: 190
+                  y: 166
+                  text: "${mdi_battery}"
+                  text_font: pl_icon28
+                  text_color: 0x5AC878
+        - obj:
+            x: 244
+            y: 42
+            width: 222
+            height: 196
+            radius: 16
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text: "FICUS AMSTEL KING"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  x: 10
+                  y: 24
+                  text: "FICUS BINNENDIJKII"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 14
+                  y: 40
+                  width: 78
+                  text_align: CENTER
+                  text: "${mdi_leaf}"
+                  text_font: pl_icon40
+                  text_color: 0x5AC878
+              # potrand
+              - obj:
+                  x: 8
+                  y: 84
+                  width: 90
+                  height: 8
+                  radius: 3
+                  bg_color: 0xE8745C
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              # pot = vochtmeter
+              - obj:
+                  x: 14
+                  y: 92
+                  width: 78
+                  height: 80
+                  radius: 10
+                  bg_color: 0x3A2A1E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clip_corner: true
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - obj:
+                        id: pl_f1
+                        align: BOTTOM_MID
+                        width: 78
+                        height: 2
+                        radius: 0
+                        bg_color: 0x5AC878
+                        bg_opa: COVER
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_lo1
+                        x: 0
+                        y: 64
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_hi1
+                        x: 0
+                        y: 32
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - label:
+                        id: pl_p1
+                        align: CENTER
+                        text: "--"
+                        text_font: r_mono
+                        text_color: 0xFFFFFF
+              # status
+              - obj:
+                  id: pl_c1
+                  x: 110
+                  y: 46
+                  width: 100
+                  height: 26
+                  radius: 13
+                  bg_color: 0x5AC878
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clickable: false
+                  widgets:
+                    - label:
+                        id: pl_ct1
+                        align: CENTER
+                        text: "..."
+                        text_font: r_mono
+                        text_color: 0x1A1D22
+              - label:
+                  x: 110
+                  y: 84
+                  text: "VOCHT"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_r1
+                  x: 150
+                  y: 84
+                  width: 60
+                  text_align: RIGHT
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 110
+                  y: 108
+                  text: "TEMPERATUUR"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_t1
+                  x: 110
+                  y: 122
+                  text: "--"
+                  text_font: r_val
+                  text_color: 0x2B2F36
+              - bar:
+                  id: pl_tb1
+                  x: 110
+                  y: 156
+                  width: 100
+                  height: 6
+                  min_value: 5
+                  max_value: 35
+                  value: 15
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  radius: 3
+                  indicator:
+                    bg_color: 0xE8745C
+                    radius: 3
+              - label:
+                  id: pl_bt1
+                  x: 110
+                  y: 172
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_bi1
+                  x: 190
+                  y: 166
+                  text: "${mdi_battery}"
+                  text_font: pl_icon28
+                  text_color: 0x5AC878
+        - obj:
+            x: 14
+            y: 246
+            width: 222
+            height: 196
+            radius: 16
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text: "LEPELPLANT"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  x: 10
+                  y: 24
+                  text: "SPATHIPHYLLUM"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 14
+                  y: 40
+                  width: 78
+                  text_align: CENTER
+                  text: "${mdi_flower}"
+                  text_font: pl_icon40
+                  text_color: 0x5AC878
+              # potrand
+              - obj:
+                  x: 8
+                  y: 84
+                  width: 90
+                  height: 8
+                  radius: 3
+                  bg_color: 0xE8745C
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              # pot = vochtmeter
+              - obj:
+                  x: 14
+                  y: 92
+                  width: 78
+                  height: 80
+                  radius: 10
+                  bg_color: 0x3A2A1E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clip_corner: true
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - obj:
+                        id: pl_f2
+                        align: BOTTOM_MID
+                        width: 78
+                        height: 2
+                        radius: 0
+                        bg_color: 0x5AC878
+                        bg_opa: COVER
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_lo2
+                        x: 0
+                        y: 64
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_hi2
+                        x: 0
+                        y: 32
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - label:
+                        id: pl_p2
+                        align: CENTER
+                        text: "--"
+                        text_font: r_mono
+                        text_color: 0xFFFFFF
+              # status
+              - obj:
+                  id: pl_c2
+                  x: 110
+                  y: 46
+                  width: 100
+                  height: 26
+                  radius: 13
+                  bg_color: 0x5AC878
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clickable: false
+                  widgets:
+                    - label:
+                        id: pl_ct2
+                        align: CENTER
+                        text: "..."
+                        text_font: r_mono
+                        text_color: 0x1A1D22
+              - label:
+                  x: 110
+                  y: 84
+                  text: "VOCHT"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_r2
+                  x: 150
+                  y: 84
+                  width: 60
+                  text_align: RIGHT
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 110
+                  y: 108
+                  text: "TEMPERATUUR"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_t2
+                  x: 110
+                  y: 122
+                  text: "--"
+                  text_font: r_val
+                  text_color: 0x2B2F36
+              - bar:
+                  id: pl_tb2
+                  x: 110
+                  y: 156
+                  width: 100
+                  height: 6
+                  min_value: 5
+                  max_value: 35
+                  value: 15
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  radius: 3
+                  indicator:
+                    bg_color: 0xE8745C
+                    radius: 3
+              - label:
+                  id: pl_bt2
+                  x: 110
+                  y: 172
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_bi2
+                  x: 190
+                  y: 166
+                  text: "${mdi_battery}"
+                  text_font: pl_icon28
+                  text_color: 0x5AC878
+        - obj:
+            x: 244
+            y: 246
+            width: 222
+            height: 196
+            radius: 16
+            bg_color: 0x1E4D3C
+            bg_opa: COVER
+            border_width: 2
+            border_color: 0x245C48
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text: "FICUS"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+              - label:
+                  x: 10
+                  y: 24
+                  text: "FICUS TRIANGULARIS"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 14
+                  y: 40
+                  width: 78
+                  text_align: CENTER
+                  text: "${mdi_tree}"
+                  text_font: pl_icon40
+                  text_color: 0x5AC878
+              # potrand
+              - obj:
+                  x: 8
+                  y: 84
+                  width: 90
+                  height: 8
+                  radius: 3
+                  bg_color: 0xE8745C
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              # pot = vochtmeter
+              - obj:
+                  x: 14
+                  y: 92
+                  width: 78
+                  height: 80
+                  radius: 10
+                  bg_color: 0x3A2A1E
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clip_corner: true
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - obj:
+                        id: pl_f3
+                        align: BOTTOM_MID
+                        width: 78
+                        height: 2
+                        radius: 0
+                        bg_color: 0x5AC878
+                        bg_opa: COVER
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_lo3
+                        x: 0
+                        y: 64
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - obj:
+                        id: pl_hi3
+                        x: 0
+                        y: 32
+                        width: 78
+                        height: 1
+                        radius: 0
+                        bg_color: 0xD8DCE2
+                        bg_opa: 70%
+                        border_width: 0
+                        clickable: false
+                    - label:
+                        id: pl_p3
+                        align: CENTER
+                        text: "--"
+                        text_font: r_mono
+                        text_color: 0xFFFFFF
+              # status
+              - obj:
+                  id: pl_c3
+                  x: 110
+                  y: 46
+                  width: 100
+                  height: 26
+                  radius: 13
+                  bg_color: 0x5AC878
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  clickable: false
+                  widgets:
+                    - label:
+                        id: pl_ct3
+                        align: CENTER
+                        text: "..."
+                        text_font: r_mono
+                        text_color: 0x1A1D22
+              - label:
+                  x: 110
+                  y: 84
+                  text: "VOCHT"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_r3
+                  x: 150
+                  y: 84
+                  width: 60
+                  text_align: RIGHT
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  x: 110
+                  y: 108
+                  text: "TEMPERATUUR"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_t3
+                  x: 110
+                  y: 122
+                  text: "--"
+                  text_font: r_val
+                  text_color: 0x2B2F36
+              - bar:
+                  id: pl_tb3
+                  x: 110
+                  y: 156
+                  width: 100
+                  height: 6
+                  min_value: 5
+                  max_value: 35
+                  value: 15
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  radius: 3
+                  indicator:
+                    bg_color: 0xE8745C
+                    radius: 3
+              - label:
+                  id: pl_bt3
+                  x: 110
+                  y: 172
+                  text: ""
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: pl_bi3
+                  x: 190
+                  y: 166
+                  text: "${mdi_battery}"
+                  text_font: pl_icon28
+                  text_color: 0x5AC878
     - id: page_rweer
       skip: true
       styles: pl_page
