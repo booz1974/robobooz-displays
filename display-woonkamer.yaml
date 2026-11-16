@@ -1926,8 +1926,8 @@ script:
             for (int k = 0; k <= 10; k++) {
               float an = (180 - k * 18) * 3.14159265f / 180.0f;
               int r2 = R - (k % 5 == 0 ? 11 : 7);
-              tick[g][k][0] = {(float) (cx + (R - 3) * cosf(an)), (float) (cy - (R - 3) * sinf(an))};
-              tick[g][k][1] = {(float) (cx + r2 * cosf(an)), (float) (cy - r2 * sinf(an))};
+              tick[g][k][0] = {(lv_value_precise_t) (cx + (R - 3) * cosf(an)), (lv_value_precise_t) (cy - (R - 3) * sinf(an))};
+              tick[g][k][1] = {(lv_value_precise_t) (cx + r2 * cosf(an)), (lv_value_precise_t) (cy - r2 * sinf(an))};
               lv_obj_t *l = lv_line_create(pg);
               lv_line_set_points(l, tick[g][k], 2);
               lv_obj_set_style_line_width(l, 2, 0);
@@ -1947,8 +1947,8 @@ script:
           // raster van de grafiek
           static lv_point_precise_t gr[15][2];
           int n = 0;
-          for (int x = 28; x <= 452 && n < 9; x += 53, n++) { gr[n][0] = {(float) x, 274}; gr[n][1] = {(float) x, 344}; }
-          for (int y = 274; y <= 344 && n < 15; y += 14, n++) { gr[n][0] = {28, (float) y}; gr[n][1] = {452, (float) y}; }
+          for (int x = 28; x <= 452 && n < 9; x += 53, n++) { gr[n][0] = {(lv_value_precise_t) x, 274}; gr[n][1] = {(lv_value_precise_t) x, 344}; }
+          for (int y = 274; y <= 344 && n < 15; y += 14, n++) { gr[n][0] = {28, (lv_value_precise_t) y}; gr[n][1] = {452, (lv_value_precise_t) y}; }
           for (int k = 0; k < n; k++) {
             lv_obj_t *l = lv_line_create(pg);
             lv_line_set_points(l, gr[k], 2);
@@ -2010,8 +2010,8 @@ script:
             float v = std::isnan(vals[g]) ? 0 : std::max(0.0f, std::min(100.0f, vals[g]));
             int cx = 66 + g * 102, cy = 198;
             float an = (180 - v * 1.8f) * 3.14159265f / 180.0f;
-            nd[g][0] = {(float) cx, (float) cy};
-            nd[g][1] = {(float) (cx + 26 * cosf(an)), (float) (cy - 26 * sinf(an))};
+            nd[g][0] = {(lv_value_precise_t) cx, (lv_value_precise_t) cy};
+            nd[g][1] = {(lv_value_precise_t) (cx + 26 * cosf(an)), (lv_value_precise_t) (cy - 26 * sinf(an))};
             if (id(srv_needle)[g]) lv_line_set_points(id(srv_needle)[g], nd[g], 2);
             lv_label_set_text(vl[g], std::isnan(vals[g]) ? "--" : ((g == 0 ? std::to_string((int) lroundf(v)) : fmt1(v)) + "%").c_str());
           }
@@ -2031,7 +2031,7 @@ script:
             for (int i = 0; i < n; i++) {
               float v = atof(p[p.size() - n + i].c_str());
               v = std::max(lo, std::min(hi, v));
-              tr[t][i] = {(float) (28 + (n > 1 ? i * 424.0f / (n - 1) : 0)), (float) (344 - (v - lo) / (hi - lo) * 70)};
+              tr[t][i] = {(lv_value_precise_t) (28 + (n > 1 ? i * 424.0f / (n - 1) : 0)), (lv_value_precise_t) (344 - (v - lo) / (hi - lo) * 70)};
             }
             if (id(srv_trace)[t] && n > 1) lv_line_set_points(id(srv_trace)[t], tr[t], n);
           }
@@ -8699,6 +8699,14 @@ lvgl:
             text: "14 / SERVERKAMER"
             text_font: r_mono
             text_color: 0x8B9099
+        # verborgen boog: zorgt dat LVGL de arc-widget meebouwt (meters)
+        - arc:
+            x: 0
+            y: 0
+            width: 10
+            height: 10
+            hidden: true
+            clickable: false
         - obj:
             x: 18
             y: 30
