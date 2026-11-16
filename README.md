@@ -22,7 +22,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Menu met kaarten, ook Nachtstand (dimme klok met sterren)
 - Dimmen: 1 min → 65 %, 2 min → 35 %, 30 min → nachtstand; eerste tik maakt alleen wakker
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
-- Woonkamer: pagina Serverkamer (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
+- Woonkamer: pagina Home Assistant (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
 - Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)
 - LIVE-ticker: AI-roast plus bijzonderheden van server (service uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij bijna leeg)
 

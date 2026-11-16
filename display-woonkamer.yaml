@@ -2047,7 +2047,7 @@ script:
           }
           lv_label_set_text(id(srv_v1), l2.c_str());
           // menukaart
-          lv_obj_t *cs = id(r_cs11);
+          lv_obj_t *cs = nullptr;
           if (cs) {
             std::string t = bad == 0 ? std::string("ALLES DRAAIT") : (bad == 1 ? badname : std::to_string(bad) + " DIENSTEN LET OP");
             if (!std::isnan(id(srv_cpu).state)) t += " · CPU " + std::to_string((int) lroundf(id(srv_cpu).state)) + "%";
@@ -2129,7 +2129,7 @@ script:
             float stc = id(srv_temp).state, scp = id(srv_cpu).state;
             if (!std::isnan(stc) && stc >= 70) bz += std::string(bz.empty() ? "" : " · ") + "CPU " + std::to_string((int) lroundf(stc)) + "°";
             if (!std::isnan(scp) && scp >= 85) bz += std::string(bz.empty() ? "" : " · ") + "CPU " + std::to_string((int) lroundf(scp)) + "%";
-            if (!bz.empty()) t += "SERVER: " + bz + "   ///   ";
+            if (!bz.empty()) t += "HOME ASSISTANT: " + bz + "   ///   ";
             if (id(pl_data).has_state()) {
               const char *pn[4] = {"PANNENKOEKENPLANT", "FICUS AMSTEL KING", "LEPELPLANT", "FICUS"};
               auto pl = split(id(pl_data).state, '~');
@@ -7076,7 +7076,7 @@ lvgl:
                         id: r_cn11
                         align: LEFT_MID
                         x: 52
-                        text: "SERVER"
+                        text: "HOME ASSISTANT"
                         text_font: r_mono
                         text_color: 0x2B2F36
                     - label:
@@ -7091,7 +7091,7 @@ lvgl:
                         id: r_ct11
                         x: 14
                         y: 44
-                        text: "SERVER"
+                        text: "HOME ASSISTANT"
                         text_font: r_title
                         text_color: 0x46201A
                         hidden: true
@@ -8696,7 +8696,7 @@ lvgl:
         - label:
             x: 18
             y: 12
-            text: "14 / SERVERKAMER"
+            text: "14 / HOME ASSISTANT"
             text_font: r_mono
             text_color: 0x8B9099
         # verborgen boog: zorgt dat LVGL de arc-widget meebouwt (meters)
