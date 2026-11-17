@@ -55,7 +55,7 @@
 #   script.lampen_random_kleuren, script.studio_pc_starten,
 #   script.studio_totaal_uit, script.intercom_zend, input_text.intercom_log,
 #   media_player.studio_mini_2 en /config/www/robobooz/krrrcht_in.mp3 en
-#   krrrcht_uit.mp3, intro_5..8.mp3 (sfeergeluid kanaal 5-8).
+#   intro_5..8.mp3 (sfeergeluid kanaal 5-8), als vooraankondiging.
 # Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
 #   nieuwsregel', 'Displays - ROBOBOOZ roast (AI)', 'Displays - serverinfo',
 #   'Displays - servergeschiedenis (CPU en temperatuur)' en
