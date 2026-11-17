@@ -4231,10 +4231,10 @@ interval:
       - lambda: |-
           if (!id(page_intercom)->is_showing()) return;
           uint32_t now = millis();
-          bool busy = id(ic_t0) && now - id(ic_t0) < 45000;
-          // geluid speelt: ruis bij het indrukken, daarna het bericht (duur komt uit Home Assistant) + ruis
-          bool playing = busy && (now - id(ic_t0) < 2500 || (id(ic_reply) && now - id(ic_reply) < (uint32_t) (id(ic_dur) + 2) * 1000));
-          if (busy && id(ic_reply) && !playing) busy = false;
+          // bezig = het script in Home Assistant draait (of net ingedrukt en nog niet gestart)
+          bool running = id(ic_run).has_state() && id(ic_run).state == "on";
+          bool busy = running || (id(ic_t0) && now - id(ic_t0) < 4000);
+          bool playing = busy;
           if (!busy && id(ic_t0)) { id(ic_t0) = 0; id(ic_reply) = 0; }
           const char *st = !busy ? "STANDBY · DRUK OM TE ZENDEN" : (!id(ic_reply) ? "VERBINDING MAKEN..." : "ONTVANGST");
           lv_label_set_text(id(ic_stat), st);
@@ -4940,6 +4940,11 @@ text_sensor:
           id(ic_dur) = std::max(3, std::min(30, atoi(v.substr(b + 1, c - b - 1).c_str())));
           if (id(ic_t0)) id(ic_reply) = millis();
       - script.execute: r_ic_render
+  # script.intercom_zend: "on" zolang er gezonden wordt (ruis + bericht + ruis)
+  - platform: homeassistant
+    id: ic_run
+    entity_id: script.intercom_zend
+    internal: true
   # ---- serverkamer
   - platform: homeassistant
     id: srv_info
@@ -9503,7 +9508,9 @@ lvgl:
             on_click:
               - if:
                   condition:
-                    lambda: 'return id(ic_t0) == 0 || millis() - id(ic_t0) > 45000;'
+                    lambda: |-
+                      bool running = id(ic_run).has_state() && id(ic_run).state == "on";
+                      return !running && (id(ic_t0) == 0 || millis() - id(ic_t0) > 4000);
                   then:
                     - lambda: |-
                         id(ic_t0) = millis(); id(ic_reply) = 0;
@@ -9605,6 +9612,7 @@ lvgl:
                   text_color: 0x5AC878
               - label:
                   id: ic_lg0
+                  height: 16
                   x: 14
                   y: 28
                   width: 420
@@ -9614,6 +9622,7 @@ lvgl:
                   text_color: 0xD8DCE2
               - label:
                   id: ic_lg1
+                  height: 16
                   x: 14
                   y: 46
                   width: 420
