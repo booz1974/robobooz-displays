@@ -7999,6 +7999,19 @@ lvgl:
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
+        # wxorder: middenblok eerst, dan de regenbalkjes erop
+        - obj:
+            x: 14
+            y: 166
+            width: 452
+            height: 160
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
         - label:
             id: r_wx_tip
             x: 190
@@ -8353,18 +8366,6 @@ lvgl:
             text: ""
             text_font: r_mono
             text_color: 0x8B9099
-        - obj:
-            x: 14
-            y: 166
-            width: 452
-            height: 160
-            radius: 14
-            bg_color: 0xECEEF1
-            bg_opa: COVER
-            border_width: 0
-            pad_all: 0
-            scrollable: false
-            clickable: false
         - label:
             x: 30
             y: 178
