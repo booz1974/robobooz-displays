@@ -41,6 +41,8 @@
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
+# secrets.yaml: wifi, ma_api_token, API-/OTA-sleutels en de huisgenoten
+#   persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-woonkamer -> Configureren ->
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
@@ -243,6 +245,13 @@ time:
     id: system_time
 
 substitutions:
+  # huisgenoten (namen en person-entiteiten staan in secrets.yaml)
+  persoon_1_naam: !secret persoon_1_naam
+  persoon_1_entity: !secret persoon_1_entity
+  persoon_2_naam: !secret persoon_2_naam
+  persoon_2_entity: !secret persoon_2_entity
+  persoon_3_naam: !secret persoon_3_naam
+  persoon_3_entity: !secret persoon_3_entity
   ha_url: "http://192.168.1.100:8123"
   ma_url: "http://192.168.1.100:8095"
   ma_token: !secret ma_api_token
@@ -2268,7 +2277,7 @@ script:
           snprintf(b, sizeof(b), "BUITEN %.0f°", std::isnan(ot) ? 0.0f : ot); lv_label_set_text(id(r_cs5), b);
           float pw = id(e_power).state;
           snprintf(b, sizeof(b), "VERBRUIK %.0f W", std::isnan(pw) ? 0.0f : pw); lv_label_set_text(id(r_cs6), b);
-          int th = (id(pers_jeroen).state == "home") + (id(pers_jip).state == "home") + (id(pers_maartje).state == "home");
+          int th = (id(pers_1).state == "home") + (id(pers_2).state == "home") + (id(pers_3).state == "home");
           snprintf(b, sizeof(b), "%d VAN 3 THUIS", th); lv_label_set_text(id(r_cs7), b);
           snprintf(b, sizeof(b), "VOOR %s · ACHTER %s", id(relay1).state ? "AAN" : "UIT", id(relay2).state ? "AAN" : "UIT"); lv_label_set_text(id(r_cs8), b);
           lv_label_set_text(id(r_cs9), id(lt_tv_on).state ? "AAN" : "UIT");
@@ -2447,9 +2456,9 @@ script:
           id: info_people_val
           text: !lambda |-
             std::vector<std::string> n;
-            if (id(pers_jeroen).state == "home") n.push_back("Jeroen");
-            if (id(pers_jip).state == "home") n.push_back("Jip");
-            if (id(pers_maartje).state == "home") n.push_back("Maartje");
+            if (id(pers_1).state == "home") n.push_back("${persoon_1_naam}");
+            if (id(pers_2).state == "home") n.push_back("${persoon_2_naam}");
+            if (id(pers_3).state == "home") n.push_back("${persoon_3_naam}");
             if (n.empty()) return std::string("Niemand");
             std::string r = n[0];
             for (size_t i = 1; i < n.size(); i++) r += (i == n.size() - 1 ? " en " : ", ") + n[i];
@@ -5339,20 +5348,20 @@ text_sensor:
     attribute: app_id
     internal: true
   - platform: homeassistant
-    id: pers_jeroen
-    entity_id: person.jeroen_van_sonsbeek
+    id: pers_1
+    entity_id: ${persoon_1_entity}
     internal: true
     on_value:
       - script.execute: people_render
   - platform: homeassistant
-    id: pers_jip
-    entity_id: person.jip_van_sonsbeek
+    id: pers_2
+    entity_id: ${persoon_2_entity}
     internal: true
     on_value:
       - script.execute: people_render
   - platform: homeassistant
-    id: pers_maartje
-    entity_id: person.maartje_driessen
+    id: pers_3
+    entity_id: ${persoon_3_entity}
     internal: true
     on_value:
       - script.execute: people_render
