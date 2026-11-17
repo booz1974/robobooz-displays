@@ -3,33 +3,60 @@
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
 # display-woonkamer - Guition ESP32-S3-4848S040 (480x480) - Woonkamer
-# Pagina's: Thuis | Menu | Lampen | Favorieten | Muziek (Nu speelt) | Sfeer |
-#           Klimaat | Weer | Energie | Huis | Schakelaar | TV
-#           (+ verborgen: Zonnestroom, Wachtrij, Deurbel, Nachtstand,
-#            Goedemorgen, Wedstrijd)
+# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt) | Sfeer | Klimaat |
+#           Weer | Energie | Info | Schakelaar | TV | Nachtstand |
+#           Home Assistant | Planten | Thema
+#           (+ verborgen: Zonnestroom, Wachtrij, Deurbel, Goedemorgen, Wedstrijd)
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
-# Thuis: tik op het klokvak = alle lampen aan/uit; tijd, datum en 3 NOS-koppen;
-#   weer, binnen (vonkjes = kachel stookt, vlokjes = uit), energie met
+# Thuis: tik op het klokvak = alle lampen aan/uit; tijd, datum en 3 nieuwsregels
+#   (bovenste = agenda, daaronder NOS en Tailscale-storingen); weer, binnen
+#   (thermostaat; vonkjes = kachel stookt, vlokjes = uit), energie met
 #   energiekosten van vandaag, hoes met VU-meter.
 #   Knoppen onderin: Lampen | Favoriet | Sfeer | TV | Menu.
+# LIVE-balk: ROBOBOOZ-roast (AI), bijzonderheden van Home Assistant (service
+#   uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij), buiten,
+#   verbruik en deur.
+# Favorieten: alle radiozenders en playlists uit Music Assistant, meest
+#   gespeeld bovenaan, scrollbaar.
+# Muziek: radio zoekt de hoes op via iTunes; bij reclame ('Advert') de eigen
+#   hoes uit /config/www/robobooz/ (Commercial Break).
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
+# Weer: nu + temperatuur per uur, regen komend uur (Buienradar, 12 x 5 min),
+#   komende dagen.
+# Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
+#   CPU/geheugen/schijf-meters, CPU-temperatuur, uptime, 24-uursgrafiek, terminal.
+# Planten: 4 planten; de pot is de vochtmeter (TOP / TE NAT / DORST),
+#   temperatuur en batterij.
 # TV: tik op de TV = aan (en naar startscherm) / uit; app-knoppen en HOME.
 # Thema's A-H: Nachtblauw, Paars & neon, Antraciet & mint, Espresso & koraal,
 #   NEC, Oranje, NMHC, Disco. Kiezen via Menu > Thema of in Home Assistant;
 #   op wedstrijddagen automatisch NEC / Oranje / NMHC.
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
-#   na 30 min nachtstand. Muziek speelt: na 2 min naar Nu speelt.
+#   na 30 min nachtstand. Tussen 23:00 en 06:00 automatisch nachtstand,
+#   behalve als er muziek speelt of er nog lampen aan zijn.
+#   Muziek speelt: na 2 min naar Nu speelt.
+# Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
+#   langer dan de standaard 5 s.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-woonkamer -> Configureren ->
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
 # Gebruikt in Home Assistant: input_select.display_thema,
 #   input_text.display_thema_eigen_keuze, input_text.nieuws_display,
-#   script.lampen_random_kleuren, automatiseringen 'Displays - NOS-nieuws
-#   bijwerken' en 'Displays - wedstrijdthema (NEC, Oranje, NMHC)'.
+#   input_text.display_roast, input_text.server_info_display,
+#   input_text.server_hist_cpu, input_text.server_hist_temp,
+#   input_text.planten_display, input_text.weer_uren_display,
+#   input_text.weer_dagen_display, input_text.ochtend_info_display,
+#   input_text.ochtend_agenda_display, input_text.wedstrijd_display,
+#   sensor.neerslag_buienradar_regen_data, System Monitor-sensoren,
+#   climate.living_room, script.lampen_random_kleuren.
+# Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
+#   nieuwsregel', 'Displays - ROBOBOOZ roast (AI)', 'Displays - serverinfo',
+#   'Displays - servergeschiedenis (CPU en temperatuur)', 'Displays - planten'
+#   en 'Displays - wedstrijdthema (NEC, Oranje, NMHC)'.
 # =====================================================================
 
 esphome:

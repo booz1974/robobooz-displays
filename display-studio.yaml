@@ -3,32 +3,55 @@
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
 # display-studio - Guition ESP32-S3-4848S040 (480x480) - Studio
-# Pagina's: Thuis | Menu | Lampen | Studio en PC | Favorieten |
-#           Muziek (Nu speelt, alleen Studio mini) | Sfeer | Weer | Energie | Huis
-#           (+ verborgen: ON AIR, Wachtrij, Deurbel, Nachtstand, Goedemorgen)
+# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, alleen Studio mini) |
+#           Sfeer | Studio en PC | Weer | Energie | Info | Nachtstand |
+#           Home Assistant | Thema
+#           (+ verborgen: ON AIR, Wachtrij, Deurbel, Goedemorgen)
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
 # Thuis: tik op het klokvak = alle studiolampen aan/uit; tijd, datum en
-#   3 NOS-koppen; weer, studiotemperatuur, energie met energiekosten van
-#   vandaag, hoes met VU-meter.
+#   3 nieuwsregels (bovenste = agenda, daaronder NOS en Tailscale-storingen);
+#   weer, studiotemperatuur, energie met energiekosten van vandaag,
+#   hoes met VU-meter.
 #   Knoppen onderin: Lampen | Favoriet | Sfeer | Studio | Menu.
+# LIVE-balk: ROBOBOOZ-roast (AI), buiten, verbruik en deur.
+# Favorieten: alle radiozenders en playlists uit Music Assistant, meest
+#   gespeeld bovenaan, scrollbaar.
+# Muziek: volumeslider voor de Studio mini; radio zoekt de hoes op via iTunes;
+#   bij reclame ('Advert') de eigen hoes uit /config/www/robobooz/.
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: studio-scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
+# Weer: nu + temperatuur per uur, regen komend uur (Buienradar, 12 x 5 min),
+#   komende dagen.
+# Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
+#   CPU/geheugen/schijf-meters, CPU-temperatuur, uptime, 24-uursgrafiek, terminal.
 # ON AIR (Ableton actief): rood scherm, deurbel stil, scherm dimt niet.
 # Thema's A-H: Nachtblauw, Paars & neon, Antraciet & mint, Espresso & koraal,
 #   NEC, Oranje, NMHC, Disco. Kiezen via Menu > Thema of in Home Assistant;
 #   op wedstrijddagen automatisch NEC / Oranje / NMHC.
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
-#   na 30 min nachtstand (niet tijdens ON AIR).
+#   na 30 min nachtstand (niet tijdens ON AIR). Tussen 23:00 en 06:00
+#   automatisch nachtstand, behalve als er muziek speelt of er nog lampen aan zijn.
+# Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
+#   langer dan de standaard 5 s.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-studio -> Configureren ->
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
 # Gebruikt in Home Assistant: input_select.display_thema,
 #   input_boolean.studio_opname_on_air, input_text.nieuws_display,
-#   script.lampen_random_kleuren, automatiseringen 'Displays - NOS-nieuws
-#   bijwerken' en 'Displays - wedstrijdthema (NEC, Oranje, NMHC)'.
+#   input_text.display_roast, input_text.server_info_display,
+#   input_text.server_hist_cpu, input_text.server_hist_temp,
+#   input_text.weer_uren_display, input_text.weer_dagen_display,
+#   input_text.ochtend_info_display, input_text.ochtend_agenda_display,
+#   sensor.neerslag_buienradar_regen_data, System Monitor-sensoren,
+#   script.lampen_random_kleuren, script.studio_pc_starten,
+#   script.studio_totaal_uit.
+# Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
+#   nieuwsregel', 'Displays - ROBOBOOZ roast (AI)', 'Displays - serverinfo',
+#   'Displays - servergeschiedenis (CPU en temperatuur)' en
+#   'Displays - wedstrijdthema (NEC, Oranje, NMHC)'.
 # =====================================================================
 
 esphome:
