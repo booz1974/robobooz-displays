@@ -2053,7 +2053,7 @@ script:
           }
           lv_label_set_text(id(srv_v1), l2.c_str());
           // menukaart
-          lv_obj_t *cs = nullptr;
+          lv_obj_t *cs = id(r_cs11);
           if (cs) {
             std::string t = bad == 0 ? std::string("ALLES DRAAIT") : (bad == 1 ? badname : std::to_string(bad) + " DIENSTEN LET OP");
             if (!std::isnan(id(srv_cpu).state)) t += " · CPU " + std::to_string((int) lroundf(id(srv_cpu).state)) + "%";
