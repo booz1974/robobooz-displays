@@ -10,6 +10,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 |---|---|---|
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
 | `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
+| `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel met timer, vonkjes/vlokjes op de kamertegel), NIET STOREN, intercom naar de kijkpaal + BEL DE STUDIO, speler kijkpaal |
 
 ## Functies
 
@@ -18,13 +19,14 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Favorieten: alle favoriete radiozenders (links) en playlists (rechts) uit Music Assistant, meest gespeeld bovenaan, scrollbaar, met albumart en volumeslider van de eigen speler
 - Nu speelt-popup en wachtrij
 - Lampen, Sfeer (scènes + Alles uit / Random kleuren), Klimaat, Huis, Energie, Schakelaars
-- 8 thema's (A–D, NEC, Oranje, NMHC, Disco) met automatisch wedstrijdthema
+- 8 thema's (A–D, NEC, Oranje, NMHC, Disco) met automatisch wedstrijdthema; display Jip heeft RACE in plaats van Disco en kiest zijn thema zelf
 - Menu met kaarten, ook Nachtstand (dimme klok met sterren)
 - Dimmen: 1 min → 65 %, 2 min → 35 %, 30 min → nachtstand; eerste tik maakt alleen wakker
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
 - Beide displays: pagina Home Assistant (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
 - Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)
 - Studio: geheime Intercom naar parallelle universums (tik op het satellietblok in de LIVE-balk): kanaalkiezer met 8 kanalen, PUSH TO TALK, ruis + bericht via ElevenLabs als aankondiging op de studiospeaker (`script.intercom_zend`, `input_text.intercom_log`; geluiden in `www/robobooz/`)
+- Jip: Kachel-pagina voor `climate.paneel_jip` (`script.paneel_jip_timer_starten`, `script.paneel_jip_uit`, `binary_sensor.paneel_jip_aan`, `sensor.paneel_jip_resterend`), NIET STOREN (`input_boolean.jip_niet_storen`), intercom op de kijkpaal (`script.intercom_zend` met `speler`) en BEL DE STUDIO (`script.intercom_bel_studio`)
 - Radio: bij reclame ('Advert') een eigen hoes "Commercial Break" (zet `www/robobooz/` uit deze repo in `/config/www/robobooz/`)
 - LIVE-ticker: AI-roast plus bijzonderheden van server (service uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij bijna leeg)
 
@@ -58,3 +60,5 @@ De afbeeldingen in `screenshots/` zijn ontwerp-mockups.
 ![Serverkamer](screenshots/serverkamer.png)
 ![Plantenkas](screenshots/plantenkas.png)
 ![Intercom](screenshots/intercom.png)
+![Display Jip](screenshots/display-jip-race.png)
+![Intercom Jip](screenshots/display-jip-intercom.png)
