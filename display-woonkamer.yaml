@@ -23,6 +23,7 @@
 #   PUSH TO TALK (script.intercom_zend) naar de speler die speelt, anders de
 #   eerste die klaar staat. ElevenLabs-audiotags staan niet in het log, lange
 #   logregels lopen door. Gaan alle drie uit, dan terug naar thuis.
+#   Knoppen STUDIO en JIP roepen die kamer op (script.intercom_bel).
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
 # Muziek: radio zoekt de hoes op via iTunes
@@ -62,6 +63,7 @@
 #   input_text.ochtend_agenda_display, input_text.wedstrijd_display,
 #   sensor.neerslag_buienradar_regen_data, System Monitor-sensoren,
 #   climate.living_room, script.lampen_random_kleuren, script.intercom_zend,
+#   script.intercom_bel,
 #   input_text.intercom_log, media_player.yamaha_living_2,
 #   media_player.woonkamer_totaal, media_player.eettafel en
 #   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3).
@@ -304,6 +306,7 @@ substitutions:
   mdi_vol_high:        "\U000F057E"
   mdi_music:           "\U000F075A"
   mdi_satellite:       "\U000F0471"
+  mdi_phone:           "\U000F03F2"
   mdi_sprout:          "\U000F0E66"
   mdi_leaf:            "\U000F032A"
   mdi_flower:          "\U000F024A"
@@ -374,7 +377,7 @@ font:
     id: pl_icon18
     size: 18
     bpp: 4
-    glyphs: ["${mdi_satellite}"]
+    glyphs: ["${mdi_satellite}", "${mdi_phone}"]
   - file:
       type: gfonts
       family: Roboto Mono
@@ -1218,6 +1221,9 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  - id: ic_bel_t0
+    type: uint32_t
+    initial_value: '0'
   # ---- intercom woonkamer: is er een speler klaar, en welke krijgt het bericht
   - id: ic_ok
     type: bool
@@ -10911,58 +10917,111 @@ lvgl:
                   text: "TO TALK"
                   text_font: r_mono
                   text_color: 0xFFF0EC
-        - obj:
-            x: 268
-            y: 312
-            width: 164
-            height: 2
-            radius: 1
-            bg_color: 0x245C48
+        # ---- BEL-knoppen (retro_icbel)
+        - button:
+            id: ic_bel0
+            x: 248
+            y: 308
+            width: 100
+            height: 40
+            radius: 10
+            bg_color: 0xF4F4F6
             bg_opa: COVER
             border_width: 0
-            clickable: false
-        - obj:
-            x: 268
-            y: 318
-            width: 164
-            height: 2
-            radius: 1
-            bg_color: 0x245C48
+            shadow_width: 0
+            pressed:
+              bg_color: 0xE31D22
+            on_click:
+              - if:
+                  condition:
+                    lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
+                  then:
+                    - lambda: |-
+                        id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
+                        lv_obj_set_style_bg_color(id(ic_bel0), lv_color_hex(0xE31D22), 0);
+                        lv_label_set_text(id(ic_bel0_lbl), "BELT...");
+                        lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xFFFFFE), 0);
+                        lv_obj_set_style_text_color(id(ic_bel0_ico), lv_color_hex(0xFFFFFE), 0);
+                    - homeassistant.action:
+                        action: script.intercom_bel
+                        data:
+                          van: woonkamer
+                          naar: studio
+                    - delay: 6s
+                    - lambda: |-
+                        lv_obj_set_style_bg_color(id(ic_bel0), lv_color_hex(0xF4F4F6), 0);
+                        lv_label_set_text(id(ic_bel0_lbl), "STUDIO");
+                        lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0x0F1013), 0);
+                        lv_obj_set_style_text_color(id(ic_bel0_ico), lv_color_hex(0x0F1013), 0);
+            widgets:
+              - label:
+                  id: ic_bel0_ico
+                  align: TOP_MID
+                  y: 1
+                  text: "${mdi_phone}"
+                  text_font: pl_icon18
+                  text_color: 0x0F1013
+              - label:
+                  id: ic_bel0_lbl
+                  align: BOTTOM_MID
+                  y: -3
+                  text: "STUDIO"
+                  text_font: r_mono
+                  text_color: 0x0F1013
+        - button:
+            id: ic_bel1
+            x: 352
+            y: 308
+            width: 100
+            height: 40
+            radius: 10
+            bg_color: 0xF4F4F6
             bg_opa: COVER
             border_width: 0
-            clickable: false
-        - obj:
-            x: 268
-            y: 324
-            width: 164
-            height: 2
-            radius: 1
-            bg_color: 0x245C48
-            bg_opa: COVER
-            border_width: 0
-            clickable: false
-        - obj:
-            x: 268
-            y: 330
-            width: 164
-            height: 2
-            radius: 1
-            bg_color: 0x245C48
-            bg_opa: COVER
-            border_width: 0
-            clickable: false
-        - obj:
-            x: 268
-            y: 336
-            width: 164
-            height: 2
-            radius: 1
-            bg_color: 0x245C48
-            bg_opa: COVER
-            border_width: 0
-            clickable: false
+            shadow_width: 0
+            pressed:
+              bg_color: 0xE31D22
+            on_click:
+              - if:
+                  condition:
+                    lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
+                  then:
+                    - lambda: |-
+                        id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
+                        lv_obj_set_style_bg_color(id(ic_bel1), lv_color_hex(0xE31D22), 0);
+                        lv_label_set_text(id(ic_bel1_lbl), "BELT...");
+                        lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xFFFFFE), 0);
+                        lv_obj_set_style_text_color(id(ic_bel1_ico), lv_color_hex(0xFFFFFE), 0);
+                    - homeassistant.action:
+                        action: script.intercom_bel
+                        data:
+                          van: woonkamer
+                          naar: jip
+                    - delay: 6s
+                    - lambda: |-
+                        lv_obj_set_style_bg_color(id(ic_bel1), lv_color_hex(0xF4F4F6), 0);
+                        lv_label_set_text(id(ic_bel1_lbl), "JIP");
+                        lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0x0F1013), 0);
+                        lv_obj_set_style_text_color(id(ic_bel1_ico), lv_color_hex(0x0F1013), 0);
+            widgets:
+              - label:
+                  id: ic_bel1_ico
+                  align: TOP_MID
+                  y: 1
+                  text: "${mdi_phone}"
+                  text_font: pl_icon18
+                  text_color: 0x0F1013
+              - label:
+                  id: ic_bel1_lbl
+                  align: BOTTOM_MID
+                  y: -3
+                  text: "JIP"
+                  text_font: r_mono
+                  text_color: 0x0F1013
+        # ---- einde BEL-knoppen
         - label:
             id: ic_spk_lbl
+            hidden: true
             x: 250
             y: 340
             width: 200
