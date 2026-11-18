@@ -53,7 +53,8 @@
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
 # Gebruikt in Home Assistant: light.slaapkamer_jip_2 (groep), light.slaapkamer_jip,
 #   light.lichtstrip_jip, light.hue_color_light_1, scene.slaapkamer_jip_*,
-#   sensor.thermo_slaapkamer_jip_*, media_player.kijkpaal_2,
+#   sensor.thermo_slaapkamer_jip_*, media_player.kijkpaal_woonkamer
+#   (Music Assistant-speler van de kijkpaal),
 #   climate.paneel_jip, binary_sensor.paneel_jip_aan, sensor.paneel_jip_resterend,
 #   timer.paneel_jip_timer, script.paneel_jip_timer_starten, script.paneel_jip_uit,
 #   input_boolean.jip_niet_storen, script.intercom_zend, script.intercom_bel,
@@ -3574,7 +3575,7 @@ script:
             - homeassistant.action:
                 action: media_player.media_play_pause
                 data:
-                  entity_id: media_player.kijkpaal_2
+                  entity_id: media_player.kijkpaal_woonkamer
       - if:
           condition:
             lambda: 'return id(fav_act) == 3;'
@@ -3583,7 +3584,7 @@ script:
             - homeassistant.action:
                 action: media_player.shuffle_set
                 data:
-                  entity_id: media_player.kijkpaal_2
+                  entity_id: media_player.kijkpaal_woonkamer
                   shuffle: "true"
       - if:
           condition:
@@ -3592,7 +3593,7 @@ script:
             - homeassistant.action:
                 action: music_assistant.play_media
                 data:
-                  entity_id: media_player.kijkpaal_2
+                  entity_id: media_player.kijkpaal_woonkamer
                   media_id: !lambda 'return id(fav_sel);'
                   media_type: !lambda 'return std::string(id(fav_act) == 3 ? "playlist" : "radio");'
                   enqueue: replace
@@ -4828,7 +4829,7 @@ sensor:
           text_color: !lambda 'return x > 0.05 ? lv_color_hex(0xF2A93B) : lv_color_hex(id(r_tcol)[4]);'
   - platform: homeassistant
     id: fav_vol
-    entity_id: media_player.kijkpaal_2
+    entity_id: media_player.kijkpaal_woonkamer
     attribute: volume_level
     internal: true
     on_value:
@@ -5097,7 +5098,7 @@ text_sensor:
   # speelt de kijkpaal? (alleen dan automatisch naar het muziekscherm)
   - platform: homeassistant
     id: studio_mini_state
-    entity_id: media_player.kijkpaal_2
+    entity_id: media_player.kijkpaal_woonkamer
     internal: true
   # kleur van de lamp(scène) -> kleur van de helderheidsbalk op de lampenpagina
   - platform: homeassistant
@@ -10310,7 +10311,7 @@ lvgl:
                         action: script.intercom_zend
                         data:
                           kanaal: !lambda 'return to_string(id(ic_ch));'
-                          speler: media_player.kijkpaal_2
+                          speler: media_player.kijkpaal_woonkamer
             widgets:
               - label:
                   align: CENTER
@@ -11819,7 +11820,7 @@ lvgl:
               - homeassistant.action:
                   action: media_player.volume_set
                   data:
-                    entity_id: media_player.kijkpaal_2
+                    entity_id: media_player.kijkpaal_woonkamer
                     volume_level: !lambda 'return x / 100.0f;'
     - id: page_music
       # @nav-boven
