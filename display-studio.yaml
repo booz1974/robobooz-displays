@@ -10,14 +10,16 @@
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
 # Intercom: tik op het gele satellietblok in de LIVE-balk. Kanaalkiezer
-#   met 8 kanalen (1 Kelder, 2 ISS, 3 Buren, 4 1986, 5 Koelkast-Bunker,
-#   6 Tuinkabouter-Verzet, 7 AIVD-busje, 8 Area 51) en PUSH TO TALK: script.intercom_zend
+#   met 12 kanalen (1 Kelder, 2 ISS, 3 Buren, 4 1986, 5 Koelkast-Bunker,
+#   6 Tuinkabouter-Verzet, 7 AIVD-busje, 8 Area 51, 9 Wekkerbrigade (opstaan),
+#   10 Keukenkazerne (eten), 11 Shampoo-Commando (douchen), 12 Fluisterwekker)
+#   en PUSH TO TALK: script.intercom_zend
 #   speelt ruis + een willekeurig bericht (ElevenLabs) als aankondiging op
 #   de studiospeaker van Music Assistant (muziek gaat daarna verder);
 #   het groene scherm glitcht zolang er geluid speelt.
 #   Berichten met ElevenLabs-audiotags ([whispers], [laughs], ...); de tags
 #   staan niet in het log, lange logregels lopen door.
-#   Knoppen WOONKAMER en JIP roepen die kamer op (script.intercom_bel).
+#   Snelkiesbalk WOONKAMER | JIP roept die kamer op (script.intercom_bel).
 # Thuis: tik op het klokvak = alle studiolampen aan/uit; tijd, datum en
 #   3 nieuwsregels (bovenste = agenda, daaronder NOS en Tailscale-storingen);
 #   weer, studiotemperatuur, energie met energiekosten van vandaag,
@@ -2086,24 +2088,26 @@ script:
   - id: r_ic_render
     then:
       - lambda: |-
-          static const char *nm[8] = {"DE KELDER", "ISS RUIMTESTATION", "DE BUREN", "HET JAAR 1986",
-                                      "DE KOELKAST-BUNKER", "TUINKABOUTER-VERZET", "AIVD AFLUISTERWAGEN", "AREA 51 VLUCHTLEIDING"};
-          static const char *sub[8] = {"ONDERGRONDS", "LAGE BAAN OM DE AARDE", "NAAST DE DEUR", "TERUG IN DE TIJD",
-                                       "INTERN BERAAD", "BUITENPOST ACHTERTUIN", "BUSJE IN DE STRAAT", "BUITENAARDSE VLUCHTLEIDING"};
-          int c = std::max(1, std::min(8, id(ic_ch)));
+          static const char *nm[12] = {"DE KELDER", "ISS RUIMTESTATION", "DE BUREN", "HET JAAR 1986",
+                                      "DE KOELKAST-BUNKER", "TUINKABOUTER-VERZET", "AIVD AFLUISTERWAGEN", "AREA 51 VLUCHTLEIDING",
+                                      "DE WEKKERBRIGADE", "DE KEUKENKAZERNE", "HET SHAMPOO-COMMANDO", "DE FLUISTERWEKKER"};
+          static const char *sub[12] = {"ONDERGRONDS", "LAGE BAAN OM DE AARDE", "NAAST DE DEUR", "TERUG IN DE TIJD",
+                                       "INTERN BERAAD", "BUITENPOST ACHTERTUIN", "BUSJE IN DE STRAAT", "BUITENAARDSE VLUCHTLEIDING",
+                                       "OPSTAAN", "AAN TAFEL", "DOUCHEN EN HAREN WASSEN", "ZACHTJES OPSTAAN"};
+          int c = std::max(1, std::min(12, id(ic_ch)));
           auto col = [](int sl, uint32_t def) -> lv_color_t { uint32_t v = id(r_tcol)[sl]; return lv_color_hex(v ? v : def); };
           lv_label_set_text(id(ic_chan), ("KANAAL " + std::to_string(c) + " · " + sub[c - 1]).c_str());
           lv_label_set_text(id(ic_name), nm[c - 1]);
-          lv_obj_t *pl[8] = {id(ic_p1), id(ic_p2), id(ic_p3), id(ic_p4), id(ic_p5), id(ic_p6), id(ic_p7), id(ic_p8)};
-          lv_obj_t *pt[8] = {id(ic_pt1), id(ic_pt2), id(ic_pt3), id(ic_pt4), id(ic_pt5), id(ic_pt6), id(ic_pt7), id(ic_pt8)};
-          for (int k = 0; k < 8; k++) {
+          lv_obj_t *pl[12] = {id(ic_p1), id(ic_p2), id(ic_p3), id(ic_p4), id(ic_p5), id(ic_p6), id(ic_p7), id(ic_p8), id(ic_p9), id(ic_p10), id(ic_p11), id(ic_p12)};
+          lv_obj_t *pt[12] = {id(ic_pt1), id(ic_pt2), id(ic_pt3), id(ic_pt4), id(ic_pt5), id(ic_pt6), id(ic_pt7), id(ic_pt8), id(ic_pt9), id(ic_pt10), id(ic_pt11), id(ic_pt12)};
+          for (int k = 0; k < 12; k++) {
             bool on = k == c - 1;
             lv_obj_set_style_bg_color(pl[k], on ? col(20, 0xE8745C) : col(1, 0xECEEF1), 0);
             lv_obj_set_style_text_color(pt[k], on ? col(21, 0x46201A) : col(3, 0x2B2F36), 0);
           }
           // wijzer van de draaiknop
           static lv_point_precise_t pp[2];
-          float an = (-135 + (c - 1) * 45) * 3.14159265f / 180.0f;   // 8 standen, om de 45 graden
+          float an = (-135 + (c - 1) * 30) * 3.14159265f / 180.0f;   // 12 standen, om de 30 graden
           int ccx = lv_obj_get_content_width(id(ic_knob)) / 2, ccy = lv_obj_get_content_height(id(ic_knob)) / 2;
           pp[0] = {(lv_value_precise_t) ccx, (lv_value_precise_t) ccy};
           pp[1] = {(lv_value_precise_t) lroundf(ccx + 42 * cosf(an)), (lv_value_precise_t) lroundf(ccy + 42 * sinf(an))};
@@ -9301,7 +9305,7 @@ lvgl:
             shadow_width: 0
             pad_all: 0
             on_click:
-              - lambda: 'id(ic_ch) = id(ic_ch) % 8 + 1;'
+              - lambda: 'id(ic_ch) = id(ic_ch) % 12 + 1;'
               - script.execute: r_ic_render
             widgets:
               - obj:
@@ -9348,8 +9352,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p2
-            x: 105
-            y: 140
+            x: 83
+            y: 143
             width: 30
             height: 24
             radius: 12
@@ -9370,8 +9374,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p3
-            x: 166
-            y: 165
+            x: 127
+            y: 143
             width: 30
             height: 24
             radius: 12
@@ -9392,8 +9396,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p4
-            x: 191
-            y: 226
+            x: 166
+            y: 165
             width: 30
             height: 24
             radius: 12
@@ -9414,8 +9418,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p5
-            x: 166
-            y: 287
+            x: 188
+            y: 204
             width: 30
             height: 24
             radius: 12
@@ -9436,8 +9440,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p6
-            x: 105
-            y: 312
+            x: 188
+            y: 248
             width: 30
             height: 24
             radius: 12
@@ -9458,7 +9462,7 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p7
-            x: 44
+            x: 166
             y: 287
             width: 30
             height: 24
@@ -9480,8 +9484,8 @@ lvgl:
                   text_color: 0x2B2F36
         - button:
             id: ic_p8
-            x: 19
-            y: 226
+            x: 127
+            y: 309
             width: 30
             height: 24
             radius: 12
@@ -9498,6 +9502,94 @@ lvgl:
                   id: ic_pt8
                   align: CENTER
                   text: "8"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+        - button:
+            id: ic_p9
+            x: 83
+            y: 309
+            width: 30
+            height: 24
+            radius: 12
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 4
+            on_click:
+              - lambda: 'id(ic_ch) = 9;'
+              - script.execute: r_ic_render
+            widgets:
+              - label:
+                  id: ic_pt9
+                  align: CENTER
+                  text: "9"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+        - button:
+            id: ic_p10
+            x: 44
+            y: 287
+            width: 30
+            height: 24
+            radius: 12
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 4
+            on_click:
+              - lambda: 'id(ic_ch) = 10;'
+              - script.execute: r_ic_render
+            widgets:
+              - label:
+                  id: ic_pt10
+                  align: CENTER
+                  text: "10"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+        - button:
+            id: ic_p11
+            x: 22
+            y: 248
+            width: 30
+            height: 24
+            radius: 12
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 4
+            on_click:
+              - lambda: 'id(ic_ch) = 11;'
+              - script.execute: r_ic_render
+            widgets:
+              - label:
+                  id: ic_pt11
+                  align: CENTER
+                  text: "11"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+        - button:
+            id: ic_p12
+            x: 22
+            y: 204
+            width: 30
+            height: 24
+            radius: 12
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 4
+            on_click:
+              - lambda: 'id(ic_ch) = 12;'
+              - script.execute: r_ic_render
+            widgets:
+              - label:
+                  id: ic_pt12
+                  align: CENTER
+                  text: "12"
                   text_font: r_mono
                   text_color: 0x2B2F36
         # zender
@@ -9574,106 +9666,138 @@ lvgl:
                   text_font: r_mono
                   text_color: 0xFFF0EC
         # ---- BEL-knoppen (retro_icbel)
-        - button:
-            id: ic_bel0
+        - obj:
+            id: ic_belbar
             x: 248
-            y: 308
-            width: 100
-            height: 40
+            y: 310
+            width: 204
+            height: 38
             radius: 10
-            bg_color: 0xF4F4F6
+            pad_all: 0
+            bg_color: 0x0A0C10
             bg_opa: COVER
-            border_width: 0
-            shadow_width: 0
-            pressed:
-              bg_color: 0xE31D22
-            on_click:
-              - if:
-                  condition:
-                    lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
-                  then:
-                    - lambda: |-
-                        id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
-                        lv_obj_set_style_bg_color(id(ic_bel0), lv_color_hex(0xE31D22), 0);
-                        lv_label_set_text(id(ic_bel0_lbl), "BELT...");
-                        lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xFFFFFE), 0);
-                        lv_obj_set_style_text_color(id(ic_bel0_ico), lv_color_hex(0xFFFFFE), 0);
-                    - homeassistant.action:
-                        action: script.intercom_bel
-                        data:
-                          van: studio
-                          naar: woonkamer
-                    - delay: 6s
-                    - lambda: |-
-                        lv_obj_set_style_bg_color(id(ic_bel0), lv_color_hex(0xF4F4F6), 0);
-                        lv_label_set_text(id(ic_bel0_lbl), "WOONKAMER");
-                        lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0x0F1013), 0);
-                        lv_obj_set_style_text_color(id(ic_bel0_ico), lv_color_hex(0x0F1013), 0);
+            border_width: 2
+            border_color: 0x245C48
+            scrollable: false
+            clickable: false
             widgets:
-              - label:
-                  id: ic_bel0_ico
-                  align: TOP_MID
+              - obj:
+                  id: ic_belsq
+                  x: 1
                   y: 1
-                  text: "${mdi_phone}"
-                  text_font: pl_icon18
-                  text_color: 0x0F1013
-              - label:
-                  id: ic_bel0_lbl
-                  align: BOTTOM_MID
-                  y: -3
-                  text: "WOONKAMER"
-                  text_font: r_mono
-                  text_color: 0x0F1013
-        - button:
-            id: ic_bel1
-            x: 352
-            y: 308
-            width: 100
-            height: 40
-            radius: 10
-            bg_color: 0xF4F4F6
-            bg_opa: COVER
-            border_width: 0
-            shadow_width: 0
-            pressed:
-              bg_color: 0xE31D22
-            on_click:
-              - if:
-                  condition:
-                    lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
-                  then:
-                    - lambda: |-
-                        id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
-                        lv_obj_set_style_bg_color(id(ic_bel1), lv_color_hex(0xE31D22), 0);
-                        lv_label_set_text(id(ic_bel1_lbl), "BELT...");
-                        lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xFFFFFE), 0);
-                        lv_obj_set_style_text_color(id(ic_bel1_ico), lv_color_hex(0xFFFFFE), 0);
-                    - homeassistant.action:
-                        action: script.intercom_bel
-                        data:
-                          van: studio
-                          naar: jip
-                    - delay: 6s
-                    - lambda: |-
-                        lv_obj_set_style_bg_color(id(ic_bel1), lv_color_hex(0xF4F4F6), 0);
-                        lv_label_set_text(id(ic_bel1_lbl), "JIP");
-                        lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0x0F1013), 0);
-                        lv_obj_set_style_text_color(id(ic_bel1_ico), lv_color_hex(0x0F1013), 0);
-            widgets:
-              - label:
-                  id: ic_bel1_ico
-                  align: TOP_MID
-                  y: 1
-                  text: "${mdi_phone}"
-                  text_font: pl_icon18
-                  text_color: 0x0F1013
-              - label:
-                  id: ic_bel1_lbl
-                  align: BOTTOM_MID
-                  y: -3
-                  text: "JIP"
-                  text_font: r_mono
-                  text_color: 0x0F1013
+                  width: 40
+                  height: 32
+                  radius: 8
+                  pad_all: 0
+                  bg_color: 0xE8745C
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+                  widgets:
+                    - label:
+                        id: ic_belico
+                        align: CENTER
+                        text: "${mdi_phone}"
+                        text_font: pl_icon18
+                        text_color: 0x46201A
+              - obj:
+                  x: 121
+                  y: 6
+                  width: 2
+                  height: 22
+                  radius: 1
+                  bg_color: 0x245C48
+                  bg_opa: COVER
+                  border_width: 0
+                  clickable: false
+              - button:
+                  id: ic_bel0
+                  x: 42
+                  y: 0
+                  width: 78
+                  height: 34
+                  radius: 8
+                  pad_all: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  shadow_width: 0
+                  pressed:
+                    bg_color: 0x245C48
+                    bg_opa: COVER
+                  on_click:
+                    - if:
+                        condition:
+                          lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
+                        then:
+                          - lambda: |-
+                              id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(0xE5534B), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(0xFFFFFE), 0);
+                              lv_label_set_text(id(ic_bel0_lbl), "BELT...");
+                              lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xE5534B), 0);
+                          - homeassistant.action:
+                              action: script.intercom_bel
+                              data:
+                                van: studio
+                                naar: woonkamer
+                          - delay: 6s
+                          - lambda: |-
+                              uint32_t a = id(r_tcol)[20], d = id(r_tcol)[21];
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(a ? a : 0xE8745C), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(d ? d : 0x46201A), 0);
+                              lv_label_set_text(id(ic_bel0_lbl), "WOONKAMER");
+                              lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xD8DCE2), 0);
+                  widgets:
+                    - label:
+                        id: ic_bel0_lbl
+                        align: CENTER
+                        text: "WOONKAMER"
+                        text_font: r_mono
+                        text_color: 0xD8DCE2
+              - button:
+                  id: ic_bel1
+                  x: 124
+                  y: 0
+                  width: 78
+                  height: 34
+                  radius: 8
+                  pad_all: 0
+                  bg_opa: TRANSP
+                  border_width: 0
+                  shadow_width: 0
+                  pressed:
+                    bg_color: 0x245C48
+                    bg_opa: COVER
+                  on_click:
+                    - if:
+                        condition:
+                          lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
+                        then:
+                          - lambda: |-
+                              id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(0xE5534B), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(0xFFFFFE), 0);
+                              lv_label_set_text(id(ic_bel1_lbl), "BELT...");
+                              lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xE5534B), 0);
+                          - homeassistant.action:
+                              action: script.intercom_bel
+                              data:
+                                van: studio
+                                naar: jip
+                          - delay: 6s
+                          - lambda: |-
+                              uint32_t a = id(r_tcol)[20], d = id(r_tcol)[21];
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(a ? a : 0xE8745C), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(d ? d : 0x46201A), 0);
+                              lv_label_set_text(id(ic_bel1_lbl), "JIP");
+                              lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xD8DCE2), 0);
+                  widgets:
+                    - label:
+                        id: ic_bel1_lbl
+                        align: CENTER
+                        text: "JIP"
+                        text_font: r_mono
+                        text_color: 0xD8DCE2
         # ---- einde BEL-knoppen
         # ontvangstlog
         - obj:

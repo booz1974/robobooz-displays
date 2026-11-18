@@ -25,8 +25,8 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
 - Beide displays: pagina Home Assistant (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
 - Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)
-- Studio: geheime Intercom naar parallelle universums (tik op het satellietblok in de LIVE-balk): kanaalkiezer met 8 kanalen, PUSH TO TALK, ruis + bericht via ElevenLabs als aankondiging op de studiospeaker (`script.intercom_zend`, `input_text.intercom_log`; geluiden in `www/robobooz/`)
-- Alle intercomschermen: knoppen om de andere kamers op te roepen (woonkamer, studio, Jip; `script.intercom_bel`). Berichten klinken op hetzelfde volume als de muziek op die speler
+- Studio: geheime Intercom naar parallelle universums (tik op het satellietblok in de LIVE-balk): kanaalkiezer met 12 kanalen (o.a. 9 Wekkerbrigade, 10 Keukenkazerne, 11 Shampoo-Commando, 12 Fluisterwekker), PUSH TO TALK, ruis + bericht via ElevenLabs als aankondiging op de studiospeaker (`script.intercom_zend`, `input_text.intercom_log`; geluiden in `www/robobooz/`)
+- Alle intercomschermen: snelkiesbalk om de andere kamers op te roepen (woonkamer, studio, Jip; `script.intercom_bel`). Berichten klinken op hetzelfde volume als de muziek op die speler
 - Woonkamer: dezelfde Intercom, maar alleen bereikbaar als woonkamer, woonkamer totaal of eettafel speelt of klaar staat (dan toont het LIVE-blok een satelliet); het bericht gaat naar de speler die speelt
 - Jip: Kachel-pagina voor `climate.paneel_jip` (`script.paneel_jip_timer_starten`, `script.paneel_jip_uit`, `binary_sensor.paneel_jip_aan`, `sensor.paneel_jip_resterend`), NIET STOREN (`input_boolean.jip_niet_storen`), intercom op de kijkpaal (`script.intercom_zend` met `speler`)
 - Radio: bij reclame ('Advert') een eigen hoes "Commercial Break" (zet `www/robobooz/` uit deze repo in `/config/www/robobooz/`)
