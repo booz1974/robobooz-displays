@@ -14,7 +14,7 @@
 #   (bovenste = agenda, daaronder NOS en Tailscale-storingen); weer, binnen
 #   (thermostaat; vonkjes = kachel stookt, vlokjes = uit), energie met
 #   energiekosten van vandaag, hoes met VU-meter.
-#   Knoppen onderin: Lampen | Favoriet | Sfeer | TV | Menu.
+#   Knoppen onderin: Lampen | Favoriet | Sfeer | Planten | TV | Menu.
 # LIVE-balk: ROBOBOOZ-roast (AI), bijzonderheden van Home Assistant (service
 #   uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij), buiten,
 #   verbruik en deur.
@@ -6513,7 +6513,7 @@ lvgl:
         - button:
             x: 14
             y: 392
-            width: 86
+            width: 70
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6541,9 +6541,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 106
+            x: 90
             y: 392
-            width: 86
+            width: 70
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6571,9 +6571,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 198
+            x: 166
             y: 392
-            width: 86
+            width: 70
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6601,9 +6601,40 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 290
+            id: r_dock_planten
+            x: 242
             y: 392
-            width: 86
+            width: 70
+            height: 56
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            pressed:
+              bg_color: 0xFFFFFF
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -8
+                  text: "${mdi_sprout}"
+                  text_font: pl_icon28
+                  text_color: 0x2B2F36
+              - label:
+                  align: CENTER
+                  y: 16
+                  text: "PLANTEN"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+            on_click:
+              - lvgl.page.show:
+                  id: page_planten
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            x: 318
+            y: 392
+            width: 70
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6631,9 +6662,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 382
+            x: 394
             y: 392
-            width: 86
+            width: 70
             height: 56
             radius: 14
             bg_color: 0xE8745C
