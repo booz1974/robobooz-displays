@@ -28,7 +28,8 @@
 # LIVE-balk: ROBOBOOZ-roast (AI), buiten, verbruik en deur.
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
-# Muziek: volumeslider voor de kijkpaal; radio zoekt de hoes op via iTunes;
+# Muziek: volumeslider voor de kijkpaal; radio zoekt de hoes op via iTunes
+#   (onthouden per nummer, ook als er meer zenders tegelijk spelen);
 #   bij reclame ('Advert') de eigen hoes uit /config/www/robobooz/.
 # Lampen: Alles, Lamp, Ledstrip en Vitrine. Tik op het icoontje = aan/uit,
 #   tik ernaast = details (helderheid, kleuren); blokjesbalk = helderheid.
@@ -1328,6 +1329,9 @@ globals:
   - id: rad_key
     type: std::string
     initial_value: '""'
+  # radio: gevonden hoezen per "artiest|titel" ("" = zoeken, "-" = geen hoes)
+  - id: rad_cache
+    type: std::map<std::string, std::string>
   - id: rad_art
     type: std::string
     initial_value: '""'
@@ -2511,7 +2515,7 @@ script:
             # eigen hoes voor reclameblokken (_200x200bb wordt voor het grote plaatje _300x300bb)
             - lambda: |-
                 id(rad_busy) = false;
-                id(rad_art) = "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg";
+                id(rad_art) = "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"; id(rad_cache)[id(rad_key)] = id(rad_art);
                 ESP_LOGI("ma", "radio: reclame -> eigen hoes");
             - script.execute: ma_poll
           else:
@@ -2536,29 +2540,29 @@ script:
                         id(rad_busy) = false;
                         if (response->status_code != 200) {
                           ESP_LOGW("ma", "iTunes: status %d", response->status_code);
-                          id(rad_art) = "-";   // dan het zenderlogo gebruiken
+                          id(rad_art) = "-"; id(rad_cache)[id(rad_key)] = id(rad_art);   // dan het zenderlogo gebruiken
                           return;
                         }
                         JsonDocument filter;
                         filter["results"][0]["artworkUrl100"] = true;
                         JsonDocument doc;
-                        if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) { id(rad_art) = "-"; return; }
+                        if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) { id(rad_art) = "-"; id(rad_cache)[id(rad_key)] = id(rad_art); return; }
                         std::string art = doc["results"][0]["artworkUrl100"] | "";
                         if (art.empty()) {
                           ESP_LOGI("ma", "radio: geen hoes gevonden voor '%s'", id(rad_term).c_str());
-                          id(rad_art) = "-";
+                          id(rad_art) = "-"; id(rad_cache)[id(rad_key)] = id(rad_art);
                           return;
                         }
                         size_t p = art.find("100x100bb");
                         if (p != std::string::npos) art.replace(p, 9, "200x200bb");
-                        id(rad_art) = art;
+                        id(rad_art) = art; id(rad_cache)[id(rad_key)] = id(rad_art);
                         ESP_LOGI("ma", "radio: hoes voor '%s' -> %s", id(rad_term).c_str(), art.c_str());
                     - script.execute: ma_poll
                 on_error:
                   then:
                     - lambda: |-
                         id(rad_busy) = false;
-                        id(rad_art) = "-";   // iTunes niet bereikbaar: zenderlogo gebruiken
+                        id(rad_art) = "-"; id(rad_cache)[id(rad_key)] = id(rad_art);   // iTunes niet bereikbaar: zenderlogo gebruiken
                     - script.execute: ma_poll
 
   # ---- spelerpagina: wachtrij ophalen
@@ -3693,16 +3697,21 @@ script:
                       std::string rad_mt = cm["media_type"] | "";
                       if (rad_mt == "radio" && !e.title.empty() && e.img.find("theaudiodb.com") == std::string::npos) {
                         std::string rkey = e.artist + "|" + e.title;
-                        if (rkey == id(rad_key)) {
-                          if (!id(rad_art).empty() && id(rad_art) != "-") e.img = id(rad_art);
-                          else if (id(rad_art).empty()) e.img = "";   // nog aan het zoeken: niet eerst het zenderlogo laden
+                        auto rc = id(rad_cache).find(rkey);
+                        if (rc != id(rad_cache).end()) {
+                          if (!rc->second.empty() && rc->second != "-") e.img = rc->second;
+                          else if (rc->second.empty()) e.img = "";   // nog aan het zoeken: niet eerst het zenderlogo laden
                         } else if (!id(rad_busy)) {
                           e.img = "";
+                          if (id(rad_cache).size() > 12) id(rad_cache).clear();
+                          id(rad_cache)[rkey] = "";
                           id(rad_key) = rkey;
                           id(rad_art) = "";
                           id(rad_term) = e.artist.empty() ? e.title : e.artist + " " + e.title;
                           id(rad_busy) = true;
                           id(rad_lookup).execute();
+                        } else {
+                          e.img = "";
                         }
                       }
                       e.playing = playing;
@@ -3764,16 +3773,21 @@ script:
                       std::string rad_mt = cm["media_type"] | "";
                       if (rad_mt == "radio" && !t.empty() && u.find("theaudiodb.com") == std::string::npos) {
                         std::string rkey = a + "|" + t;
-                        if (rkey == id(rad_key)) {
-                          if (!id(rad_art).empty() && id(rad_art) != "-") u = id(rad_art);
-                          else if (id(rad_art).empty()) u = "";
+                        auto rc = id(rad_cache).find(rkey);
+                        if (rc != id(rad_cache).end()) {
+                          if (!rc->second.empty() && rc->second != "-") u = rc->second;
+                          else if (rc->second.empty()) u = "";   // nog aan het zoeken: niet eerst het zenderlogo laden
                         } else if (!id(rad_busy)) {
                           u = "";
+                          if (id(rad_cache).size() > 12) id(rad_cache).clear();
+                          id(rad_cache)[rkey] = "";
                           id(rad_key) = rkey;
                           id(rad_art) = "";
                           id(rad_term) = a.empty() ? t : a + " " + t;
                           id(rad_busy) = true;
                           id(rad_lookup).execute();
+                        } else {
+                          u = "";
                         }
                       }
                       if (!u.empty() && u[0] == '/') u = std::string("${ma_url}") + u;
