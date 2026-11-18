@@ -63,7 +63,7 @@
 #   input_text.weer_dagen_display, input_text.ochtend_info_display,
 #   input_text.ochtend_agenda_display, sensor.neerslag_buienradar_regen_data,
 #   System Monitor-sensoren, script.lampen_random_kleuren en
-#   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3, advert-hoes).
+#   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3, intro_12.mp3, advert-hoes).
 # =====================================================================
 
 esphome:

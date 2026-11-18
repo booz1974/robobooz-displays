@@ -64,7 +64,8 @@
 #   script.studio_totaal_uit, script.intercom_zend, script.intercom_bel,
 #   input_text.intercom_log,
 #   media_player.studio_mini_2 en /config/www/robobooz/krrrcht_in.mp3 en
-#   intro_5..8.mp3 (sfeergeluid kanaal 5-8), als vooraankondiging.
+#   intro_5..8.mp3 (sfeergeluid kanaal 5-8) en intro_12.mp3
+#   (wakker-word-melodietje kanaal 12), als vooraankondiging.
 # Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
 #   nieuwsregel', 'Displays - ROBOBOOZ roast (AI)', 'Displays - serverinfo',
 #   'Displays - servergeschiedenis (CPU en temperatuur)' en
