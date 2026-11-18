@@ -23,7 +23,9 @@
 #   PUSH TO TALK (script.intercom_zend) naar de speler die speelt, anders de
 #   eerste die klaar staat. ElevenLabs-audiotags staan niet in het log, lange
 #   logregels lopen door. Gaan alle drie uit, dan terug naar thuis.
-#   Snelkiesbalk STUDIO | JIP roept die kamer op (script.intercom_bel).
+#   Ontvanger HIER / STUDIO / JIP:
+#   PUSH TO TALK stuurt het kanaal daarheen, het telefoonvak een oproep
+#   van Jeroen (script.intercom_bel).
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
 # Muziek: radio zoekt de hoes op via iTunes
@@ -1224,6 +1226,16 @@ globals:
   - id: ic_bel_t0
     type: uint32_t
     initial_value: '0'
+  # ontvanger van de intercom: 0 = hier, 1/2 = andere kamer
+  - id: ic_naar
+    type: int
+    initial_value: '0'
+  - id: ic_naar_key
+    type: std::string
+    initial_value: '"hier"'
+  - id: ic_naar_lbl
+    type: std::string
+    initial_value: '""'
   # ---- intercom woonkamer: is er een speler klaar, en welke krijgt het bericht
   - id: ic_ok
     type: bool
@@ -4591,8 +4603,9 @@ interval:
           bool busy = running || (id(ic_t0) && now - id(ic_t0) < 4000);
           bool playing = busy;
           if (!busy && id(ic_t0)) { id(ic_t0) = 0; id(ic_reply) = 0; }
-          const char *st = !busy ? "STANDBY · DRUK OM TE ZENDEN" : (!id(ic_reply) ? "VERBINDING MAKEN..." : "ONTVANGST");
-          lv_label_set_text(id(ic_stat), st);
+          std::string st = !busy ? (id(ic_naar) ? "ZENDT NAAR " + id(ic_naar_lbl) + " · DRUK OM TE ZENDEN" : std::string("STANDBY · DRUK OM TE ZENDEN"))
+                                 : (!id(ic_reply) ? std::string("VERBINDING MAKEN...") : std::string("ONTVANGST"));
+          if (strcmp(lv_label_get_text(id(ic_stat)), st.c_str()) != 0) lv_label_set_text(id(ic_stat), st.c_str());
           // gloed rond de knop knippert tijdens verbinding
           lv_obj_set_style_shadow_opa(id(ic_btn), busy ? ((now / 300) % 2 ? 255 : 90) : 110, 0);
           // signaalbalkjes
@@ -11024,6 +11037,7 @@ lvgl:
                         action: script.intercom_zend
                         data:
                           kanaal: !lambda 'return to_string(id(ic_ch));'
+                          naar: !lambda 'return id(ic_naar_key);'
                           speler: !lambda 'return id(ic_spk);'
             widgets:
               - label:
@@ -11054,7 +11068,8 @@ lvgl:
             scrollable: false
             clickable: false
             widgets:
-              - obj:
+              # telefoon: willekeurige oproep van Jeroen naar de gekozen ontvanger (niet bij HIER)
+              - button:
                   id: ic_belsq
                   x: 1
                   y: 1
@@ -11065,7 +11080,26 @@ lvgl:
                   bg_color: 0xE8745C
                   bg_opa: COVER
                   border_width: 0
-                  clickable: false
+                  shadow_width: 0
+                  on_click:
+                    - if:
+                        condition:
+                          lambda: 'return id(ic_naar) > 0 && (id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000);'
+                        then:
+                          - lambda: |-
+                              id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(0xE5534B), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(0xFFFFFE), 0);
+                          - homeassistant.action:
+                              action: script.intercom_bel
+                              data:
+                                van: woonkamer
+                                naar: !lambda 'return id(ic_naar_key);'
+                          - delay: 6s
+                          - lambda: |-
+                              uint32_t a = id(r_tcol)[20], d = id(r_tcol)[21];
+                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(a ? a : 0xE8745C), 0);
+                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(d ? d : 0x46201A), 0);
                   widgets:
                     - label:
                         id: ic_belico
@@ -11073,104 +11107,155 @@ lvgl:
                         text: "${mdi_phone}"
                         text_font: pl_icon18
                         text_color: 0x46201A
-              - obj:
-                  x: 121
-                  y: 6
-                  width: 2
-                  height: 22
-                  radius: 1
+              - button:
+                  id: ic_to0
+                  x: 44
+                  y: 2
+                  width: 34
+                  height: 30
+                  radius: 7
+                  pad_all: 0
                   bg_color: 0x245C48
                   bg_opa: COVER
                   border_width: 0
-                  clickable: false
+                  shadow_width: 0
+                  on_click:
+                    - lambda: |-
+                        static const char *k[3] = {"hier", "studio", "jip"};
+                        static const char *n[3] = {"", "STUDIO", "JIP"};
+                        id(ic_naar) = 0; id(ic_naar_key) = k[0]; id(ic_naar_lbl) = n[0];
+                        lv_obj_t *b[3] = {id(ic_to0), id(ic_to1), id(ic_to2)};
+                        lv_obj_t *t[3] = {id(ic_to0_lbl), id(ic_to1_lbl), id(ic_to2_lbl)};
+                        lv_obj_t *u[3] = {id(ic_to0_u), id(ic_to1_u), id(ic_to2_u)};
+                        uint32_t a = id(r_tcol)[20];
+                        for (int j = 0; j < 3; j++) {
+                          bool on = j == 0;
+                          lv_obj_set_style_bg_opa(b[j], on ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+                          lv_obj_set_style_text_color(t[j], lv_color_hex(on ? 0xD8DCE2 : 0x8B9099), 0);
+                          lv_obj_set_style_bg_color(u[j], lv_color_hex(a ? a : 0xE8745C), 0);
+                          if (on) lv_obj_remove_flag(u[j], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(u[j], LV_OBJ_FLAG_HIDDEN);
+                        }
+                        // telefoon gedimd bij HIER (jezelf oproepen kan niet)
+                        lv_obj_set_style_opa(id(ic_belsq), 0 == 0 ? 90 : 255, 0);
+                  widgets:
+                    - label:
+                        id: ic_to0_lbl
+                        align: CENTER
+                        y: -2
+                        text: "HIER"
+                        text_font: r_mono
+                        text_color: 0xD8DCE2
+                    - obj:
+                        id: ic_to0_u
+                        align: BOTTOM_MID
+                        y: -3
+                        width: 20
+                        height: 2
+                        radius: 1
+                        border_width: 0
+                        bg_color: 0xE8745C
+                        bg_opa: COVER
+                        clickable: false
               - button:
-                  id: ic_bel0
-                  x: 42
-                  y: 0
-                  width: 78
-                  height: 34
-                  radius: 8
+                  id: ic_to1
+                  x: 80
+                  y: 2
+                  width: 48
+                  height: 30
+                  radius: 7
                   pad_all: 0
+                  bg_color: 0x245C48
                   bg_opa: TRANSP
                   border_width: 0
                   shadow_width: 0
-                  pressed:
-                    bg_color: 0x245C48
-                    bg_opa: COVER
                   on_click:
-                    - if:
-                        condition:
-                          lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
-                        then:
-                          - lambda: |-
-                              id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
-                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(0xE5534B), 0);
-                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(0xFFFFFE), 0);
-                              lv_label_set_text(id(ic_bel0_lbl), "BELT...");
-                              lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xE5534B), 0);
-                          - homeassistant.action:
-                              action: script.intercom_bel
-                              data:
-                                van: woonkamer
-                                naar: studio
-                          - delay: 6s
-                          - lambda: |-
-                              uint32_t a = id(r_tcol)[20], d = id(r_tcol)[21];
-                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(a ? a : 0xE8745C), 0);
-                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(d ? d : 0x46201A), 0);
-                              lv_label_set_text(id(ic_bel0_lbl), "STUDIO");
-                              lv_obj_set_style_text_color(id(ic_bel0_lbl), lv_color_hex(0xD8DCE2), 0);
+                    - lambda: |-
+                        static const char *k[3] = {"hier", "studio", "jip"};
+                        static const char *n[3] = {"", "STUDIO", "JIP"};
+                        id(ic_naar) = 1; id(ic_naar_key) = k[1]; id(ic_naar_lbl) = n[1];
+                        lv_obj_t *b[3] = {id(ic_to0), id(ic_to1), id(ic_to2)};
+                        lv_obj_t *t[3] = {id(ic_to0_lbl), id(ic_to1_lbl), id(ic_to2_lbl)};
+                        lv_obj_t *u[3] = {id(ic_to0_u), id(ic_to1_u), id(ic_to2_u)};
+                        uint32_t a = id(r_tcol)[20];
+                        for (int j = 0; j < 3; j++) {
+                          bool on = j == 1;
+                          lv_obj_set_style_bg_opa(b[j], on ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+                          lv_obj_set_style_text_color(t[j], lv_color_hex(on ? 0xD8DCE2 : 0x8B9099), 0);
+                          lv_obj_set_style_bg_color(u[j], lv_color_hex(a ? a : 0xE8745C), 0);
+                          if (on) lv_obj_remove_flag(u[j], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(u[j], LV_OBJ_FLAG_HIDDEN);
+                        }
+                        // telefoon gedimd bij HIER (jezelf oproepen kan niet)
+                        lv_obj_set_style_opa(id(ic_belsq), 1 == 0 ? 90 : 255, 0);
                   widgets:
                     - label:
-                        id: ic_bel0_lbl
+                        id: ic_to1_lbl
                         align: CENTER
+                        y: -2
                         text: "STUDIO"
                         text_font: r_mono
-                        text_color: 0xD8DCE2
+                        text_color: 0x8B9099
+                    - obj:
+                        id: ic_to1_u
+                        align: BOTTOM_MID
+                        y: -3
+                        width: 34
+                        height: 2
+                        radius: 1
+                        border_width: 0
+                        bg_color: 0xE8745C
+                        bg_opa: COVER
+                        clickable: false
+                        hidden: true
               - button:
-                  id: ic_bel1
-                  x: 124
-                  y: 0
-                  width: 78
-                  height: 34
-                  radius: 8
+                  id: ic_to2
+                  x: 130
+                  y: 2
+                  width: 27
+                  height: 30
+                  radius: 7
                   pad_all: 0
+                  bg_color: 0x245C48
                   bg_opa: TRANSP
                   border_width: 0
                   shadow_width: 0
-                  pressed:
-                    bg_color: 0x245C48
-                    bg_opa: COVER
                   on_click:
-                    - if:
-                        condition:
-                          lambda: 'return id(ic_bel_t0) == 0 || millis() - id(ic_bel_t0) > 8000;'
-                        then:
-                          - lambda: |-
-                              id(ic_bel_t0) = millis(); id(ic_t0) = millis(); id(ic_reply) = 0;
-                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(0xE5534B), 0);
-                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(0xFFFFFE), 0);
-                              lv_label_set_text(id(ic_bel1_lbl), "BELT...");
-                              lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xE5534B), 0);
-                          - homeassistant.action:
-                              action: script.intercom_bel
-                              data:
-                                van: woonkamer
-                                naar: jip
-                          - delay: 6s
-                          - lambda: |-
-                              uint32_t a = id(r_tcol)[20], d = id(r_tcol)[21];
-                              lv_obj_set_style_bg_color(id(ic_belsq), lv_color_hex(a ? a : 0xE8745C), 0);
-                              lv_obj_set_style_text_color(id(ic_belico), lv_color_hex(d ? d : 0x46201A), 0);
-                              lv_label_set_text(id(ic_bel1_lbl), "JIP");
-                              lv_obj_set_style_text_color(id(ic_bel1_lbl), lv_color_hex(0xD8DCE2), 0);
+                    - lambda: |-
+                        static const char *k[3] = {"hier", "studio", "jip"};
+                        static const char *n[3] = {"", "STUDIO", "JIP"};
+                        id(ic_naar) = 2; id(ic_naar_key) = k[2]; id(ic_naar_lbl) = n[2];
+                        lv_obj_t *b[3] = {id(ic_to0), id(ic_to1), id(ic_to2)};
+                        lv_obj_t *t[3] = {id(ic_to0_lbl), id(ic_to1_lbl), id(ic_to2_lbl)};
+                        lv_obj_t *u[3] = {id(ic_to0_u), id(ic_to1_u), id(ic_to2_u)};
+                        uint32_t a = id(r_tcol)[20];
+                        for (int j = 0; j < 3; j++) {
+                          bool on = j == 2;
+                          lv_obj_set_style_bg_opa(b[j], on ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+                          lv_obj_set_style_text_color(t[j], lv_color_hex(on ? 0xD8DCE2 : 0x8B9099), 0);
+                          lv_obj_set_style_bg_color(u[j], lv_color_hex(a ? a : 0xE8745C), 0);
+                          if (on) lv_obj_remove_flag(u[j], LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(u[j], LV_OBJ_FLAG_HIDDEN);
+                        }
+                        // telefoon gedimd bij HIER (jezelf oproepen kan niet)
+                        lv_obj_set_style_opa(id(ic_belsq), 2 == 0 ? 90 : 255, 0);
                   widgets:
                     - label:
-                        id: ic_bel1_lbl
+                        id: ic_to2_lbl
                         align: CENTER
+                        y: -2
                         text: "JIP"
                         text_font: r_mono
-                        text_color: 0xD8DCE2
+                        text_color: 0x8B9099
+                    - obj:
+                        id: ic_to2_u
+                        align: BOTTOM_MID
+                        y: -3
+                        width: 13
+                        height: 2
+                        radius: 1
+                        border_width: 0
+                        bg_color: 0xE8745C
+                        bg_opa: COVER
+                        clickable: false
+                        hidden: true
         # ---- einde BEL-knoppen
         - label:
             id: ic_spk_lbl
