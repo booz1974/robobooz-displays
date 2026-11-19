@@ -28,6 +28,8 @@
 #   van Jeroen (script.intercom_bel).
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
+#   Volumeslider volgt de zone die speelt: woonkamer totaal of eettafel
+#   (groepsvolume), anders de Yamaha-receiver.
 # Muziek: radio zoekt de hoes op via iTunes
 #   (onthouden per nummer, ook als er meer zenders tegelijk spelen); bij reclame ('Advert') de eigen
 #   hoes uit /config/www/robobooz/ (Commercial Break).
@@ -1236,6 +1238,10 @@ globals:
   - id: ic_naar_lbl
     type: std::string
     initial_value: '""'
+  # favorietenslider: 0 = woonkamer (receiver), 1 = woonkamer totaal, 2 = eettafel
+  - id: fav_zone
+    type: int
+    initial_value: '0'
   # ---- intercom woonkamer: is er een speler klaar, en welke krijgt het bericht
   - id: ic_ok
     type: bool
@@ -1650,6 +1656,26 @@ globals:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # favorieten: welke zone speelt er, en zet de slider op het volume daarvan
+  - id: fav_vol_sync
+    mode: restart
+    then:
+      - lambda: |-
+          auto st = [](esphome::text_sensor::TextSensor *t) { return t->has_state() ? t->state : std::string(""); };
+          std::string w = st(id(ic_mp0)), t = st(id(ic_mp1)), e = st(id(ic_mp2));
+          int z = 0;
+          if (t == "playing") z = 1;
+          else if (e == "playing") z = 2;
+          else if (w != "playing" && t == "paused") z = 1;
+          else if (w != "playing" && e == "paused") z = 2;
+          id(fav_zone) = z;
+          float v = z == 1 ? id(fav_vol_tot).state : (z == 2 ? id(fav_vol_eet).state : id(fav_vol).state);
+          if (std::isnan(v)) return;
+          int p = (int) lroundf(v * 100.0f);
+          if (!lv_obj_has_state(id(fav_vol_slider), LV_STATE_PRESSED)) {
+            lv_slider_set_value(id(fav_vol_slider), p, LV_ANIM_OFF);
+            char b[8]; snprintf(b, sizeof(b), "%d%%", p); lv_label_set_text(id(r_fav_volpct), b);
+          }
   # intercom alleen als woonkamer / woonkamer totaal / eettafel speelt of klaar staat
   - id: ic_gate
     then:
@@ -5218,11 +5244,22 @@ sensor:
     attribute: volume_level
     internal: true
     on_value:
-      - lambda: |-
-          if (std::isnan(x)) return;
-          if (!lv_obj_has_state(id(fav_vol_slider), LV_STATE_PRESSED))
-            lv_slider_set_value(id(fav_vol_slider), (int) lroundf(x * 100.0f), LV_ANIM_OFF);
-          { char b[8]; snprintf(b, sizeof(b), "%d%%", (int) lroundf(x * 100.0f)); lv_label_set_text(id(r_fav_volpct), b); }
+      - script.execute: fav_vol_sync
+  # groepsvolume van woonkamer totaal en eettafel (voor de favorietenslider)
+  - platform: homeassistant
+    id: fav_vol_tot
+    entity_id: media_player.woonkamer_totaal
+    attribute: volume_level
+    internal: true
+    on_value:
+      - script.execute: fav_vol_sync
+  - platform: homeassistant
+    id: fav_vol_eet
+    entity_id: media_player.eettafel
+    attribute: volume_level
+    internal: true
+    on_value:
+      - script.execute: fav_vol_sync
   - platform: homeassistant
     id: lt_all_bri
     entity_id: light.woonkamer
@@ -5412,18 +5449,21 @@ text_sensor:
     internal: true
     on_value:
       - script.execute: ic_gate
+      - script.execute: fav_vol_sync
   - platform: homeassistant
     id: ic_mp1
     entity_id: media_player.woonkamer_totaal
     internal: true
     on_value:
       - script.execute: ic_gate
+      - script.execute: fav_vol_sync
   - platform: homeassistant
     id: ic_mp2
     entity_id: media_player.eettafel
     internal: true
     on_value:
       - script.execute: ic_gate
+      - script.execute: fav_vol_sync
   # ---- intercom
   - platform: homeassistant
     id: ic_log
@@ -12867,7 +12907,11 @@ lvgl:
               - homeassistant.action:
                   action: media_player.volume_set
                   data:
-                    entity_id: media_player.yamaha_receiver_woonkamer
+                    # zone die speelt: totaal / eettafel (groep), anders de receiver
+                    entity_id: !lambda |-
+                      return std::string(id(fav_zone) == 1 ? "media_player.woonkamer_totaal"
+                                       : id(fav_zone) == 2 ? "media_player.eettafel"
+                                       : "media_player.yamaha_receiver_woonkamer");
                     volume_level: !lambda 'return x / 100.0f;'
     - id: page_music
       # @nav-boven
