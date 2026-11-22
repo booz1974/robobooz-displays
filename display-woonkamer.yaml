@@ -53,6 +53,8 @@
 #   Muziek speelt: na 2 min naar Nu speelt.
 # Watchdog 60 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
+# Schakelaars (relais): de knoppen op het scherm worden pas bijgewerkt als
+#   LVGL klaar is; anders crasht hij bij het opstarten (ESPHome 2026.11).
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 # secrets.yaml: wifi, ma_api_token, API-/OTA-sleutels en de huisgenoten
 #   persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
@@ -5761,21 +5763,27 @@ switch:
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_state:
-      - lvgl.widget.update:
-          id: rl1
-          bg_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
-      - lvgl.widget.update:
-          id: rl1_icon
-          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-      - lvgl.widget.update:
-          id: rl1_name
-          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
-      - lvgl.widget.update:
-          id: rl1_state
-          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-      - lvgl.label.update:
-          id: rl1_state
-          text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
+      # pas de knop op het scherm bijwerken als LVGL de pagina's al gemaakt heeft;
+      # bij het opstarten zet ESPHome het relais (2026.11) soms eerder dan het scherm klaar is
+      - if:
+          condition:
+            lambda: 'return id(rl1) != nullptr && id(rl1_icon) != nullptr && id(rl1_name) != nullptr && id(rl1_state) != nullptr;'
+          then:
+              - lvgl.widget.update:
+                  id: rl1
+                  bg_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
+              - lvgl.widget.update:
+                  id: rl1_icon
+                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+              - lvgl.widget.update:
+                  id: rl1_name
+                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
+              - lvgl.widget.update:
+                  id: rl1_state
+                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+              - lvgl.label.update:
+                  id: rl1_state
+                  text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
   - platform: gpio
     id: relay2
     name: "Schakelaar achter"
@@ -5784,21 +5792,27 @@ switch:
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_state:
-      - lvgl.widget.update:
-          id: rl2
-          bg_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
-      - lvgl.widget.update:
-          id: rl2_icon
-          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-      - lvgl.widget.update:
-          id: rl2_name
-          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
-      - lvgl.widget.update:
-          id: rl2_state
-          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-      - lvgl.label.update:
-          id: rl2_state
-          text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
+      # pas de knop op het scherm bijwerken als LVGL de pagina's al gemaakt heeft;
+      # bij het opstarten zet ESPHome het relais (2026.11) soms eerder dan het scherm klaar is
+      - if:
+          condition:
+            lambda: 'return id(rl2) != nullptr && id(rl2_icon) != nullptr && id(rl2_name) != nullptr && id(rl2_state) != nullptr;'
+          then:
+              - lvgl.widget.update:
+                  id: rl2
+                  bg_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
+              - lvgl.widget.update:
+                  id: rl2_icon
+                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+              - lvgl.widget.update:
+                  id: rl2_name
+                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
+              - lvgl.widget.update:
+                  id: rl2_state
+                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+              - lvgl.label.update:
+                  id: rl2_state
+                  text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
 
 lvgl:
   id: lvgl_main
