@@ -128,6 +128,10 @@ esp32:
   watchdog_timeout: 60s
   framework:
     type: esp-idf
+    # het woonkamerpaneel heeft een Boya-flashchip (studio: generic); zo staat het
+    # in de opstartlog van ESPHome. Expliciet instellen sinds ESPHome 2026.11.
+    advanced:
+      flash_chip: boya
     sdkconfig_options:
       COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
