@@ -36,7 +36,7 @@
 #   tik ernaast = details (helderheid, kleuren); blokjesbalk = helderheid.
 # Sfeer: scènes van slaapkamer Jip (Helder, Gedimd, Lezen, Concentreren,
 #   Jip blauw; vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
-# Weer: nu + temperatuur per uur, regen komende 2 uur (Buienradar, 12 balkjes van 10 min), komende dagen.
+# Weer: nu + temperatuur per uur, regen komende 2 uur met paraplu als watermerk (Buienradar, 12 balkjes van 10 min), komende dagen.
 # Home Assistant: services, CPU/geheugen/schijf, uptime, grafiek, terminal.
 # Thema's A-H: Nachtblauw, Paars & neon, Antraciet & mint, Espresso & koraal,
 #   NEC, Oranje, NMHC, RACE. Kiezen via Menu > Thema; display Jip volgt
@@ -477,6 +477,12 @@ font:
     size: 72
     bpp: 4
     glyphs: *mdi_glyphs
+  # grote paraplu als watermerk achter de regengrafiek (weerpagina)
+  - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    id: pl_regen_bg
+    size: 140
+    bpp: 4
+    glyphs: ["${mdi_umbrella}"]
   - file:
       type: gfonts
       family: Roboto
@@ -10726,6 +10732,15 @@ lvgl:
             pad_all: 0
             scrollable: false
             clickable: false
+            widgets:
+              # paraplu als watermerk: groot en half doorzichtig, achter de balkjes
+              - label:
+                  align: CENTER
+                  y: 8
+                  text: "${mdi_umbrella}"
+                  text_font: pl_regen_bg
+                  text_color: 0x2B2F36
+                  text_opa: 18%
         - label:
             id: r_wx_tip
             x: 190
@@ -10743,7 +10758,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10769,7 +10784,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10795,7 +10810,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10821,7 +10836,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10847,7 +10862,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10873,7 +10888,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10899,7 +10914,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10925,7 +10940,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10951,7 +10966,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -10977,7 +10992,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11003,7 +11018,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11029,7 +11044,7 @@ lvgl:
             height: 90
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
