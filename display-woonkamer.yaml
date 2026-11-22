@@ -51,10 +51,10 @@
 #   na 30 min nachtstand. Tussen 23:00 en 06:00 automatisch nachtstand,
 #   behalve als er muziek speelt of er nog lampen aan zijn.
 #   Muziek speelt: na 2 min naar Nu speelt.
-# Watchdog 60 s: het aanmaken van alle pagina's bij het opstarten duurt
+# Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
-# Schakelaars (relais): de knoppen op het scherm worden pas bijgewerkt als
-#   LVGL klaar is; anders crasht hij bij het opstarten (ESPHome 2026.11).
+# Let op: bouwen met ESPHome 2026.10.2. Met 2026.11.0 loopt dit display bij het
+#   opstarten vast (crash na ~16 s, daarna OTA rollback); studio heeft dat niet.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 # secrets.yaml: wifi, ma_api_token, API-/OTA-sleutels en de huisgenoten
 #   persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
@@ -125,15 +125,10 @@ esp32:
   board: esp32-s3-devkitc-1
   variant: esp32s3
   flash_size: 16MB
-  # opstarten (alle LVGL-pagina's aanmaken) duurt langer dan de standaard 5 s;
-  # woonkamer heeft de meeste pagina's: 30 s was te krap sinds ESPHome 2026.11 + zonwering
-  watchdog_timeout: 60s
+  # opstarten (alle LVGL-pagina's aanmaken) duurt langer dan de standaard 5 s
+  watchdog_timeout: 30s
   framework:
     type: esp-idf
-    # het woonkamerpaneel heeft een Boya-flashchip (studio: generic); zo staat het
-    # in de opstartlog van ESPHome. Expliciet instellen sinds ESPHome 2026.11.
-    advanced:
-      flash_chip: boya
     sdkconfig_options:
       COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
@@ -5763,27 +5758,21 @@ switch:
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_state:
-      # pas de knop op het scherm bijwerken als LVGL de pagina's al gemaakt heeft;
-      # bij het opstarten zet ESPHome het relais (2026.11) soms eerder dan het scherm klaar is
-      - if:
-          condition:
-            lambda: 'return id(rl1) != nullptr && id(rl1_icon) != nullptr && id(rl1_name) != nullptr && id(rl1_state) != nullptr;'
-          then:
-              - lvgl.widget.update:
-                  id: rl1
-                  bg_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
-              - lvgl.widget.update:
-                  id: rl1_icon
-                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-              - lvgl.widget.update:
-                  id: rl1_name
-                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
-              - lvgl.widget.update:
-                  id: rl1_state
-                  text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-              - lvgl.label.update:
-                  id: rl1_state
-                  text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
+      - lvgl.widget.update:
+          id: rl1
+          bg_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
+      - lvgl.widget.update:
+          id: rl1_icon
+          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+      - lvgl.widget.update:
+          id: rl1_name
+          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
+      - lvgl.widget.update:
+          id: rl1_state
+          text_color: !lambda 'return id(relay1).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+      - lvgl.label.update:
+          id: rl1_state
+          text: !lambda 'return id(relay1).state ? std::string("AAN") : std::string("UIT");'
   - platform: gpio
     id: relay2
     name: "Schakelaar achter"
@@ -5792,27 +5781,21 @@ switch:
       inverted: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_state:
-      # pas de knop op het scherm bijwerken als LVGL de pagina's al gemaakt heeft;
-      # bij het opstarten zet ESPHome het relais (2026.11) soms eerder dan het scherm klaar is
-      - if:
-          condition:
-            lambda: 'return id(rl2) != nullptr && id(rl2_icon) != nullptr && id(rl2_name) != nullptr && id(rl2_state) != nullptr;'
-          then:
-              - lvgl.widget.update:
-                  id: rl2
-                  bg_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
-              - lvgl.widget.update:
-                  id: rl2_icon
-                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-              - lvgl.widget.update:
-                  id: rl2_name
-                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
-              - lvgl.widget.update:
-                  id: rl2_state
-                  text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
-              - lvgl.label.update:
-                  id: rl2_state
-                  text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
+      - lvgl.widget.update:
+          id: rl2
+          bg_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[1]);'
+      - lvgl.widget.update:
+          id: rl2_icon
+          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+      - lvgl.widget.update:
+          id: rl2_name
+          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[3]);'
+      - lvgl.widget.update:
+          id: rl2_state
+          text_color: !lambda 'return id(relay2).state ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(id(r_tcol)[4]);'
+      - lvgl.label.update:
+          id: rl2_state
+          text: !lambda 'return id(relay2).state ? std::string("AAN") : std::string("UIT");'
 
 lvgl:
   id: lvgl_main
