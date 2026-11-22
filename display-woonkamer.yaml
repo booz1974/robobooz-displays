@@ -37,7 +37,7 @@
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
 # Weer: nu + temperatuur per uur, regen komende 2 uur (Buienradar, 12 balkjes
-#   van 10 min), zonwering eettafel (OMHOOG / STOP / OMLAAG, stand in blokjes
+#   van 10 min, met een grote paraplu als watermerk), zonwering eettafel (OMHOOG / STOP / OMLAAG, stand in blokjes
 #   en een venstertje met het doek) en komende dagen.
 # Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
 #   CPU/geheugen/schijf-meters, CPU-temperatuur, uptime, 24-uursgrafiek, terminal.
@@ -504,6 +504,12 @@ font:
     size: 72
     bpp: 4
     glyphs: *mdi_glyphs
+  # grote paraplu als watermerk achter de regengrafiek (weerpagina)
+  - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    id: pl_regen_bg
+    size: 140
+    bpp: 4
+    glyphs: ["${mdi_umbrella}"]
   - file:
       type: gfonts
       family: Roboto
@@ -5574,7 +5580,7 @@ text_sensor:
     internal: true
     on_value:
       - script.execute: r_ticker
-  # regen komend uur: "VVV|HH:MM VVV|HH:MM ..." per 5 minuten (Neerslag-app, bron Buienradar)
+  # regen komende 2 uur: "VVV|HH:MM VVV|HH:MM ..." per 5 minuten (Neerslag-app, bron Buienradar)
   - platform: homeassistant
     id: wx_regen
     entity_id: sensor.neerslag_buienradar_regen_data
@@ -11537,6 +11543,15 @@ lvgl:
             pad_all: 0
             scrollable: false
             clickable: false
+            widgets:
+              # paraplu als watermerk: groot en half doorzichtig, achter de balkjes
+              - label:
+                  align: CENTER
+                  y: 10
+                  text: "${mdi_umbrella}"
+                  text_font: pl_regen_bg
+                  text_color: 0x2B2F36
+                  text_opa: 18%
         - label:
             id: r_wx_tip
             x: 190
@@ -11554,7 +11569,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11580,7 +11595,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11606,7 +11621,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11632,7 +11647,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11658,7 +11673,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11684,7 +11699,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11710,7 +11725,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11736,7 +11751,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11762,7 +11777,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11788,7 +11803,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11814,7 +11829,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
@@ -11840,7 +11855,7 @@ lvgl:
             height: 62
             radius: 2
             bg_color: 0x245C48
-            bg_opa: COVER
+            bg_opa: 55%
             border_width: 0
             pad_all: 0
             scrollable: false
