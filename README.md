@@ -24,6 +24,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Dimmen: 1 min → 65 %, 2 min → 35 %, 30 min → nachtstand; eerste tik maakt alleen wakker
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
 - Beide displays: pagina Home Assistant (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
+- Woonkamer: weerpagina met regen voor de komende 2 uur (12 balkjes van 10 minuten, Buienradar) en een paneel voor de zonwering eettafel: OMHOOG / STOP / OMLAAG, de stand in blokjes en een venstertje waarin het doek meebeweegt
 - Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)
 - Studio: geheime Intercom naar parallelle universums (tik op het satellietblok in de LIVE-balk): kanaalkiezer met 12 kanalen (o.a. 9 Wekkerbrigade, 10 Keukenkazerne, 11 Shampoo-Commando, 12 Fluisterwekker), PUSH TO TALK, ruis + bericht via ElevenLabs als aankondiging op de studiospeaker (`script.intercom_zend`, `input_text.intercom_log`; geluiden in `www/robobooz/`, kanaal 12 begint met een zacht melodietje `intro_12.mp3`)
 - Alle intercomschermen: kies de ontvanger (HIER of een andere kamer); PUSH TO TALK stuurt het kanaal van de draaischijf daarheen (`script.intercom_zend`, veld `naar`), het telefoonvak een oproep van Jeroen (`script.intercom_bel`). Berichten klinken op hetzelfde volume als de muziek op die speler
@@ -47,6 +48,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - `script.lampen_random_kleuren`
 - Music Assistant (app) op `http://<ha-ip>:8095` met API-token (`ma_api_token`); favorieten worden rechtstreeks uit Music Assistant gehaald
 - Woonkamer: `input_text.server_info_display`, `input_text.server_hist_cpu`, `input_text.server_hist_temp` (automatiseringen *Displays - serverinfo* en *servergeschiedenis*) en System Monitor-sensoren
+- Woonkamer: `sensor.neerslag_buienradar_regen_data` (Neerslag-app, attribuut `data`) en `cover.eettafel_zonwering_eettafel` (met `current_position`)
 - Woonkamer: `input_text.planten_display` (automatisering *Displays - planten*)
 - Optioneel: Team Tracker-sensoren voor NEC/Oranje en een agenda voor NMHC (automatisch wedstrijdthema)
 
