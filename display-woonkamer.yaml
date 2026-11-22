@@ -51,7 +51,7 @@
 #   na 30 min nachtstand. Tussen 23:00 en 06:00 automatisch nachtstand,
 #   behalve als er muziek speelt of er nog lampen aan zijn.
 #   Muziek speelt: na 2 min naar Nu speelt.
-# Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
+# Watchdog 60 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 # secrets.yaml: wifi, ma_api_token, API-/OTA-sleutels en de huisgenoten
@@ -123,8 +123,9 @@ esp32:
   board: esp32-s3-devkitc-1
   variant: esp32s3
   flash_size: 16MB
-  # opstarten (alle LVGL-pagina's aanmaken) duurt langer dan de standaard 5 s
-  watchdog_timeout: 30s
+  # opstarten (alle LVGL-pagina's aanmaken) duurt langer dan de standaard 5 s;
+  # woonkamer heeft de meeste pagina's: 30 s was te krap sinds ESPHome 2026.11 + zonwering
+  watchdog_timeout: 60s
   framework:
     type: esp-idf
     sdkconfig_options:
