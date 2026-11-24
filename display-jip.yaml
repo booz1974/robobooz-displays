@@ -51,6 +51,8 @@
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
 #   na 30 min nachtstand (niet tijdens NIET STOREN). Tussen 23:00 en 06:00
 #   automatisch nachtstand, behalve als er muziek speelt of er lampen aan zijn.
+# Kijkpaal speelt: na 30 s niets aanraken automatisch naar Nu speelt (ook als
+#   het scherm sliep, dan op 35%); 30 s na het stoppen terug naar Thuis.
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
 # Diagnose in HA: sensoren 'Stapel hoofdtaak vrij' (B) en 'Intern RAM vrij' (kB).
@@ -4535,7 +4537,7 @@ interval:
             lambda: 'return id(page_player)->is_showing() && lv_display_get_inactive_time(nullptr) > 2500;'
           then:
             - script.execute: ma_qpoll
-  # na 2 minuten niets aanraken: het juiste rustscherm kiezen
+  # na 2 minuten niets aanraken: het juiste rustscherm kiezen (muziek al na 30 s)
   #   NIET STOREN > muziek > nachtstand (23-06, niet als er lampen aan zijn) > goedemorgen (06:30-09:30) > thuispagina
   - interval: 5s
     then:
@@ -4544,10 +4546,29 @@ interval:
           bool kijkpaal_speelt = id(studio_mini_state).has_state() && id(studio_mini_state).state == "playing";
           if (kijkpaal_speelt) last_play = millis();
           if (id(bell_active)) return;
-          if (lv_display_get_inactive_time(nullptr) < 120000) return;   // na 2 minuten niets aanraken
+          uint32_t stil = lv_display_get_inactive_time(nullptr);
+          if (stil < 30000) return;   // iemand bedient het scherm: niets wisselen
           auto show = [](esphome::lvgl::LvPageType *pg) {
             if (!pg->is_showing()) id(lvgl_main)->show_page(pg->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 300);
           };
+          // kijkpaal speelt: na 30 s niets aanraken naar Nu speelt (scherm sliep: weer aan op 35%)
+          if (kijkpaal_speelt && !id(onair).state) {
+            if (!id(page_music)->is_showing() && !id(page_player)->is_showing()) {
+              if (id(lvgl_main)->is_paused()) {
+                id(lvgl_main)->set_paused(false, false);
+                auto lc = id(display_backlight).turn_on(); lc.set_brightness(0.35f); lc.perform();
+              }
+              show(id(page_music));
+            }
+            return;
+          }
+          // gestopt: 30 s later van het muziekscherm terug naar Thuis
+          if (millis() - last_play >= 30000 && last_play != 0 && (id(page_music)->is_showing() || id(page_player)->is_showing())) {
+            last_play = 0;
+            show(id(page_rhome));
+            return;
+          }
+          if (stil < 120000) return;   // de rest pas na 2 minuten niets aanraken
           auto t = id(system_time).now();
           int hm = t.is_valid() ? t.hour * 60 + t.minute : -1;
           // nachtstand 23:00-06:00, maar niet zolang er nog lampen aan zijn (muziek gaat hieronder al voor)
