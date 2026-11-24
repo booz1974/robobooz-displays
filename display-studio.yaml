@@ -53,6 +53,7 @@
 #   automatisch nachtstand, behalve als er muziek speelt of er nog lampen aan zijn.
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
+# Diagnose in HA: sensoren 'Stapel hoofdtaak vrij' (B) en 'Intern RAM vrij' (kB).
 # Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB). Hoofdtaak-stapel 16 KB
 #   (loop_task_stack_size), net als Jip: met 8 KB liep die daar bij het opstarten over.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
@@ -4889,6 +4890,23 @@ binary_sensor:
           id: info_regen_icon
           text_color: !lambda 'return x ? lv_color_hex(0xE5736A) : lv_color_hex(id(r_tcol)[4]);'
 sensor:
+  # diagnose: hoeveel stapel de hoofdtaak minimaal vrij hield en hoeveel intern RAM er vrij is
+  - platform: template
+    name: "Stapel hoofdtaak vrij"
+    id: diag_stack
+    unit_of_measurement: "B"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: 'return (float) uxTaskGetStackHighWaterMark(nullptr);'
+  - platform: template
+    name: "Intern RAM vrij"
+    id: diag_iram
+    unit_of_measurement: "kB"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: 'return (float) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);'
   # ---- serverkamer
   - platform: homeassistant
     id: srv_cpu

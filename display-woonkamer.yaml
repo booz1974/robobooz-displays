@@ -57,6 +57,7 @@
 #   12 frames per gif (~0,6 MB minder PSRAM).
 # Zonnestroom: vakjes zon/huis/net in de tegelkleur van het thema (zon was
 #   in donkere thema's onleesbaar).
+# Diagnose in HA: sensoren 'Stapel hoofdtaak vrij' (B) en 'Intern RAM vrij' (kB).
 # Hoofdtaak-stapel 20 KB (loop_task_stack_size). Met de standaard 8 KB liep dit
 #   display met ESPHome 2026.11.0 bij het opstarten vast (crash na ~16 s, daarna
 #   OTA rollback); bij Jip loste een grotere stapel precies dat op. Werkt 2026.11
@@ -5235,6 +5236,23 @@ binary_sensor:
           id: info_regen_icon
           text_color: !lambda 'return x ? lv_color_hex(0xE5736A) : lv_color_hex(id(r_tcol)[4]);'
 sensor:
+  # diagnose: hoeveel stapel de hoofdtaak minimaal vrij hield en hoeveel intern RAM er vrij is
+  - platform: template
+    name: "Stapel hoofdtaak vrij"
+    id: diag_stack
+    unit_of_measurement: "B"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: 'return (float) uxTaskGetStackHighWaterMark(nullptr);'
+  - platform: template
+    name: "Intern RAM vrij"
+    id: diag_iram
+    unit_of_measurement: "kB"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: 'return (float) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024);'
   # zonwering eettafel: 0 = dicht (omlaag), 100 = open (omhoog)
   - platform: homeassistant
     id: zw_pos
