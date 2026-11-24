@@ -11,6 +11,7 @@
 #   vegen naar links/rechts kan ook.
 # Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
 #   zon vandaag' op Energie; omvormer + P1 live (ook ZON/NET op Thuis).
+#   Vakjes zon/huis/net in de tegelkleur van het thema (zon was onleesbaar).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. Kanaalkiezer
 #   met 12 kanalen (1 Kelder, 2 ISS, 3 Buren, 4 1986, 5 Koelkast-Bunker,
 #   6 Tuinkabouter-Verzet, 7 AIVD-busje, 8 Area 51, 9 Wekkerbrigade (opstaan),
@@ -14808,7 +14809,7 @@ lvgl:
             width: 144
             height: 78
             radius: 14
-            bg_color: 0xFFF3D6
+            bg_color: ${c_tile}   # zelfde als het net-vakje (leesbaar in elk thema)
             bg_opa: COVER
             border_width: 0
             pad_all: 0

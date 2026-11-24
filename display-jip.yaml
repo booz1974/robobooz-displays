@@ -16,6 +16,7 @@
 #   energiekosten van vandaag en ZON/NET live, hoes met VU-meter.
 # Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
 #   zon vandaag' op Energie; omvormer + P1 live, 'goed moment om te wassen'.
+#   Vakjes zon/huis/net in de tegelkleur van het thema (zon was onleesbaar).
 #   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Menu.
 # Kachel: alleen het paneel (climate.paneel_jip), niet de smartplug.
 #   Kachel aan = kiezen uit 15, 30 of 60 min, dan
@@ -15782,7 +15783,7 @@ lvgl:
             width: 144
             height: 78
             radius: 14
-            bg_color: 0xFFF3D6
+            bg_color: ${c_tile}   # zelfde als het net-vakje (leesbaar in elk thema)
             bg_opa: COVER
             border_width: 0
             pad_all: 0

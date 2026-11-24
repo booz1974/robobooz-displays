@@ -55,6 +55,8 @@
 #   langer dan de standaard 5 s.
 # Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB) en kachelanimatie met
 #   12 frames per gif (~0,6 MB minder PSRAM).
+# Zonnestroom: vakjes zon/huis/net in de tegelkleur van het thema (zon was
+#   in donkere thema's onleesbaar).
 # Hoofdtaak-stapel 20 KB (loop_task_stack_size). Met de standaard 8 KB liep dit
 #   display met ESPHome 2026.11.0 bij het opstarten vast (crash na ~16 s, daarna
 #   OTA rollback); bij Jip loste een grotere stapel precies dat op. Werkt 2026.11
@@ -16936,7 +16938,7 @@ lvgl:
             width: 144
             height: 78
             radius: 14
-            bg_color: 0xFFF3D6
+            bg_color: ${c_tile}   # zelfde als het net-vakje (leesbaar in elk thema)
             bg_opa: COVER
             border_width: 0
             pad_all: 0
