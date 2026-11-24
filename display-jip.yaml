@@ -16,7 +16,8 @@
 #   energiekosten van vandaag, hoes met VU-meter.
 #   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Menu.
 # Kachel: alleen het paneel (climate.paneel_jip), niet de smartplug.
-#   Kachel aan = script.paneel_jip_timer_starten (timer, resterende minuten
+#   Kachel aan = kiezen uit 15, 30 of 60 min, dan
+#   script.paneel_jip_timer_starten (veld minuten; resterende minuten
 #   onder de knop); Kachel uit = 1 s vasthouden (script.paneel_jip_uit);
 #   NIET STOREN = input_boolean.jip_niet_storen (rood scherm, deurbel stil).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. 12 kanalen zoals
@@ -2249,6 +2250,24 @@ script:
           id: r_layout
           anim: false
       - script.execute: r_theme_mark
+  # ---- Kachel aan met gekozen timer (15/30/60 min) via script.paneel_jip_timer_starten (veld minuten)
+  - id: pc_timer_kies
+    mode: restart
+    parameters:
+      minuten: int
+    then:
+      - lvgl.widget.hide: pc_keuze
+      - homeassistant.action:
+          action: script.paneel_jip_timer_starten
+          data:
+            minuten: !lambda 'return std::to_string(minuten);'
+      - lvgl.label.update:
+          id: pc_on_hint
+          text: !lambda |-
+            char b[40]; snprintf(b, sizeof(b), "KACHEL GAAT AAN · %d MIN", minuten);
+            return std::string(b);
+      - delay: 5s
+      - lambda: 'id(pk_left).publish_state(id(pk_left).state);'
   # ---- Kachel uit: na 1 seconde vasthouden (script.paneel_jip_uit: paneel uit + timer stoppen)
   - id: off_hold
     mode: restart
@@ -11479,6 +11498,8 @@ lvgl:
       # @nav-boven
       styles: pl_page
       scrollable: false
+      on_unload:
+        - lvgl.widget.hide: pc_keuze
       on_swipe_left:
         - lambda: 'lv_indev_wait_release(lv_indev_active());'
         - lvgl.page.next:
@@ -11624,16 +11645,9 @@ lvgl:
                   text: "PANEEL AAN MET TIMER"
                   text_font: r_mono
                   text_color: 0x8B9099
+            # eerst kiezen hoe lang: 15, 30 of 60 minuten (keuzevenster pc_keuze)
             on_click:
-              - homeassistant.action:
-                  action: script.turn_on
-                  data:
-                    entity_id: script.paneel_jip_timer_starten
-              - lvgl.label.update:
-                  id: pc_on_hint
-                  text: "KACHEL GAAT AAN, TIMER LOOPT"
-              - delay: 5s
-              - lambda: 'id(pk_left).publish_state(id(pk_left).state);'
+              - lvgl.widget.show: pc_keuze
         # uit: kachel uit na 1 s vasthouden (script.paneel_jip_uit)
         - button:
             id: pc_off_btn
@@ -11728,6 +11742,141 @@ lvgl:
                   action: input_boolean.toggle
                   data:
                     entity_id: input_boolean.jip_niet_storen
+        # keuzevenster na 'Kachel aan': hoe lang moet de timer lopen? (tik ernaast = annuleren)
+        - obj:
+            id: pc_keuze
+            hidden: true
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            radius: 0
+            border_width: 0
+            pad_all: 0
+            bg_color: 0x000000
+            bg_opa: 60%
+            scrollable: false
+            on_click:
+              - lvgl.widget.hide: pc_keuze
+            widgets:
+              - obj:
+                  x: 40
+                  y: 100
+                  width: 400
+                  height: 270
+                  radius: 18
+                  border_width: 0
+                  pad_all: 0
+                  bg_color: 0xFFFFFE
+                  scrollable: false
+                  widgets:
+                    - label:
+                        align: TOP_MID
+                        y: 22
+                        text: "Hoe lang?"
+                        text_font: pl_t30
+                        text_color: ${c_text}
+                    - button:
+                        x: 20
+                        y: 74
+                        width: 112
+                        height: 112
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_ofs_y: 4
+                        border_width: 0
+                        pressed:
+                          bg_color: ${c_tile_on}
+                        widgets:
+                          - label:
+                              align: CENTER
+                              y: -12
+                              text: "15"
+                              text_font: pl_t30
+                              text_color: ${c_text}
+                          - label:
+                              align: CENTER
+                              y: 24
+                              text: "MIN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - script.execute:
+                              id: pc_timer_kies
+                              minuten: 15
+                    - button:
+                        x: 144
+                        y: 74
+                        width: 112
+                        height: 112
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_ofs_y: 4
+                        border_width: 0
+                        pressed:
+                          bg_color: ${c_tile_on}
+                        widgets:
+                          - label:
+                              align: CENTER
+                              y: -12
+                              text: "30"
+                              text_font: pl_t30
+                              text_color: ${c_text}
+                          - label:
+                              align: CENTER
+                              y: 24
+                              text: "MIN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - script.execute:
+                              id: pc_timer_kies
+                              minuten: 30
+                    - button:
+                        x: 268
+                        y: 74
+                        width: 112
+                        height: 112
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_ofs_y: 4
+                        border_width: 0
+                        pressed:
+                          bg_color: ${c_tile_on}
+                        widgets:
+                          - label:
+                              align: CENTER
+                              y: -12
+                              text: "60"
+                              text_font: pl_t30
+                              text_color: ${c_text}
+                          - label:
+                              align: CENTER
+                              y: 24
+                              text: "MIN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - script.execute:
+                              id: pc_timer_kies
+                              minuten: 60
+                    - button:
+                        align: BOTTOM_MID
+                        y: -16
+                        width: 200
+                        height: 40
+                        radius: 20
+                        bg_opa: TRANSP
+                        shadow_opa: TRANSP
+                        border_width: 0
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "ANNULEREN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - lvgl.widget.hide: pc_keuze
     - id: page_favs
       # @nav-boven
       styles: pl_page
