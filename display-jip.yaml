@@ -35,7 +35,8 @@
 # LIVE-balk: ROBOBOOZ-roast (AI), buiten, verbruik en deur.
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
-# Muziek: volumeslider voor de kijkpaal; radio zoekt de hoes op via iTunes
+# Muziek: alleen de kijkpaal, via beide MA-spelers (ec5bd534-... = cast en
+#   dashboard:chromecast_ec5bd534-...); volumeslider voor de kijkpaal; radio zoekt de hoes op via iTunes
 #   (onthouden per nummer, ook als er meer zenders tegelijk spelen);
 #   bij reclame ('Advert') de eigen hoes uit /config/www/robobooz/.
 # Lampen: Alles, Lamp, Ledstrip en Vitrine. Tik op het icoontje = aan/uit,
@@ -3819,7 +3820,9 @@ script:
                       if (p["enabled"].is<bool>() && !p["enabled"].as<bool>()) continue;
                       if (p["available"].is<bool>() && !p["available"].as<bool>()) continue;
                       if (!p["synced_to"].isNull()) continue;
-                      if (std::string(p["player_id"] | "") != "dashboard:chromecast_ec5bd534-c65d-79f7-bbf4-953eee6f7b6b") continue;   // alleen kijkpaal Jip
+                      // alleen kijkpaal Jip: MA kent hem twee keer (cast-speler en dashboard-speler)
+                      { std::string pid = p["player_id"] | "";
+                        if (pid != "ec5bd534-c65d-79f7-bbf4-953eee6f7b6b" && pid != "dashboard:chromecast_ec5bd534-c65d-79f7-bbf4-953eee6f7b6b") continue; }
                       std::string st = p["playback_state"] | (p["state"] | "");
                       bool playing = st == "playing";
                       if (pass == 0 && !playing) continue;
