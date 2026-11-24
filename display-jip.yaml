@@ -14,10 +14,10 @@
 #   3 nieuwsregels en een finishvlag; weer, kamertegel (temperatuur kamer;
 #   vonkjes = kachel aan, vlokjes = uit; tik = Kachel), energie met
 #   energiekosten van vandaag en ZON/NET live, hoes met VU-meter.
+#   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Menu.
 # Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
 #   zon vandaag' op Energie; omvormer + P1 live, 'goed moment om te wassen'.
 #   Vakjes zon/huis/net in de tegelkleur van het thema (zon was onleesbaar).
-#   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Menu.
 # Kachel: alleen het paneel (climate.paneel_jip), niet de smartplug.
 #   Kachel aan = kiezen uit 15, 30 of 60 min, dan
 #   script.paneel_jip_timer_starten (veld minuten; resterende minuten
@@ -56,6 +56,8 @@
 # Diagnose in HA: sensoren 'Stapel hoofdtaak vrij' (B) en 'Intern RAM vrij' (kB).
 # Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB). Hoofdtaak-stapel 16 KB
 #   (loop_task_stack_size): met 8 KB liep hij bij het opstarten over.
+# Zuiniger: themacontrole elke 5 s (was 1 s), Music Assistant elke 12 s als er
+#   niets speelt en geen muziekpagina open is (anders 3 s), watermerk via pl_wx110.
 # Aanraken: de touchchip van het nieuwe paneel (1 relais) meldt zich als
 #   1024x600 scherm; met calibration 0..479 klopt de plek van elke tik weer.
 # Relais: het board heeft 1 relais; nog niet in gebruik.
@@ -78,6 +80,9 @@
 #   input_text.ochtend_agenda_display, sensor.neerslag_buienradar_regen_data,
 #   System Monitor-sensoren, script.lampen_random_kleuren en
 #   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3, intro_12.mp3, advert-hoes).
+# Ook gebruikt in HA: sensor.dle3a27053_pv_output_actual en
+#   sensor.p1_meter_3c39e7240afe_active_power
+#   (Zonnestroom, ZON/NET op Thuis).
 # =====================================================================
 
 esphome:
@@ -179,7 +184,7 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "Plate02 Fallback Hotspot"
+    ssid: "Plate03 Fallback Hotspot"
     password: !secret plate03_ap_password
 
 captive_portal:
@@ -502,12 +507,6 @@ font:
     size: 72
     bpp: 4
     glyphs: *mdi_glyphs
-  # weericoon van nu als watermerk achter de regengrafiek (weerpagina)
-  - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
-    id: pl_regen_bg
-    size: 110
-    bpp: 4
-    glyphs: ["${mdi_night}", "${mdi_wx_cloudy}", "${mdi_wx_fog}", "${mdi_wx_hail}", "${mdi_wx_lightning}", "${mdi_wx_lrain}", "${mdi_weather}", "${mdi_wx_pouring}", "${mdi_rain}", "${mdi_wx_snowy}", "${mdi_wx_snowrain}", "${mdi_wx_sunny}", "${mdi_wx_windy}"]
   - file:
       type: gfonts
       family: Roboto
@@ -1340,9 +1339,6 @@ globals:
   - id: big_buf
     type: uint16_t*
     initial_value: 'nullptr'
-  - id: is_dark
-    type: bool
-    initial_value: 'true'
   - id: theme_idx
     type: int
     restore_value: true
@@ -2320,14 +2316,14 @@ script:
           bool terug = grid < -20.0f, van = grid > 20.0f;
           lv_label_set_text(id(zs_net_t), terug ? "Teruglevering" : (van ? "Van het net" : "Net"));
           // nettegel groen bij teruglevering
-          lv_obj_set_style_bg_color(id(zs_net_tile), lv_color_hex(terug ? ${c_tile_on} : ${c_tile}), 0);
-          lv_obj_set_style_text_color(id(zs_net_v), lv_color_hex(terug ? ${c_dark} : ${c_text}), 0);
-          lv_obj_set_style_text_color(id(zs_net_t), lv_color_hex(terug ? ${c_dark} : ${c_sub}), 0);
-          lv_obj_set_style_text_color(id(zs_net_u), lv_color_hex(terug ? ${c_dark} : ${c_sub}), 0);
+          lv_obj_set_style_bg_color(id(zs_net_tile), lv_color_hex(terug ? id(r_tcol)[2] : id(r_tcol)[1]), 0);
+          lv_obj_set_style_text_color(id(zs_net_v), lv_color_hex(terug ? id(r_tcol)[5] : id(r_tcol)[3]), 0);
+          lv_obj_set_style_text_color(id(zs_net_t), lv_color_hex(terug ? id(r_tcol)[5] : id(r_tcol)[4]), 0);
+          lv_obj_set_style_text_color(id(zs_net_u), lv_color_hex(terug ? id(r_tcol)[5] : id(r_tcol)[4]), 0);
           // statuspil
           lv_label_set_text(id(zs_pill_lbl), terug ? "Teruglevering" : (van ? "Van het net" : "In balans"));
-          lv_obj_set_style_bg_color(id(zs_pill), lv_color_hex(terug ? ${c_tile_on} : 0xDDE2E8), 0);
-          lv_obj_set_style_text_color(id(zs_pill_lbl), lv_color_hex(terug ? ${c_dark} : 0x5A6270), 0);
+          lv_obj_set_style_bg_color(id(zs_pill), lv_color_hex(terug ? id(r_tcol)[2] : id(r_tcol)[10]), 0);
+          lv_obj_set_style_text_color(id(zs_pill_lbl), lv_color_hex(terug ? id(r_tcol)[5] : id(r_tcol)[4]), 0);
           // stromen (W) voor de bewegende bolletjes: zon->huis, zon->net, net->huis
           id(zs_flow)[0] = std::min(pv, huis);
           id(zs_flow)[1] = std::max(0.0f, -grid);
@@ -2360,7 +2356,7 @@ script:
             lv_obj_set_style_shadow_offset_y(fr, 6, 0);
             lv_obj_set_style_shadow_width(fr, 22, 0);
             lv_obj_set_style_bg_color(id(zs_bar), lv_color_hex(id(r_tcol)[1]), 0);
-            lv_obj_set_style_text_color(id(zs_status), lv_color_hex(terug ? 0x2E8B65 : ${c_sub}), 0);
+            lv_obj_set_style_text_color(id(zs_status), lv_color_hex(terug ? 0x2E8B65 : id(r_tcol)[4]), 0);
             lv_obj_add_flag(id(zs_wash), LV_OBJ_FLAG_HIDDEN);
             std::string st = terug ? "Je levert " + fmt(-grid) + " terug" : (van ? "Je haalt " + fmt(grid) + " van het net" : "Zon en verbruik in balans");
             lv_label_set_text(id(zs_status), st.c_str());
@@ -4488,16 +4484,12 @@ interval:
           lv_obj_t *cl[] = {id(mp_big_clock_o0), id(mp_big_clock_o1), id(mp_big_clock_o2), id(mp_big_clock_o3),
                             id(mp_big_clock_o4), id(mp_big_clock_o5), id(mp_big_clock_o6), id(mp_big_clock_o7), id(mp_big_clock)};
           for (auto *o : cl) lv_label_set_text(o, b);
-  # nachtstand: kleuren die tussendoor (opnieuw) gezet zijn ook omzetten
-  - interval: 1s
+  # thema: kleuren die tussendoor (opnieuw) gezet zijn ook omzetten (elke 5 s; was elke seconde)
+  - interval: 5s
     then:
-      - if:
-          condition:
-            lambda: 'return id(is_dark);'
-          then:
-            - script.execute:
-                id: night_remap
-                full: false
+      - script.execute:
+          id: night_remap
+          full: false
   # bewaking hoesjes-wachtrij: download hangt (timeout is 6 s) -> na 9 s doorgaan,
   # en het grote hoesje opnieuw proberen
   - interval: 2s
@@ -4530,7 +4522,12 @@ interval:
       - if:
           condition:
             # niet ophalen terwijl iemand het scherm bedient: ophalen blokkeert de aanraking
-            lambda: 'return wifi::global_wifi_component->is_connected() && lv_display_get_inactive_time(nullptr) > 2500;'
+            # elke 3 s als er muziek speelt of een muziekpagina open is, anders elke 12 s
+            lambda: |-
+              if (!wifi::global_wifi_component->is_connected() || lv_display_get_inactive_time(nullptr) <= 2500) return false;
+              static uint8_t n = 0;
+              bool actief = id(mp_any) || id(page_music)->is_showing() || id(page_player)->is_showing();
+              return actief || (++n % 4) == 0;
           then:
             - script.execute: ma_poll
       - if:
@@ -5385,15 +5382,6 @@ text_sensor:
     internal: true
     on_value:
       - script.execute: people_render
-  - platform: homeassistant
-    id: sun_state
-    entity_id: sun.sun
-    internal: true
-    on_value:
-      then:
-        - lambda: |-
-            // RETRO: geen dag/nacht-wissel; het thema bepaalt de kleuren
-            return;
   - platform: homeassistant
     id: cam_pic
     entity_id: camera.voordeur
@@ -10937,7 +10925,7 @@ lvgl:
                   align: CENTER
                   y: 8
                   text: "${mdi_weather}"
-                  text_font: pl_regen_bg
+                  text_font: pl_wx110
                   text_color: 0x2B2F36
                   text_opa: 12%
         - label:
@@ -11870,7 +11858,7 @@ lvgl:
             border_width: 0
             gesture_bubble: false
             pressed:
-              bg_color: 0xF3D2CF
+              bg_color: 0xF6B8B0
             widgets:
               - label:
                   align: LEFT_MID
@@ -15765,7 +15753,7 @@ lvgl:
                   width: 64
                   height: 64
                   radius: 14
-                  bg_color: 0xDDE2E8
+                  bg_color: 0xDDE0E5
                   bg_opa: COVER
                   border_width: 0
                   pad_all: 0
@@ -15952,7 +15940,7 @@ lvgl:
             bg_color: ${c_tile}
             bg_opa: COVER
             pressed:
-              bg_color: 0xDDE2E8
+              bg_color: 0xDDE0E5
             layout:
               type: FLEX
               flex_flow: ROW
