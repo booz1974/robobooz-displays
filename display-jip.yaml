@@ -47,8 +47,8 @@
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
 # Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB).
-# TIJDELIJK: aanraakdiagnose (log 'tik' met coördinaten) voor het nieuwe
-#   paneel met 1 relais; weer weghalen als het aanraken klopt.
+# Aanraken: de touchchip van het nieuwe paneel (1 relais) meldt zich als
+#   1024x600 scherm; met calibration 0..479 klopt de plek van elke tik weer.
 # Relais: het board heeft 1 relais; nog niet in gebruik.
 # secrets.yaml: wifi, ma_api_token, plate03_* (API-/OTA-/AP-sleutels) en de
 #   huisgenoten persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
@@ -196,10 +196,13 @@ touchscreen:
   id: my_touchscreen
   display: my_display
   i2c_id: bus_a
+  # nieuw paneel: GT911 geeft 0..479 door maar meldt 1024x600; vast bereik instellen
+  calibration:
+    x_min: 0
+    x_max: 479
+    y_min: 0
+    y_max: 479
   on_touch:
-    # TIJDELIJK (diagnose nieuw paneel): elke tik met ruwe en omgerekende coördinaten in de log
-    - lambda: |-
-          for (auto &t : touches) ESP_LOGI("tik", "x=%d y=%d  (ruw x=%d y=%d)", t.x, t.y, t.x_raw, t.y_raw);
     # scherm gedimd/uit: deze tik alleen om wakker te maken (LVGL negeert hem tot loslaten)
     - lambda: |-
           auto &bl = id(display_backlight).current_values;
