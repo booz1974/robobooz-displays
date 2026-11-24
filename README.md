@@ -24,7 +24,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Dimmen: 1 min → 65 %, 2 min → 35 %, 30 min → nachtstand; eerste tik maakt alleen wakker
 - Automatische nachtstand tussen 23:00 en 06:00, behalve als er muziek speelt of er nog lampen aan zijn
 - Beide displays: pagina Home Assistant (services als modules, CPU/geheugen/schijf-meters, temperatuur, 24-uursgrafiek, terminal)
-- Weerpagina (alle displays): regen voor de komende 2 uur (12 balkjes van 10 minuten, Buienradar) met een grote paraplu als watermerk
+- Weerpagina (alle displays): regen voor de komende 2 uur (12 balkjes van 10 minuten, Buienradar) met het weericoon van nu als watermerk (doorzichtig, achter de balkjes)
 - Alle displays: op Energie opent de tegel *Bespaard door zon vandaag* de pagina Zonnestroom (live zon / huis / net met lopende bolletjes, 'goed moment om te wassen')
 - Woonkamer: op de weerpagina ook een paneel voor de zonwering eettafel: OMHOOG / STOP / OMLAAG, de stand in blokjes en een venstertje waarin het doek meebeweegt
 - Woonkamer: pagina Plantenkas (4 planten; de pot is de vochtmeter, met status TOP / TE NAT / DORST, temperatuur en batterij)

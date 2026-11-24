@@ -39,7 +39,7 @@
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: studio-scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
-# Weer: nu + temperatuur per uur, regen komende 2 uur met paraplu als watermerk (Buienradar, 12 balkjes
+# Weer: nu + temperatuur per uur, regen komende 2 uur met het weericoon van nu als watermerk (Buienradar, 12 balkjes
 #   van 10 min),
 #   komende dagen.
 # Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
@@ -497,12 +497,12 @@ font:
     size: 72
     bpp: 4
     glyphs: *mdi_glyphs
-  # grote paraplu als watermerk achter de regengrafiek (weerpagina)
+  # weericoon van nu als watermerk achter de regengrafiek (weerpagina)
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: pl_regen_bg
-    size: 140
+    size: 110
     bpp: 4
-    glyphs: ["${mdi_umbrella}"]
+    glyphs: ["${mdi_night}", "${mdi_wx_cloudy}", "${mdi_wx_fog}", "${mdi_wx_hail}", "${mdi_wx_lightning}", "${mdi_wx_lrain}", "${mdi_weather}", "${mdi_wx_pouring}", "${mdi_rain}", "${mdi_wx_snowy}", "${mdi_wx_snowrain}", "${mdi_wx_sunny}", "${mdi_wx_windy}"]
   - file:
       type: gfonts
       family: Roboto
@@ -1975,6 +1975,7 @@ script:
           };
           const C *x = look(id(info_weather).state);
           lv_label_set_text(id(r_wx_icon), x->ico); lv_label_set_text(id(r_wx_cond), x->nl);
+          lv_label_set_text(id(r_wx_bg), x->ico);   // watermerk achter de regengrafiek
           float v = id(info_out_temp).state;
           if (!std::isnan(v)) { char b[12]; snprintf(b, sizeof(b), "%d°", (int) lroundf(v)); lv_label_set_text(id(r_wx_temp), b); }
           if (id(am_info).has_state()) {
@@ -10227,14 +10228,15 @@ lvgl:
             scrollable: false
             clickable: false
             widgets:
-              # paraplu als watermerk: groot en half doorzichtig, achter de balkjes
+              # weericoon van nu als watermerk: groot en doorzichtig, achter de balkjes
               - label:
+                  id: r_wx_bg
                   align: CENTER
                   y: 8
-                  text: "${mdi_umbrella}"
+                  text: "${mdi_weather}"
                   text_font: pl_regen_bg
                   text_color: 0x2B2F36
-                  text_opa: 18%
+                  text_opa: 12%
         - label:
             id: r_wx_tip
             x: 190
