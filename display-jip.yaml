@@ -2267,19 +2267,17 @@ script:
           action: script.paneel_jip_timer_starten
           data:
             minuten: !lambda 'return std::to_string(minuten);'
-      - lvgl.label.update:
-          id: pc_on_hint
-          text: !lambda |-
-            char b[40]; snprintf(b, sizeof(b), "KACHEL GAAT AAN · %d MIN", minuten);
-            return std::string(b);
+      - lambda: |-
+          char b[40]; snprintf(b, sizeof(b), "KACHEL GAAT AAN · %d MIN", minuten);
+          lv_label_set_text(id(pc_on_hint), b);
       - delay: 5s
       - lambda: 'id(pk_left).publish_state(id(pk_left).state);'
   # ---- Temperatuurvenster: getal tonen
   - id: pc_tw_render
     then:
-      - lvgl.label.update:
-          id: pc_tw_val
-          text: !lambda 'return std::to_string(id(pc_tw)) + "°";'
+      - lambda: |-
+          char b[12]; snprintf(b, sizeof(b), "%d°", id(pc_tw));
+          lv_label_set_text(id(pc_tw_val), b);
   # ---- Kachel uit: na 1 seconde vasthouden (script.paneel_jip_uit: paneel uit + timer stoppen)
   - id: off_hold
     mode: restart
@@ -12070,9 +12068,9 @@ lvgl:
                               data:
                                 entity_id: climate.paneel_jip
                                 temperature: !lambda 'return std::to_string(id(pc_tw));'
-                          - lvgl.label.update:
-                              id: pc_t_set
-                              text: !lambda 'return "GEWENST " + std::to_string(id(pc_tw)) + "°";'
+                          - lambda: |-
+                              char b[24]; snprintf(b, sizeof(b), "GEWENST %d°", id(pc_tw));
+                              lv_label_set_text(id(pc_t_set), b);
     - id: page_favs
       # @nav-boven
       styles: pl_page
