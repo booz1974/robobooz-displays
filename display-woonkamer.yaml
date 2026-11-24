@@ -38,7 +38,7 @@
 # Sfeer: scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
 # Weer: nu + temperatuur per uur, regen komende 2 uur (Buienradar, 12 balkjes
 #   van 10 min, met het weericoon van nu als watermerk), zonwering eettafel (OMHOOG / STOP / OMLAAG, stand in blokjes
-#   en een venstertje met het doek) en komende dagen.
+#   en een venstertje met het doek en de batterij, '+' = laadt op) en komende dagen.
 # Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
 #   CPU/geheugen/schijf-meters, CPU-temperatuur, uptime, 24-uursgrafiek, terminal.
 # Planten: 4 planten; de pot is de vochtmeter (TOP / TE NAT / DORST),
@@ -75,7 +75,7 @@
 #   input_text.planten_display, input_text.weer_uren_display,
 #   input_text.weer_dagen_display, input_text.ochtend_info_display,
 #   input_text.ochtend_agenda_display, input_text.wedstrijd_display,
-#   sensor.neerslag_buienradar_regen_data, cover.eettafel_zonwering_eettafel,
+#   sensor.neerslag_buienradar_regen_data, cover.eettafel_zonwering_eettafel (+ _batterij, _opladen),
 #   System Monitor-sensoren,
 #   climate.living_room, script.lampen_random_kleuren, script.intercom_zend,
 #   script.intercom_bel,
@@ -2022,6 +2022,15 @@ script:
           }
           lv_label_set_text(id(r_wx_tip), t.c_str());
   # ---- RETRO 2: weer – zonwering eettafel (stand, blokjes en doek in het venstertje)
+  - id: r_zw_bat_render
+    then:
+      - lambda: |-
+          float b = id(zw_bat).state;
+          if (std::isnan(b)) { lv_label_set_text(id(r_zw_bat), "–"); return; }
+          char t[12]; snprintf(t, sizeof(t), "%d%%%s", (int) lroundf(b), id(zw_laden).state ? "+" : "");
+          lv_label_set_text(id(r_zw_bat), t);
+          // onder 20%: rood, anders wit
+          lv_obj_set_style_text_color(id(r_zw_bat), lv_color_hex(b < 20 ? 0xFF6B5B : 0xFFFFFE), 0);
   - id: r_zw_render
     then:
       - lambda: |-
@@ -5063,6 +5072,13 @@ interval:
     then:
       - lambda: 'if (id(page_morgen)->is_showing() || id(page_nacht)->is_showing()) id(am_clock).execute();'
 binary_sensor:
+  # zonwering eettafel laadt op (zonnepaneeltje / usb)
+  - platform: homeassistant
+    id: zw_laden
+    entity_id: binary_sensor.eettafel_zonwering_eettafel_opladen
+    internal: true
+    on_state:
+      - script.execute: r_zw_bat_render
   - platform: homeassistant
     id: bell_ring
     entity_id: binary_sensor.voordeur_ringing
@@ -5262,6 +5278,12 @@ sensor:
     internal: true
     on_value:
       - script.execute: r_zw_render
+  - platform: homeassistant
+    id: zw_bat
+    entity_id: sensor.eettafel_zonwering_eettafel_batterij
+    internal: true
+    on_value:
+      - script.execute: r_zw_bat_render
   # ---- serverkamer
   - platform: homeassistant
     id: srv_cpu
@@ -12188,6 +12210,19 @@ lvgl:
                   pad_all: 0
                   scrollable: false
                   clickable: false
+              # batterij van de zonwering als overlay onderin het venstertje (+ = laadt op)
+              - label:
+                  id: r_zw_bat
+                  align: BOTTOM_MID
+                  y: -3
+                  text: "–"
+                  text_font: r_mono
+                  text_color: 0xFFFFFE
+                  bg_color: 0x000000
+                  bg_opa: 45%
+                  radius: 3
+                  pad_left: 2
+                  pad_right: 2
         - label:
             x: 80
             y: 294
