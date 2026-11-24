@@ -38,7 +38,8 @@
 # Sfeer: scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
 # Weer: nu + temperatuur per uur, regen komende 2 uur (Buienradar, 12 balkjes
 #   van 10 min, met het weericoon van nu als watermerk), zonwering eettafel (OMHOOG / STOP / OMLAAG, stand in blokjes
-#   en een venstertje met het doek en de batterij, '+' = laadt op) en komende dagen.
+#   met woorden onder de knoppen, en een venstertje met het doek en de batterij;
+#   'LAADT OP' / 'BATTERIJ BIJNA LEEG' in de standregel) en komende dagen.
 # Home Assistant: services (OpenVPN, Tailscale, MCP, Music Assistant),
 #   CPU/geheugen/schijf-meters, CPU-temperatuur, uptime, 24-uursgrafiek, terminal.
 # Planten: 4 planten; de pot is de vochtmeter (TOP / TE NAT / DORST),
@@ -2022,8 +2023,9 @@ script:
       - lambda: |-
           float b = id(zw_bat).state;
           if (std::isnan(b)) { lv_label_set_text(id(r_zw_bat), "–"); return; }
-          char t[12]; snprintf(t, sizeof(t), "%d%%%s", (int) lroundf(b), id(zw_laden).state ? "+" : "");
+          char t[12]; snprintf(t, sizeof(t), "%d%%", (int) lroundf(b));
           lv_label_set_text(id(r_zw_bat), t);
+          id(r_zw_render).execute();   // regel onder de blokjes: 'LAADT OP' / 'BATTERIJ BIJNA LEEG'
           // onder 20%: rood, anders wit
           lv_obj_set_style_text_color(id(r_zw_bat), lv_color_hex(b < 20 ? 0xFF6B5B : 0xFFFFFE), 0);
   - id: r_zw_render
@@ -2046,7 +2048,13 @@ script:
           else if (pos >= 100) snprintf(b, sizeof(b), "HELEMAAL OMHOOG");
           else if (pos == 0) snprintf(b, sizeof(b), "HELEMAAL OMLAAG");
           else if (pos < 0) snprintf(b, sizeof(b), st == "open" ? "OMHOOG" : "OMLAAG");
-          else snprintf(b, sizeof(b), "%d%% OPEN", pos);
+          else snprintf(b, sizeof(b), "%d%% OMHOOG", pos);
+          // batterij in woorden als hij oplaadt of bijna leeg is (en de zonwering stilstaat);
+          // de stand blijft dan zichtbaar in de blokjes. Max ~25 tekens (knoppen staan ernaast)
+          float bat = id(zw_bat).state;
+          bool beweegt = st == "opening" || st == "closing";
+          if (!weg && !beweegt && id(zw_laden).state) snprintf(b, sizeof(b), "BATTERIJ LAADT OP");
+          else if (!weg && !beweegt && !std::isnan(bat) && bat < 20) snprintf(b, sizeof(b), "BATTERIJ BIJNA LEEG");
           lv_label_set_text(id(r_zw_pct), b);
   # ---- RETRO 2: weer
   - id: r_weer_render
@@ -12193,7 +12201,7 @@ lvgl:
                   pad_all: 0
                   scrollable: false
                   clickable: false
-              # batterij van de zonwering als overlay onderin het venstertje (+ = laadt op)
+              # batterij van de zonwering als overlay onderin het venstertje
               - label:
                   id: r_zw_bat
                   align: BOTTOM_MID
@@ -12364,8 +12372,15 @@ lvgl:
             widgets:
               - label:
                   align: CENTER
+                  y: -8
                   text: "${mdi_zw_up}"
                   text_font: pl_icon28
+                  text_color: 0x2B2F36
+              - label:
+                  align: CENTER
+                  y: 19
+                  text: "OMHOOG"
+                  text_font: r_mono
                   text_color: 0x2B2F36
             on_click:
               - homeassistant.action:
@@ -12387,8 +12402,15 @@ lvgl:
             widgets:
               - label:
                   align: CENTER
+                  y: -8
                   text: "${mdi_zw_stop}"
                   text_font: pl_icon28
+                  text_color: 0x46201A
+              - label:
+                  align: CENTER
+                  y: 19
+                  text: "STOP"
+                  text_font: r_mono
                   text_color: 0x46201A
             on_click:
               - homeassistant.action:
@@ -12410,8 +12432,15 @@ lvgl:
             widgets:
               - label:
                   align: CENTER
+                  y: -8
                   text: "${mdi_zw_down}"
                   text_font: pl_icon28
+                  text_color: 0x2B2F36
+              - label:
+                  align: CENTER
+                  y: 19
+                  text: "OMLAAG"
+                  text_font: r_mono
                   text_color: 0x2B2F36
             on_click:
               - homeassistant.action:

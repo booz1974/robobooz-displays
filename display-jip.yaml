@@ -21,8 +21,8 @@
 # Kachel: alleen het paneel (climate.paneel_jip), niet de smartplug.
 #   Kachel aan = kiezen uit 15, 30 of 60 min, dan
 #   script.paneel_jip_timer_starten (veld minuten; resterende minuten
-#   onder de knop; rechts in de tegel kamertemperatuur en gewenst, tik
-#   daarop = venster om de gewenste temperatuur in te stellen, 5-30 °C);
+#   onder de knop; rechts in de tegel een knop met NU (kamer), GEWENST en
+#   AANPASSEN = venster om de gewenste temperatuur in te stellen, 5-30 °C);
 #   Kachel uit = één tik (script.paneel_jip_uit);
 #   NIET STOREN = input_boolean.jip_niet_storen (rood scherm, deurbel stil).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. 12 kanalen zoals
@@ -51,8 +51,9 @@
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
 #   na 30 min nachtstand (niet tijdens NIET STOREN). Tussen 23:00 en 06:00
 #   automatisch nachtstand, behalve als er muziek speelt of er lampen aan zijn.
-# Kijkpaal speelt: na 30 s niets aanraken automatisch naar Nu speelt (ook als
-#   het scherm sliep, dan op 35%); 30 s na het stoppen terug naar Thuis.
+# Kijkpaal speelt: na 30 s niets aanraken automatisch naar Nu speelt (sliep het
+#   scherm, dan aan op 35%, behalve tussen 23:00 en 07:00); 30 s na het stoppen
+#   terug naar Thuis.
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
 # Diagnose in HA: sensoren 'Stapel hoofdtaak vrij' (B) en 'Intern RAM vrij' (kB).
@@ -2284,7 +2285,9 @@ script:
       - lambda: |-
           char b[40]; snprintf(b, sizeof(b), "KACHEL GAAT AAN · %d MIN", minuten);
           lv_label_set_text(id(pc_on_hint), b);
-      - delay: 5s
+      # de aftelling 'TIMER LOOPT · NOG .. MIN' neemt het over zodra HA de timer meldt;
+      # komt die niet binnen een minuut, dan de gewone tekst terugzetten
+      - delay: 60s
       - lambda: 'id(pk_left).publish_state(id(pk_left).state);'
   # ---- Temperatuurvenster: getal tonen
   - id: pc_tw_render
@@ -4551,8 +4554,12 @@ interval:
           auto show = [](esphome::lvgl::LvPageType *pg) {
             if (!pg->is_showing()) id(lvgl_main)->show_page(pg->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 300);
           };
-          // kijkpaal speelt: na 30 s niets aanraken naar Nu speelt (scherm sliep: weer aan op 35%)
+          // kijkpaal speelt: na 30 s niets aanraken naar Nu speelt (scherm sliep: weer aan op 35%,
+          // maar niet tussen 23:00 en 07:00: dan blijft een slapend scherm uit)
           if (kijkpaal_speelt && !id(onair).state) {
+            auto tn = id(system_time).now();
+            bool slaaptijd = tn.is_valid() && (tn.hour >= 23 || tn.hour < 7);
+            if (id(lvgl_main)->is_paused() && slaaptijd) return;
             if (!id(page_music)->is_showing() && !id(page_player)->is_showing()) {
               if (id(lvgl_main)->is_paused()) {
                 id(lvgl_main)->set_paused(false, false);
@@ -4980,7 +4987,7 @@ sensor:
       - lvgl.label.update:
           id: pc_on_hint
           text: !lambda |-
-            if (std::isnan(x) || x <= 0) return std::string("PANEEL AAN MET TIMER");
+            if (std::isnan(x) || x <= 0) return std::string("KIES 15, 30 OF 60 MIN");
             char b[40]; snprintf(b, sizeof(b), "TIMER LOOPT · NOG %d MIN", (int) x);
             return std::string(b);
   # ---- serverkamer
@@ -11823,7 +11830,7 @@ lvgl:
                   align: LEFT_MID
                   x: 96
                   y: 22
-                  text: "PANEEL AAN MET TIMER"
+                  text: "KIES 15, 30 OF 60 MIN"
                   text_font: r_mono
                   text_color: 0x8B9099
               # rechts: knop met kamertemperatuur (groot) en gewenst (klein); tik = temperatuur aanpassen
@@ -11831,8 +11838,8 @@ lvgl:
                   id: pc_t_btn
                   align: RIGHT_MID
                   x: 6
-                  width: 124
-                  height: 84
+                  width: 132
+                  height: 96
                   radius: 12
                   pad_all: 0
                   bg_color: 0xDDE0E5   # themakleur (wordt donker in een donker thema)
@@ -11843,19 +11850,31 @@ lvgl:
                     bg_color: ${c_tile_on}
                   widgets:
                     - label:
+                        align: CENTER
+                        y: -36
+                        text: "NU"
+                        text_font: r_mono
+                        text_color: 0x8B9099
+                    - label:
                         id: pc_t_nu
                         align: CENTER
-                        y: -12
+                        y: -14
                         text: "–°"
                         text_font: pl_t30
                         text_color: ${c_text}
                     - label:
                         id: pc_t_set
                         align: CENTER
-                        y: 22
+                        y: 15
                         text: "GEWENST –°"
+                        text_font: pl_t16
+                        text_color: ${c_text}
+                    - label:
+                        align: CENTER
+                        y: 35
+                        text: "AANPASSEN >"
                         text_font: r_mono
-                        text_color: 0x8B9099
+                        text_color: ${c_accent}
                   on_click:
                     - lambda: |-
                         float t = id(pc_set_temp).state;
