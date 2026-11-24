@@ -4,11 +4,13 @@
 #
 # display-studio - Guition ESP32-S3-4848S040 (480x480) - Studio
 # Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, alleen Studio mini) |
-#           Sfeer | Studio en PC | Weer | Energie | Info | Nachtstand |
+#           Sfeer | Studio en PC | Weer | Energie (+ Zonnestroom) | Info | Nachtstand |
 #           Home Assistant | Thema
 #           (+ verborgen: ON AIR, Wachtrij, Deurbel, Goedemorgen, Intercom)
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
+# Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
+#   zon vandaag' op Energie; omvormer + P1 live (ook ZON/NET op Thuis).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. Kanaalkiezer
 #   met 12 kanalen (1 Kelder, 2 ISS, 3 Buren, 4 1986, 5 Koelkast-Bunker,
 #   6 Tuinkabouter-Verzet, 7 AIVD-busje, 8 Area 51, 9 Wekkerbrigade (opstaan),
@@ -276,6 +278,7 @@ substitutions:
   c_sub: "0x8B9099"
   c_dark: "0x1F3A33"
   c_accent: "0x3FAE8E"
+  zs_was_w: "800"                     # vanaf zoveel W teruglevering: "goed moment om te wassen"
   # Music Assistant-spelers waartussen de zone-knop op het hoesscherm wisselt
   mz_woonkamer: "up00a0dea23bed"       # media_player.yamaha_living_2 (woonkamer)
   mz_totaal: "syncgroup_2sqfwxj7"      # media_player.woonkamer_totaal
@@ -1217,6 +1220,11 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # @zon-begin
+  - id: zs_flow
+    type: std::array<float, 3>
+    initial_value: '{0, 0, 0}'
+  # @zon-einde
   - id: ic_bel_t0
     type: uint32_t
     initial_value: '0'
@@ -1624,6 +1632,78 @@ globals:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # @zon-begin
+  - id: zs_render
+    then:
+      - lambda: |-
+          float pv = id(zs_pv).has_state() && !std::isnan(id(zs_pv).state) ? std::max(0.0f, id(zs_pv).state) : 0.0f;
+          float grid = id(zs_grid).has_state() && !std::isnan(id(zs_grid).state) ? id(zs_grid).state : 0.0f;
+          float huis = std::max(0.0f, pv + grid);
+          // getal en eenheid apart (groot getal, kleine eenheid)
+          auto put = [](lv_obj_t *v, lv_obj_t *u, float w) {
+            char b[16]; float a = fabsf(w);
+            if (a >= 1000.0f) { snprintf(b, sizeof(b), "%.1f", a / 1000.0f); for (char *c = b; *c; c++) if (*c == '.') *c = ','; lv_label_set_text(u, "kW"); }
+            else { snprintf(b, sizeof(b), "%d", (int) lroundf(a)); lv_label_set_text(u, "W"); }
+            lv_label_set_text(v, b);
+          };
+          auto fmt = [](float w) {
+            char b[20]; float a = fabsf(w);
+            if (a >= 1000.0f) { snprintf(b, sizeof(b), "%.1f kW", a / 1000.0f); for (char *c = b; *c; c++) if (*c == '.') *c = ','; }
+            else snprintf(b, sizeof(b), "%d W", (int) lroundf(a));
+            return std::string(b);
+          };
+          put(id(zs_zon_v), id(zs_zon_u), pv);
+          put(id(zs_huis_v), id(zs_huis_u), huis);
+          put(id(zs_net_v), id(zs_net_u), grid);
+          bool terug = grid < -20.0f, van = grid > 20.0f;
+          lv_label_set_text(id(zs_net_t), terug ? "Teruglevering" : (van ? "Van het net" : "Net"));
+          // nettegel groen bij teruglevering
+          lv_obj_set_style_bg_color(id(zs_net_tile), lv_color_hex(terug ? ${c_tile_on} : ${c_tile}), 0);
+          lv_obj_set_style_text_color(id(zs_net_v), lv_color_hex(terug ? ${c_dark} : ${c_text}), 0);
+          lv_obj_set_style_text_color(id(zs_net_t), lv_color_hex(terug ? ${c_dark} : ${c_sub}), 0);
+          lv_obj_set_style_text_color(id(zs_net_u), lv_color_hex(terug ? ${c_dark} : ${c_sub}), 0);
+          // statuspil
+          lv_label_set_text(id(zs_pill_lbl), terug ? "Teruglevering" : (van ? "Van het net" : "In balans"));
+          lv_obj_set_style_bg_color(id(zs_pill), lv_color_hex(terug ? ${c_tile_on} : 0xDDE2E8), 0);
+          lv_obj_set_style_text_color(id(zs_pill_lbl), lv_color_hex(terug ? ${c_dark} : 0x5A6270), 0);
+          // stromen (W) voor de bewegende bolletjes: zon->huis, zon->net, net->huis
+          id(zs_flow)[0] = std::min(pv, huis);
+          id(zs_flow)[1] = std::max(0.0f, -grid);
+          id(zs_flow)[2] = std::max(0.0f, grid);
+          // goed moment om te wassen: minstens ${zs_was_w} W teruglevering
+          bool was = grid <= -${zs_was_w};
+          lv_obj_t *fr = id(zs_frame);
+          if (was) {
+            lv_obj_set_style_border_side(fr, LV_BORDER_SIDE_FULL, 0); lv_obj_set_style_border_width(fr, 3, 0);
+            lv_obj_set_style_border_color(fr, lv_color_hex(0x2EB872), 0);
+            lv_obj_set_style_border_width(fr, 3, 0);
+            lv_obj_set_style_border_opa(fr, LV_OPA_COVER, 0);
+            lv_obj_set_style_shadow_color(fr, lv_color_hex(0x2EB872), 0);
+            lv_obj_set_style_shadow_opa(fr, 110, 0);
+            lv_obj_set_style_shadow_offset_x(fr, 0, 0);
+            lv_obj_set_style_shadow_offset_y(fr, 0, 0);
+            lv_obj_set_style_shadow_width(fr, 28, 0);
+            lv_obj_set_style_bg_color(id(zs_bar), lv_color_hex(0x2EB872), 0);
+            lv_obj_set_style_text_color(id(zs_status), lv_color_hex(id(r_tcol)[8]), 0);
+            lv_obj_remove_flag(id(zs_wash), LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(id(zs_status), "Goed moment om te wassen");
+          } else {
+            lv_obj_set_style_border_side(fr, (lv_border_side_t) (LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_LEFT), 0);
+            lv_obj_set_style_border_width(fr, 0, 0);
+            lv_obj_set_style_border_width(fr, 2, 0);
+            lv_obj_set_style_border_opa(fr, 230, 0);
+            lv_obj_set_style_shadow_color(fr, lv_color_hex(id(r_tcol)[7]), 0);
+            lv_obj_set_style_shadow_opa(fr, 115, 0);
+            lv_obj_set_style_shadow_offset_x(fr, 6, 0);
+            lv_obj_set_style_shadow_offset_y(fr, 6, 0);
+            lv_obj_set_style_shadow_width(fr, 22, 0);
+            lv_obj_set_style_bg_color(id(zs_bar), lv_color_hex(id(r_tcol)[1]), 0);
+            lv_obj_set_style_text_color(id(zs_status), lv_color_hex(terug ? 0x2E8B65 : ${c_sub}), 0);
+            lv_obj_add_flag(id(zs_wash), LV_OBJ_FLAG_HIDDEN);
+            std::string st = terug ? "Je levert " + fmt(-grid) + " terug" : (van ? "Je haalt " + fmt(grid) + " van het net" : "Zon en verbruik in balans");
+            lv_label_set_text(id(zs_status), st.c_str());
+          }
+  # @zon-einde
   # ================= RETRO =================
   - id: r_all_lights
     mode: single
@@ -1688,7 +1768,7 @@ script:
           float ti = id(room_temp).state, hu = id(room_hum).state;
           if (!std::isnan(ti)) { char b[12]; snprintf(b, sizeof(b), "%.1f°", ti); for (char *p = b; *p; p++) if (*p == '.') *p = ','; lv_label_set_text(id(r_tin), b); }
           if (!std::isnan(hu)) { char b[24]; snprintf(b, sizeof(b), "VOCHT %.0f%%", hu); lv_label_set_text(id(r_hum), b); }
-          float pw = id(e_power).state, pv = NAN, gr = NAN;
+          float pw = id(e_power).state, pv = id(zs_pv).state, gr = id(zs_grid).state;
           if (!std::isnan(pw)) {
             char b[16];
             if (pw >= 1000) { snprintf(b, sizeof(b), "%.1f kW", pw / 1000); for (char *p = b; *p; p++) if (*p == '.') *p = ','; }
@@ -2155,7 +2235,7 @@ script:
       - lambda: |-
           std::string t;
           if (id(ai_roast).has_state() && id(ai_roast).state.size() > 3) t = "ROBOBOOZ: " + id(ai_roast).state + "   ///   ";
-          float ot = id(info_out_temp).state, pw = id(e_power).state, pv = NAN;
+          float ot = id(info_out_temp).state, pw = id(e_power).state, pv = id(zs_pv).state;
           char b[64];
           if (!std::isnan(ot)) { snprintf(b, sizeof(b), "BUITEN %d°", (int) lroundf(ot)); t += b; }
           if (!std::isnan(pw)) { snprintf(b, sizeof(b), "   ///   VERBRUIK %.0f W", pw); t += b; }
@@ -2423,6 +2503,9 @@ script:
             walk(id(page_morgen)->obj, true);
             App.feed_wdt();
             walk(id(page_energy)->obj, true);
+            // @zon-begin
+            walk(id(page_zon)->obj, true);
+            // @zon-einde
             App.feed_wdt();
             walk(id(page_bell)->obj, true);
             App.feed_wdt();
@@ -4285,6 +4368,32 @@ script:
             return txt;
 
 interval:
+  # @zon-begin
+  # zonnestroom: bolletjes over de lijnen laten lopen (sneller bij meer vermogen)
+  - interval: 50ms
+    then:
+      - lambda: |-
+          if (!id(page_zon)->is_showing()) return;
+          static const int P[3][4] = {{76, 104, 380, 104}, {76, 104, 228, 188}, {228, 188, 380, 104}};
+          static float ph[3] = {0, 0, 0};
+          lv_obj_t *o[3][3] = {{id(zs_a0), id(zs_a1), id(zs_a2)}, {id(zs_b0), id(zs_b1), id(zs_b2)}, {id(zs_c0), id(zs_c1), id(zs_c2)}};
+          for (int k = 0; k < 3; k++) {
+            float w = id(zs_flow)[k];
+            bool on = w >= 20.0f;
+            if (!on) { for (int i = 0; i < 3; i++) lv_obj_add_flag(o[k][i], LV_OBJ_FLAG_HIDDEN); continue; }
+            ph[k] += std::min(0.004f + w * 0.000008f, 0.03f);
+            if (ph[k] >= 1.0f) ph[k] -= 1.0f;
+            float dx = P[k][2] - P[k][0], dy = P[k][3] - P[k][1];
+            float len = sqrtf(dx * dx + dy * dy);
+            float f0 = 40.0f / len, f1 = 1.0f - f0;   // alleen tussen de cirkels
+            for (int i = 0; i < 3; i++) {
+              float t = ph[k] + i / 3.0f; if (t >= 1.0f) t -= 1.0f;
+              float f = f0 + (f1 - f0) * t;
+              lv_obj_set_pos(o[k][i], (int) (P[k][0] + dx * f) - 5, (int) (P[k][1] + dy * f) - 7);
+              lv_obj_remove_flag(o[k][i], LV_OBJ_FLAG_HIDDEN);
+            }
+          }
+  # @zon-einde
   # ---- intercom: status, gloed en glitch tijdens ontvangst
   - interval: 90ms
     then:
@@ -4851,6 +4960,21 @@ sensor:
     id: room_temp
     entity_id: sensor.thermo_studio_temperatuur
     internal: true
+  # @zon-begin
+  # zonnestroom live: zonnepanelen (omvormer) en P1 (+ = van het net, - = teruglevering)
+  - platform: homeassistant
+    id: zs_pv
+    entity_id: sensor.dle3a27053_pv_output_actual
+    internal: true
+    on_value:
+      - script.execute: zs_render
+  - platform: homeassistant
+    id: zs_grid
+    entity_id: sensor.p1_meter_3c39e7240afe_active_power
+    internal: true
+    on_value:
+      - script.execute: zs_render
+  # @zon-einde
   - platform: homeassistant
     id: room_hum
     entity_id: sensor.thermo_studio_luchtvochtigheid
@@ -14087,6 +14211,15 @@ lvgl:
             width: 456
             height: 46
             radius: 14
+            # @zon-begin
+            on_click:
+              - lvgl.page.show:
+                  id: page_zon
+                  animation: MOVE_LEFT
+                  time: 250ms
+            pressed:
+              bg_color: 0xFFE7B0
+            # @zon-einde
             bg_color: 0xFFF3D6
             bg_opa: COVER
             border_width: 0
@@ -14106,10 +14239,18 @@ lvgl:
                   text: "BESPAARD DOOR ZON VANDAAG"
                   text_font: r_mono
                   text_color: 0x46201A
+              # @zon-begin
+              - label:
+                  align: RIGHT_MID
+                  x: -8
+                  text: "${mdi_chev_right}"
+                  text_font: pl_icon28
+                  text_color: 0xC98A1E
+              # @zon-einde
               - label:
                   id: e_zon_lbl
                   align: RIGHT_MID
-                  x: -16
+                  x: -42
                   text: "–"
                   text_font: pl_t24
                   text_color: 0x7A4A00
@@ -14323,6 +14464,511 @@ lvgl:
                   text: "–"
                   text_font: r_val
                   text_color: ${c_text}
+    # @zon-begin
+    - id: page_zon
+      # alleen te openen via de tegel 'Bespaard door zon vandaag' op Energie
+      skip: true
+      styles: pl_page
+      scrollable: false
+      on_swipe_right:
+        - lambda: 'lv_indev_wait_release(lv_indev_active());'
+        - lvgl.page.show:
+            id: page_energy
+            animation: MOVE_RIGHT
+            time: 250ms
+      on_load:
+        - script.execute: zs_render
+      widgets:
+        # RETRO: altijd terug naar THUIS of het MENU
+        - button:
+            align: TOP_RIGHT
+            x: -10
+            y: 6
+            width: 78
+            height: 28
+            radius: 14
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "THUIS"
+                  text_font: r_mono
+                  text_color: 0x46201A
+            on_click:
+              - lvgl.page.show:
+                  id: page_rhome
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            align: TOP_RIGHT
+            x: -92
+            y: 6
+            width: 74
+            height: 28
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "MENU"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+            on_click:
+              - lvgl.page.show:
+                  id: page_rmenu
+                  animation: FADE_IN
+                  time: 200ms
+        - label:
+            x: 18
+            y: 12
+            text: "07 / ZONNESTROOM"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            id: r_hbx_zon
+            x: 18
+            y: 30
+            width: 120
+            height: 3
+            radius: 0
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            x: 18
+            y: 42
+            text: "ZONNESTROOM"
+            text_font: r_title
+            text_color: 0x2B2F36
+        # statuspil rechtsboven: teruglevering / van het net
+        - obj:
+            id: zs_pill
+            align: TOP_RIGHT
+            x: -14
+            y: 50
+            width: SIZE_CONTENT
+            height: 30
+            radius: 15
+            pad_left: 14
+            pad_right: 14
+            pad_top: 0
+            pad_bottom: 0
+            border_width: 0
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: zs_pill_lbl
+                  align: CENTER
+                  text: ""
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+        # grote tegel met de stroomdiagram (krijgt een groene gloed bij 'goed moment om te wassen')
+        - obj:
+            id: zs_frame
+            x: 12
+            y: 94
+            width: 456
+            height: 238
+            radius: 14
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - line:
+                  points:
+                    - 76,104
+                    - 380,104
+                  line_width: 3
+                  line_color: 0xD3D8DF
+                  line_rounded: true
+              - line:
+                  points:
+                    - 76,104
+                    - 228,188
+                  line_width: 3
+                  line_color: 0xD3D8DF
+                  line_rounded: true
+              - line:
+                  points:
+                    - 228,188
+                    - 380,104
+                  line_width: 3
+                  line_color: 0xD3D8DF
+                  line_rounded: true
+              - obj:
+                  id: zs_a0
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0xF2A93B
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_a1
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0xF2A93B
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_a2
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0xF2A93B
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_b0
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x2EB872
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_b1
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x2EB872
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_b2
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x2EB872
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_c0
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x8A94A3
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_c1
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x8A94A3
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  id: zs_c2
+                  x: 0
+                  y: 0
+                  width: 10
+                  height: 10
+                  radius: 5
+                  border_width: 0
+                  bg_color: 0x8A94A3
+                  bg_opa: COVER
+                  clickable: false
+                  hidden: true
+              - obj:
+                  x: 44
+                  y: 72
+                  width: 64
+                  height: 64
+                  radius: 14
+                  bg_color: 0xFFF3D6
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - label:
+                        align: CENTER
+                        text: "${mdi_sun}"
+                        text_font: pl_icon40
+                        text_color: 0xF2A93B
+              - obj:
+                  x: 348
+                  y: 72
+                  width: 64
+                  height: 64
+                  radius: 14
+                  bg_color: ${c_tile_on}
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - label:
+                        align: CENTER
+                        text: "${mdi_home}"
+                        text_font: pl_icon40
+                        text_color: ${c_dark}
+              - obj:
+                  x: 196
+                  y: 156
+                  width: 64
+                  height: 64
+                  radius: 14
+                  bg_color: 0xDDE2E8
+                  bg_opa: COVER
+                  border_width: 0
+                  pad_all: 0
+                  scrollable: false
+                  clickable: false
+                  widgets:
+                    - label:
+                        align: CENTER
+                        text: "${mdi_tower}"
+                        text_font: pl_icon40
+                        text_color: 0x6B7A90
+              - label:
+                  x: 16
+                  y: 142
+                  width: 120
+                  text_align: CENTER
+                  text: "Zon"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+              - label:
+                  x: 320
+                  y: 142
+                  width: 120
+                  text_align: CENTER
+                  text: "Huis"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+              - label:
+                  x: 268
+                  y: 178
+                  text: "Net"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+        - obj:
+            id: zs_zon_tile
+            x: 12
+            y: 344
+            width: 144
+            height: 78
+            radius: 14
+            bg_color: 0xFFF3D6
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: zs_zon_t
+                  x: 14
+                  y: 8
+                  text: "Zon"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+              - label:
+                  id: zs_zon_v
+                  x: 12
+                  y: 30
+                  text: "–"
+                  text_font: pl_t40
+                  text_color: ${c_text}
+              - label:
+                  id: zs_zon_u
+                  align: BOTTOM_RIGHT
+                  x: -14
+                  y: -12
+                  text: ""
+                  text_font: pl_t20
+                  text_color: ${c_sub}
+        - obj:
+            id: zs_huis_tile
+            x: 168
+            y: 344
+            width: 144
+            height: 78
+            radius: 14
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: zs_huis_t
+                  x: 14
+                  y: 8
+                  text: "Huis"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+              - label:
+                  id: zs_huis_v
+                  x: 12
+                  y: 30
+                  text: "–"
+                  text_font: pl_t40
+                  text_color: ${c_text}
+              - label:
+                  id: zs_huis_u
+                  align: BOTTOM_RIGHT
+                  x: -14
+                  y: -12
+                  text: ""
+                  text_font: pl_t20
+                  text_color: ${c_sub}
+        - obj:
+            id: zs_net_tile
+            x: 324
+            y: 344
+            width: 144
+            height: 78
+            radius: 14
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: zs_net_t
+                  x: 14
+                  y: 8
+                  text: "Net"
+                  text_font: pl_t16
+                  text_color: ${c_sub}
+              - label:
+                  id: zs_net_v
+                  x: 12
+                  y: 30
+                  text: "–"
+                  text_font: pl_t40
+                  text_color: ${c_text}
+              - label:
+                  id: zs_net_u
+                  align: BOTTOM_RIGHT
+                  x: -14
+                  y: -12
+                  text: ""
+                  text_font: pl_t20
+                  text_color: ${c_sub}
+        # onderbalk: status of 'goed moment om te wassen'
+        - obj:
+            id: zs_bar
+            x: 12
+            y: 432
+            width: 456
+            height: 40
+            radius: 14
+            border_width: 0
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  id: zs_wash
+                  align: LEFT_MID
+                  x: 14
+                  text: "${mdi_washer}"
+                  text_font: pl_icon28
+                  text_color: 0xFFFFFF
+                  hidden: true
+              - label:
+                  id: zs_status
+                  align: CENTER
+                  text: ""
+                  text_font: pl_t20
+                  text_color: ${c_sub}
+        # terug naar Energie
+        - button:
+            x: 8
+            y: 4
+            width: SIZE_CONTENT
+            height: 28
+            radius: 14
+            ext_click_area: 10
+            pad_left: 6
+            pad_right: 12
+            pad_top: 0
+            pad_bottom: 0
+            border_width: 0
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            pressed:
+              bg_color: 0xDDE2E8
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_cross: CENTER
+              flex_align_track: CENTER
+              pad_column: 2
+            widgets:
+              - label:
+                  text: "${mdi_chev_left}"
+                  text_font: pl_icon28
+                  text_color: ${c_text}
+              - label:
+                  text: "Energie"
+                  text_font: pl_t16
+                  text_color: ${c_text}
+            on_click:
+              - lvgl.page.show:
+                  id: page_energy
+                  animation: MOVE_RIGHT
+                  time: 250ms
+    # @zon-einde
     - id: page_nacht
       skip: true
       scrollable: false
