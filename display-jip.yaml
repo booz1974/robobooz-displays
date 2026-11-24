@@ -51,7 +51,8 @@
 #   automatisch nachtstand, behalve als er muziek speelt of er lampen aan zijn.
 # Watchdog 30 s: het aanmaken van alle pagina's bij het opstarten duurt
 #   langer dan de standaard 5 s.
-# Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB).
+# Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB). Hoofdtaak-stapel 16 KB
+#   (loop_task_stack_size): met 8 KB liep hij bij het opstarten over.
 # Aanraken: de touchchip van het nieuwe paneel (1 relais) meldt zich als
 #   1024x600 scherm; met calibration 0..479 klopt de plek van elke tik weer.
 # Relais: het board heeft 1 relais; nog niet in gebruik.
@@ -95,6 +96,8 @@ esphome:
     - priority: -100
       then:
         - lambda: |-
+            ESP_LOGI("geheugen", "hoofdtaak: minimaal %u bytes stapel vrij gebleven; intern RAM vrij %u KB",
+                     (unsigned) uxTaskGetStackHighWaterMark(nullptr), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
             ESP_LOGI("geheugen", "hoesbuffer %s, PSRAM vrij %u KB, grootste blok %u KB",
                      id(big_buf) ? "ok" : "MISLUKT",
                      (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
@@ -123,6 +126,10 @@ esp32:
   watchdog_timeout: 30s
   framework:
     type: esp-idf
+    advanced:
+      # hoofdtaak 16 KB i.p.v. 8 KB: het aanmaken van alle pagina's in één keer liet de
+      # standaardstapel overlopen (crash 'Abort' op core 1 bij het opstarten)
+      loop_task_stack_size: 16384
     sdkconfig_options:
       COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
