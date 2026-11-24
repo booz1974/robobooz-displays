@@ -22,7 +22,7 @@
 #   script.paneel_jip_timer_starten (veld minuten; resterende minuten
 #   onder de knop; rechts in de tegel kamertemperatuur en gewenst, tik
 #   daarop = venster om de gewenste temperatuur in te stellen, 5-30 °C);
-#   Kachel uit = 1 s vasthouden (script.paneel_jip_uit);
+#   Kachel uit = één tik (script.paneel_jip_uit);
 #   NIET STOREN = input_boolean.jip_niet_storen (rood scherm, deurbel stil).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. 12 kanalen zoals
 #   op de studio; PUSH TO TALK speelt het bericht op de kijkpaal van Jip
@@ -1334,9 +1334,6 @@ globals:
   - id: fav_loaded_ms
     type: uint32_t
     initial_value: '0'
-  - id: off_t0
-    type: uint32_t
-    initial_value: '0'
   - id: big_buf
     type: uint16_t*
     initial_value: 'nullptr'
@@ -2365,34 +2362,21 @@ script:
             lv_label_set_text(id(zs_status), st.c_str());
           }
   # @zon-einde
-  # ---- Kachel uit: na 1 seconde vasthouden (script.paneel_jip_uit: paneel uit + timer stoppen)
-  - id: off_hold
+  # ---- Kachel uit: één tik (script.paneel_jip_uit: paneel uit + timer stoppen)
+  - id: pc_uit
     mode: restart
     then:
-      - lambda: 'id(off_t0) = millis();'
-      - while:
-          condition:
-            lambda: 'return lv_obj_has_state(id(pc_off_btn), LV_STATE_PRESSED) && millis() - id(off_t0) < 1000;'
-          then:
-            - lambda: 'lv_bar_set_value(id(pc_off_bar), (int) ((millis() - id(off_t0)) / 10), LV_ANIM_OFF);'
-            - delay: 50ms
-      - if:
-          condition:
-            lambda: 'return lv_obj_has_state(id(pc_off_btn), LV_STATE_PRESSED) && millis() - id(off_t0) >= 1000;'
-          then:
-            - lambda: 'lv_bar_set_value(id(pc_off_bar), 100, LV_ANIM_OFF);'
-            - homeassistant.action:
-                action: script.turn_on
-                data:
-                  entity_id: script.paneel_jip_uit
-            - lvgl.label.update:
-                id: pc_off_hint
-                text: "KACHEL GAAT UIT"
-            - delay: 3s
-      - lambda: 'lv_bar_set_value(id(pc_off_bar), 0, LV_ANIM_OFF);'
+      - homeassistant.action:
+          action: script.turn_on
+          data:
+            entity_id: script.paneel_jip_uit
       - lvgl.label.update:
           id: pc_off_hint
-          text: "1 SECONDE INGEDRUKT HOUDEN"
+          text: "KACHEL GAAT UIT"
+      - delay: 3s
+      - lvgl.label.update:
+          id: pc_off_hint
+          text: "TIK OM UIT TE ZETTEN"
   # ---- goedemorgen-scherm vullen
   - id: am_render
     then:
@@ -11818,7 +11802,7 @@ lvgl:
                   height: 84
                   radius: 12
                   pad_all: 0
-                  bg_color: 0xFFFFFE
+                  bg_color: 0xDDE0E5   # themakleur (wordt donker in een donker thema)
                   shadow_opa: TRANSP
                   border_width: 2
                   border_color: ${c_accent}
@@ -11848,7 +11832,7 @@ lvgl:
             # eerst kiezen hoe lang: 15, 30 of 60 minuten (keuzevenster pc_keuze)
             on_click:
               - lvgl.widget.show: pc_keuze
-        # uit: kachel uit na 1 s vasthouden (script.paneel_jip_uit)
+        # uit: kachel uit met één tik (script.paneel_jip_uit)
         - button:
             id: pc_off_btn
             x: 12
@@ -11866,14 +11850,13 @@ lvgl:
             widgets:
               - label:
                   align: LEFT_MID
-                  y: -8
                   text: "${mdi_power}"
                   text_font: pl_icon72
                   text_color: 0xD9534F
               - label:
                   align: LEFT_MID
                   x: 96
-                  y: -24
+                  y: -16
                   text: "Kachel uit"
                   text_font: pl_t30
                   text_color: ${c_text}
@@ -11881,27 +11864,12 @@ lvgl:
                   id: pc_off_hint
                   align: LEFT_MID
                   x: 96
-                  y: 12
-                  text: "1 SECONDE INGEDRUKT HOUDEN"
+                  y: 20
+                  text: "TIK OM UIT TE ZETTEN"
                   text_font: r_mono
                   text_color: 0x8B9099
-              - bar:
-                  id: pc_off_bar
-                  align: BOTTOM_MID
-                  width: 416
-                  height: 8
-                  min_value: 0
-                  max_value: 100
-                  value: 0
-                  radius: 4
-                  bg_color: 0xD9DCE2
-                  bg_opa: COVER
-                  indicator:
-                    radius: 4
-                    bg_color: 0xD9534F
-                    bg_opa: COVER
-            on_press:
-              - script.execute: off_hold
+            on_click:
+              - script.execute: pc_uit
         # NIET STOREN: rood scherm, deurbel stil
         - button:
             id: pc_air_btn
@@ -11967,7 +11935,7 @@ lvgl:
                   radius: 18
                   border_width: 0
                   pad_all: 0
-                  bg_color: 0xFFFFFE
+                  bg_color: ${c_bg}
                   scrollable: false
                   widgets:
                     - label:
@@ -12102,7 +12070,7 @@ lvgl:
                   radius: 18
                   border_width: 0
                   pad_all: 0
-                  bg_color: 0xFFFFFE
+                  bg_color: ${c_bg}
                   scrollable: false
                   widgets:
                     - label:
@@ -12183,7 +12151,7 @@ lvgl:
                         width: 150
                         height: 48
                         radius: 24
-                        bg_color: ${c_accent}
+                        bg_color: 0xE8745C
                         shadow_opa: TRANSP
                         border_width: 0
                         widgets:
@@ -12191,7 +12159,7 @@ lvgl:
                               align: CENTER
                               text: "INSTELLEN"
                               text_font: r_mono
-                              text_color: 0xFFFFFE
+                              text_color: 0x46201A
                         on_click:
                           - lvgl.widget.hide: pc_temp
                           - homeassistant.action:

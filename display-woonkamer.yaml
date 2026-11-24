@@ -55,8 +55,10 @@
 #   langer dan de standaard 5 s.
 # Geheugen: hoesbuffer 210x210 (88 KB, was 460 KB) en kachelanimatie met
 #   12 frames per gif (~0,6 MB minder PSRAM).
-# Let op: bouwen met ESPHome 2026.10.2. Met 2026.11.0 loopt dit display bij het
-#   opstarten vast (crash na ~16 s, daarna OTA rollback); studio heeft dat niet.
+# Hoofdtaak-stapel 20 KB (loop_task_stack_size). Met de standaard 8 KB liep dit
+#   display met ESPHome 2026.11.0 bij het opstarten vast (crash na ~16 s, daarna
+#   OTA rollback); bij Jip loste een grotere stapel precies dat op. Werkt 2026.11
+#   hiermee nog niet, bouw dan met 2026.10.2.
 # Zelfstandig bestand: heeft de map modules/ niet nodig.
 # secrets.yaml: wifi, ma_api_token, API-/OTA-sleutels en de huisgenoten
 #   persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
@@ -103,6 +105,8 @@ esphome:
     - priority: -100
       then:
         - lambda: |-
+            ESP_LOGI("geheugen", "hoofdtaak: minimaal %u bytes stapel vrij gebleven; intern RAM vrij %u KB",
+                     (unsigned) uxTaskGetStackHighWaterMark(nullptr), (unsigned) (heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024));
             ESP_LOGI("geheugen", "hoesbuffer %s, klimaatbuffer %s, PSRAM vrij %u KB, grootste blok %u KB",
                      id(big_buf) ? "ok" : "MISLUKT", id(cl_buf) ? "ok" : "MISLUKT",
                      (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
@@ -131,6 +135,10 @@ esp32:
   watchdog_timeout: 30s
   framework:
     type: esp-idf
+    advanced:
+      # grotere stapel voor de hoofdtaak (standaard 8 KB): het aanmaken van alle pagina's
+      # in één keer liet hem overlopen (crash 'Abort' bij het opstarten, zie Jip)
+      loop_task_stack_size: 20480
     sdkconfig_options:
       COMPILER_OPTIMIZATION_SIZE: y
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
