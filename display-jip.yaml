@@ -18,7 +18,9 @@
 # Kachel: alleen het paneel (climate.paneel_jip), niet de smartplug.
 #   Kachel aan = kiezen uit 15, 30 of 60 min, dan
 #   script.paneel_jip_timer_starten (veld minuten; resterende minuten
-#   onder de knop); Kachel uit = 1 s vasthouden (script.paneel_jip_uit);
+#   onder de knop; rechts in de tegel kamertemperatuur en gewenst, tik
+#   daarop = venster om de gewenste temperatuur in te stellen, 5-30 °C);
+#   Kachel uit = 1 s vasthouden (script.paneel_jip_uit);
 #   NIET STOREN = input_boolean.jip_niet_storen (rood scherm, deurbel stil).
 # Intercom: tik op het gele satellietblok in de LIVE-balk. 12 kanalen zoals
 #   op de studio; PUSH TO TALK speelt het bericht op de kijkpaal van Jip
@@ -1219,6 +1221,10 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # Kachel-pagina: gewenste temperatuur in het venster 'Temperatuur' (nog niet verstuurd)
+  - id: pc_tw
+    type: int
+    initial_value: '20'
   - id: ic_bel_t0
     type: uint32_t
     initial_value: '0'
@@ -2268,6 +2274,12 @@ script:
             return std::string(b);
       - delay: 5s
       - lambda: 'id(pk_left).publish_state(id(pk_left).state);'
+  # ---- Temperatuurvenster: getal tonen
+  - id: pc_tw_render
+    then:
+      - lvgl.label.update:
+          id: pc_tw_val
+          text: !lambda 'return std::to_string(id(pc_tw)) + "°";'
   # ---- Kachel uit: na 1 seconde vasthouden (script.paneel_jip_uit: paneel uit + timer stoppen)
   - id: off_hold
     mode: restart
@@ -4911,6 +4923,28 @@ sensor:
     id: room_temp
     entity_id: sensor.thermo_slaapkamer_jip_temperatuur
     internal: true
+    on_value:
+      # Kachel-pagina: temperatuur in de kamer in de tegel 'Kachel aan'
+      - lvgl.label.update:
+          id: pc_t_nu
+          text: !lambda |-
+            if (std::isnan(x)) return std::string("–°");
+            char b[16]; snprintf(b, sizeof(b), "%.1f°", x);
+            for (char *c = b; *c; c++) if (*c == '.') *c = ',';
+            return std::string(b);
+  # gewenste temperatuur van het paneel (climate.paneel_jip)
+  - platform: homeassistant
+    id: pc_set_temp
+    entity_id: climate.paneel_jip
+    attribute: temperature
+    internal: true
+    on_value:
+      - lvgl.label.update:
+          id: pc_t_set
+          text: !lambda |-
+            if (std::isnan(x)) return std::string("GEWENST –°");
+            char b[24]; snprintf(b, sizeof(b), "GEWENST %d°", (int) lroundf(x));
+            return std::string(b);
   - platform: homeassistant
     id: room_hum
     entity_id: sensor.thermo_slaapkamer_jip_luchtvochtigheid
@@ -11500,6 +11534,7 @@ lvgl:
       scrollable: false
       on_unload:
         - lvgl.widget.hide: pc_keuze
+        - lvgl.widget.hide: pc_temp
       on_swipe_left:
         - lambda: 'lv_indev_wait_release(lv_indev_active());'
         - lvgl.page.next:
@@ -11645,6 +11680,42 @@ lvgl:
                   text: "PANEEL AAN MET TIMER"
                   text_font: r_mono
                   text_color: 0x8B9099
+              # rechts: knop met kamertemperatuur (groot) en gewenst (klein); tik = temperatuur aanpassen
+              - button:
+                  id: pc_t_btn
+                  align: RIGHT_MID
+                  x: 6
+                  width: 124
+                  height: 84
+                  radius: 12
+                  pad_all: 0
+                  bg_color: 0xFFFFFE
+                  shadow_opa: TRANSP
+                  border_width: 2
+                  border_color: ${c_accent}
+                  pressed:
+                    bg_color: ${c_tile_on}
+                  widgets:
+                    - label:
+                        id: pc_t_nu
+                        align: CENTER
+                        y: -12
+                        text: "–°"
+                        text_font: pl_t30
+                        text_color: ${c_text}
+                    - label:
+                        id: pc_t_set
+                        align: CENTER
+                        y: 22
+                        text: "GEWENST –°"
+                        text_font: r_mono
+                        text_color: 0x8B9099
+                  on_click:
+                    - lambda: |-
+                        float t = id(pc_set_temp).state;
+                        id(pc_tw) = std::isnan(t) ? 20 : (int) lroundf(t);
+                    - script.execute: pc_tw_render
+                    - lvgl.widget.show: pc_temp
             # eerst kiezen hoe lang: 15, 30 of 60 minuten (keuzevenster pc_keuze)
             on_click:
               - lvgl.widget.show: pc_keuze
@@ -11877,6 +11948,131 @@ lvgl:
                               text_color: 0x8B9099
                         on_click:
                           - lvgl.widget.hide: pc_keuze
+        # venster 'Temperatuur': gewenste temperatuur van het paneel instellen (tik ernaast = annuleren)
+        - obj:
+            id: pc_temp
+            hidden: true
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            radius: 0
+            border_width: 0
+            pad_all: 0
+            bg_color: 0x000000
+            bg_opa: 60%
+            scrollable: false
+            on_click:
+              - lvgl.widget.hide: pc_temp
+            widgets:
+              - obj:
+                  x: 40
+                  y: 100
+                  width: 400
+                  height: 270
+                  radius: 18
+                  border_width: 0
+                  pad_all: 0
+                  bg_color: 0xFFFFFE
+                  scrollable: false
+                  widgets:
+                    - label:
+                        align: TOP_MID
+                        y: 22
+                        text: "Gewenste temperatuur"
+                        text_font: pl_t30
+                        text_color: ${c_text}
+                    - button:
+                        x: 24
+                        y: 74
+                        width: 96
+                        height: 96
+                        radius: 48
+                        bg_color: ${c_tile}
+                        shadow_ofs_y: 4
+                        border_width: 0
+                        pressed:
+                          bg_color: ${c_tile_on}
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "-"
+                              text_font: pl_t30
+                              text_color: ${c_text}
+                        on_click:
+                          - lambda: 'id(pc_tw) = std::max(5, std::min(30, id(pc_tw) + (-1)));'
+                          - script.execute: pc_tw_render
+                    - label:
+                        id: pc_tw_val
+                        x: 120
+                        y: 98
+                        width: 160
+                        text_align: CENTER
+                        text: "20°"
+                        text_font: pl_t30
+                        text_color: ${c_text}
+                    - button:
+                        x: 280
+                        y: 74
+                        width: 96
+                        height: 96
+                        radius: 48
+                        bg_color: ${c_tile}
+                        shadow_ofs_y: 4
+                        border_width: 0
+                        pressed:
+                          bg_color: ${c_tile_on}
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "+"
+                              text_font: pl_t30
+                              text_color: ${c_text}
+                        on_click:
+                          - lambda: 'id(pc_tw) = std::max(5, std::min(30, id(pc_tw) + (1)));'
+                          - script.execute: pc_tw_render
+                    - button:
+                        x: 40
+                        y: 200
+                        width: 150
+                        height: 48
+                        radius: 24
+                        bg_opa: TRANSP
+                        shadow_opa: TRANSP
+                        border_width: 0
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "ANNULEREN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - lvgl.widget.hide: pc_temp
+                    - button:
+                        x: 210
+                        y: 200
+                        width: 150
+                        height: 48
+                        radius: 24
+                        bg_color: ${c_accent}
+                        shadow_opa: TRANSP
+                        border_width: 0
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "INSTELLEN"
+                              text_font: r_mono
+                              text_color: 0xFFFFFE
+                        on_click:
+                          - lvgl.widget.hide: pc_temp
+                          - homeassistant.action:
+                              action: climate.set_temperature
+                              data:
+                                entity_id: climate.paneel_jip
+                                temperature: !lambda 'return std::to_string(id(pc_tw));'
+                          - lvgl.label.update:
+                              id: pc_t_set
+                              text: !lambda 'return "GEWENST " + std::to_string(id(pc_tw)) + "°";'
     - id: page_favs
       # @nav-boven
       styles: pl_page
