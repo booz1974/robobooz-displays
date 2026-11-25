@@ -11,6 +11,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
 | `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
 | `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
+| `display-test.yaml` | Testpaneel | **Nieuwe stijl "Raster & Cirkel"** (stap 1): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis, Licht, Sfeer, Nu speelt, Klimaat, Weer en Menu, vaste onderbalk en zwarte spelerbalk met volume. Entiteiten van de woonkamer, geen Music Assistant-token nodig. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
 
 ## Functies
 
@@ -87,6 +88,12 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Speler: `media_player.kijkpaal_woonkamer` (Music Assistant)
 - Kachel: `climate.paneel_jip`, `script.paneel_jip_timer_starten` (optioneel veld `minuten`; anders `input_number.paneel_jip_timerduur`), `script.paneel_jip_uit`, `binary_sensor.paneel_jip_aan`, `sensor.paneel_jip_resterend`
 - Kamer en rust: `sensor.thermo_slaapkamer_jip_temperatuur`, `sensor.thermo_slaapkamer_jip_luchtvochtigheid`, `input_boolean.jip_niet_storen`
+
+**Test (Raster & Cirkel)**
+- Lampen en sfeer: `light.woonkamer`, `light.eettafel`, `light.keuken`, `scene.woonkamer_woonkamer`, `scene.keuken_keuken_totaal`, `scene.eettafel_tafel`, `scene.woonkamer_woonkamer_eettafel`, `scene.woonkamer_herfst_goud`, `scene.woonkamer_tafel`, `scene.woonkamer_concentreren`, `scene.woonkamer_fairfax`, `script.lampen_random_kleuren`
+- Speler: `media_player.yamaha_living_2` (titel, artiest, album, volume via HA)
+- Klimaat: `climate.living_room`
+- Weer: `weather.de_scholekster`, `input_text.weer_uren_display`, `sensor.neerslag_buienradar_regen_data`
 
 **Optioneel**: Team Tracker-sensoren voor NEC/Oranje en een agenda voor NMHC (automatisch wedstrijdthema).
 
