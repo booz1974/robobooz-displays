@@ -5,6 +5,8 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
 #   nog van de woonkamer).
+#   Versie 0.5 (25-11-2026): wekkerscherm met sluimertijd - / + (5..30 min,
+#   standaard 5); volume begint op 50% (Alarm 100%) en gaat langzaam naar 100%.
 #   Versie 0.4 (25-11-2026): avondstand werkt: de SPI naar het scherm wordt
 #   eerst weer aangemeld (de driver geeft hem na het opstarten vrij).
 #   Versie 0.3 (25-11-2026): spelerbalk hoger (68 px, hoes 68x68) zodat titel en
@@ -44,7 +46,9 @@
 #   Wekkerbrigade (ElevenLabs, zoals de intercom), Zoemer, Klassieke wekker,
 #   Alarm (mp3 in /config/www/robobooz/), Rustig wekken, Muziek (NPO Radio 2),
 #   Natuurgeluiden, Alleen licht; PROBEER NU laat hem meteen afgaan.
-#   Gaat hij af: volledig scherm met klok, SLUIMER 9 MIN en STOP.
+#   Gaat hij af: volledig scherm met klok, SLUIMER (- / + per 5 min, standaard 5)
+#   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
+#   100%, tot STOP of SLUIMER.
 # Nachtstand: zwart, gedimde klok in donkerrood en de wekkertijd, scherm op 12%.
 #   Tik = terug naar Thuis.
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
@@ -67,6 +71,7 @@
 # Wekker in HA: input_datetime.wekker_slaapkamer_tijd,
 #   input_boolean.wekker_slaapkamer_aan / _lampen / _gaat_af,
 #   input_select.wekker_slaapkamer_dagen / _geluid,
+#   input_number.wekker_slaapkamer_sluimertijd (5..30 min, stap 5),
 #   input_text.wekker_slaapkamer_speaker (nu media_player.yamaha_living_2),
 #   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
 #   light.slaapkamer_jeroen_maartje (zonsopgang), script.intercom_zend,
@@ -581,6 +586,14 @@ text_sensor:
             - lvgl.widget.hide: ring
 
 sensor:
+  - platform: homeassistant
+    id: wk_sluimer
+    entity_id: input_number.wekker_slaapkamer_sluimertijd
+    internal: true
+    on_value:
+      - lambda: |-
+          char t[24]; snprintf(t, sizeof(t), "Sluimer %d min", std::isnan(x) ? 5 : (int) lroundf(x));
+          lv_label_set_text(id(r_sluimer), t);
   - platform: homeassistant
     id: lt_b0
     entity_id: light.woonkamer
@@ -1525,10 +1538,24 @@ lvgl:
             - label: {x: 24, y: 30, styles: st_mono12, text: "GOEDEMORGEN"}
             - label: {x: 24, y: 50, styles: st_mono11, text_color: "${c_sub}", text: "DE WEKKER GAAT AF"}
             - label: {id: r_clock, x: 18, y: 76, text_font: f_clock, text_letter_space: -6, text: "--:--"}
+            # sluimertijd - / +  (stappen van 5 min, standaard 5)
             - button:
                 x: 24
                 y: 236
-                width: 432
+                width: 80
+                height: 80
+                styles: st_outline
+                on_click:
+                  - homeassistant.action:
+                      action: input_number.decrement
+                      data:
+                        entity_id: input_number.wekker_slaapkamer_sluimertijd
+                widgets:
+                  - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic30}
+            - button:
+                x: 112
+                y: 236
+                width: 256
                 height: 80
                 bg_color: ${c_ink}
                 bg_opa: COVER
@@ -1542,8 +1569,21 @@ lvgl:
                         entity_id: script.wekker_slaapkamer_sluimer
                   - lvgl.widget.hide: ring
                 widgets:
-                  - label: {x: 20, y: 26, text: "${ic_snooze}", text_font: f_ic30}
-                  - label: {x: 64, y: 22, text_font: f_26, text: "Sluimer 9 min"}
+                  - label: {x: 16, y: 25, text: "${ic_snooze}", text_font: f_ic30}
+                  - label: {id: r_sluimer, x: 56, y: 24, text_font: f_26, text: "Sluimer 5 min"}
+            - button:
+                x: 376
+                y: 236
+                width: 80
+                height: 80
+                styles: st_outline
+                on_click:
+                  - homeassistant.action:
+                      action: input_number.increment
+                      data:
+                        entity_id: input_number.wekker_slaapkamer_sluimertijd
+                widgets:
+                  - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic30}
             - button:
                 x: 306
                 y: 332
