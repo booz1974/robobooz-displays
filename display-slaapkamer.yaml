@@ -49,7 +49,8 @@
 #   scherm in de avondstand, gedimd (35%); nachtstand gaat na 20 s weer uit.
 #   Avondstand vanzelf om 21:00 aan en om 06:00 uit; in de nachtstand nooit omgedraaid.
 #   Versie 0.5 (25-11-2026): wekkerscherm met sluimertijd - / + (5..30 min,
-#   standaard 5); volume begint op 50% (Alarm 100%) en gaat langzaam naar 100%.
+#   standaard 5); volume 20% -> 50% in 1 min -> 80% na 5 min (Alarm 60%, de lampen
+#   knipperen fel wit als er na 1 min nog niet op STOP of SLUIMER is getikt).
 #   Versie 0.4 (25-11-2026): avondstand werkt: de SPI naar het scherm wordt
 #   eerst weer aangemeld (de driver geeft hem na het opstarten vrij).
 #   Versie 0.3 (25-11-2026): spelerbalk hoger (68 px, hoes 68x68) zodat titel en
@@ -95,8 +96,10 @@
 #   Alarm (mp3 in /config/www/robobooz/), Rustig wekken, Muziek (NPO Radio 2),
 #   Natuurgeluiden, Alleen licht; PROBEER NU laat hem meteen afgaan.
 #   Gaat hij af: volledig scherm met klok, SLUIMER (- / + per 5 min, standaard 5)
-#   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
-#   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
+#   en STOP. Volume (regelt HA, script.wekker_afgaan): 20%, in 1 minuut 50%, na
+#   5 minuten 80%; Alarm meteen 60% en na 1 minuut zonder reactie knipperen de
+#   lampen fel wit. Licht in 20 stapjes naar 100% in 5 minuten. STOP en SLUIMER
+#   werken meteen. Speelde er al muziek, dan pauzeert die en gaat
 #   na STOP verder op het oude volume (dat regelt HA, niet het display).
 # Tikken: SLAPEN (scherm uit) -> tik -> NACHTSTAND (zwart, alleen een gedempt
 #   rode klok, 15%) -> tik -> NORMAAL. Dat geldt altijd, ook overdag.
