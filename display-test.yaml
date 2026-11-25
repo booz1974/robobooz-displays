@@ -5,6 +5,8 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.10 (25-11-2026): tik op SLAPEN (scherm uit) = altijd eerst de
+#   nachtstand, tik op de nachtstand = NORMAAL (ook overdag).
 #   Versie 0.9 (25-11-2026): DIM-paneel, standen van het scherm heten nu NORMAAL,
 #   NACHTSTAND en SLAPEN.
 #   Versie 0.8 (25-11-2026): licht, sfeer en DIM-lampen naar de slaapkamer van
@@ -62,7 +64,8 @@
 #   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
 #   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
 #   na STOP verder op het oude volume (dat regelt HA, niet het display).
-# Nachtstand: zwart met alleen een donkerrode klok, scherm op 15%. Tik = terug.
+# Tikken: SLAPEN (scherm uit) -> tik -> NACHTSTAND (zwart, alleen een gedempt
+#   rode klok, 15%) -> tik -> NORMAAL. Dat geldt altijd, ook overdag.
 # Nacht (21:00-06:00): na 1 min niets aanraken gaat het scherm uit (slapen).
 #   Eerste tik = nachtstand, volgende tik = gewone scherm (avondstand, 35%);
 #   de nachtstand gaat na 20 s vanzelf weer uit.
@@ -214,20 +217,17 @@ touchscreen:
             lv_indev_t *in = lv_indev_get_next(nullptr);
             if (in != nullptr) lv_indev_wait_release(in);
           }
-    # 's nachts (21-6) en scherm uit: eerste tik = nachtstand (alleen de klok, gedimd)
+    # scherm uit (SLAPEN): eerste tik = nachtstand (alleen de klok, gedimd)
     - if:
         condition:
-          lambda: |-
-            auto t = id(system_time).now();
-            bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
-            return nacht && !id(display_backlight).current_values.is_on() && id(wk_af).state != "on";
+          lambda: 'return !id(display_backlight).current_values.is_on() && id(wk_af).state != "on";'
         then:
           - lvgl.resume:
           - lvgl.widget.hide: qp
           - lvgl.page.show: p_nacht
           - light.turn_on: {id: display_backlight, brightness: 15%}
         else:
-          # in de nachtstand: volgende tik = gewone scherm, 's nachts omgedraaid en gedimd (35%)
+          # in de nachtstand: volgende tik = gewone scherm (NORMAAL); 's nachts omgedraaid en gedimd (35%)
           - if:
               condition:
                 lambda: 'return id(cur_page) == 9;'
