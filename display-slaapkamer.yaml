@@ -9,6 +9,7 @@
 #   Versie 0.27 (25-11-2026): SLUITEN op de deurbel reageert al bij indrukken, stopt de
 #   eigen livestream en gaat naar Thuis; de stop na 1 minuut werkt nu ook als het
 #   deurbelscherm al weg is (batterij van de deurbel).
+#   LAMP HAL AAN: icoon en tekst in het midden van de knop.
 #   Versie 0.26 (25-11-2026): camerabeeld voordeur: de Eufy-deurbel ververst zijn beeld
 #   alleen tijdens een livestream (buiten aanbellen om was het beeld oud en gestreept).
 #   Zelf geopend via Menu: het display start kort een livestream (stopt bij sluiten of na
@@ -3870,8 +3871,20 @@ lvgl:
                   data:
                     entity_id: light.hal
             widgets:
-              - label: {x: 16, y: 16, text: "${ic_bulb}", text_font: f_ic22}
-              - label: {x: 50, y: 21, styles: st_mono12, text: "LAMP HAL AAN"}
+              # icoon en tekst samen in het midden van de knop
+              - obj:
+                  align: CENTER
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  clickable: false
+                  layout:
+                    type: flex
+                    flex_flow: ROW
+                    flex_align_cross: CENTER
+                    pad_column: 10
+                  widgets:
+                    - label: {text: "${ic_bulb}", text_font: f_ic22}
+                    - label: {styles: st_mono12, text: "LAMP HAL AAN"}
         - button:
             x: 244
             y: 344
