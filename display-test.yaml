@@ -5,6 +5,8 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.9 (25-11-2026): DIM-paneel, standen van het scherm heten nu NORMAAL,
+#   NACHTSTAND en SLAPEN.
 #   Versie 0.8 (25-11-2026): licht, sfeer en DIM-lampen naar de slaapkamer van
 #   Maartje en Jeroen (Alles, Plafond, Ledstrip; scènes slaapkamer_jeroen_maartje_*).
 #   Versie 0.7 (25-11-2026): nachtstand-klok weer zichtbaar: scherm 15% (was 6%)
@@ -21,7 +23,7 @@
 #   artiest niet meer wegvallen; wekkerpagina 4 px opgeschoven.
 #   Versie 0.2 (25-11-2026): spelerbalk bovenin met echte hoes, hoes op
 #   Nu speelt, nieuw menu, WEKKER (+ wekkergeluid, afgaan-scherm), DIM-paneel
-#   (lampen aan/dimmen/uit, scherm helder/nachtstand/donker, avondstand),
+#   (lampen aan/dimmen/uit, scherm normaal/nachtstand/slapen, avondstand),
 #   nachtstand-scherm en avondstand (alle kleuren omgedraaid).
 #   Versie 0.1 (25-11-2026): stap 1 van de mockups "Woonkamer display – nieuwe stijl".
 # Stijl: warm papierwit, zwarte strakke letters (Inter Tight), kleine labels in
@@ -31,7 +33,8 @@
 #   07 Wekker | 08 Wekkergeluid | Nachtstand | 00 Menu.
 # Onderbalk (op elk scherm, behalve nachtstand): THUIS / WEKKER / MUZIEK /
 #   MENU / DIM (zwart = waar je bent). DIM opent het paneel LICHT & SCHERM:
-#   lampen AAN / DIMMEN (20%) / UIT, scherm HELDER / NACHTSTAND / DONKER en
+#   lampen AAN / DIMMEN (20%) / UIT, scherm NORMAAL / NACHTSTAND (alleen de klok,
+#   gedimd) / SLAPEN (scherm helemaal uit) en
 #   AVONDSTAND aan/uit (de hele kleurenset omgedraaid via het scherm zelf).
 # Spelerbalk: bovenin (68 px) zolang de woonkamer speelt of gepauzeerd is:
 #   hoes, titel (tik = Nu speelt), pauze, volume - en +. De schermen schuiven
@@ -60,7 +63,7 @@
 #   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
 #   na STOP verder op het oude volume (dat regelt HA, niet het display).
 # Nachtstand: zwart met alleen een donkerrode klok, scherm op 15%. Tik = terug.
-# Nacht (21:00-06:00): na 1 min niets aanraken gaat het scherm uit (donker).
+# Nacht (21:00-06:00): na 1 min niets aanraken gaat het scherm uit (slapen).
 #   Eerste tik = nachtstand, volgende tik = gewone scherm (avondstand, 35%);
 #   de nachtstand gaat na 20 s vanzelf weer uit.
 # Scherm overdag: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
@@ -1429,7 +1432,7 @@ lvgl:
                   - lvgl.widget.hide: qp
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_brightness}", text_font: f_ic22}
-                  - label: {x: 12, y: 40, styles: st_mono11, text: "HELDER"}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "NORMAAL"}
             - button:
                 x: 171
                 y: 182
@@ -1458,7 +1461,7 @@ lvgl:
                   - light.turn_off: display_backlight
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_sleep}", text_font: f_ic22}
-                  - label: {x: 12, y: 40, styles: st_mono11, text: "DONKER"}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "SLAPEN"}
             # avondstand: alle kleuren omgedraaid
             - obj:
                 x: 24
