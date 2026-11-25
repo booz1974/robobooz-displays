@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.23 (25-11-2026): schuif FELHEID SCHERM in LAMPEN & SCHERM; in het donkere
+#   schema wordt die stand ook de nachthelderheid van het gewone scherm (standaard weer 35%).
+#   Wekkertijd als de wekker uit staat leesbaar in het donkere schema.
 #   Versie 0.22 (25-11-2026): klok, datum en andere teksten zonder eigen kleur bleven zwart
 #   in het donkere schema (ze erfden het LVGL-zwart 0x212121); nu licht. Omlijnde knoppen
 #   (zoals PER LAMP) hebben een dichte achtergrond: de cirkels schijnen er niet meer door.
@@ -287,7 +290,7 @@ touchscreen:
           auto &bl = id(display_backlight).current_values;
           auto t = id(system_time).now();
           bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
-          float vol = nacht ? ${nacht_hl}f : 1.0f;   // 's nachts is het gewone scherm gedimd
+          float vol = nacht ? id(hl_nacht) : 1.0f;   // 's nachts is het gewone scherm gedimd
           bool wekker = id(wk_af).state == "on";
           bool slaap = !bl.is_on() || id(lvgl_main)->is_paused() ||
                        (!wekker && (bl.get_brightness() < vol - 0.01f || id(cur_page) == 9));
@@ -324,7 +327,7 @@ touchscreen:
                     id: display_backlight
                     brightness: !lambda |-
                       auto t = id(system_time).now();
-                      return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? ${nacht_hl}f : 1.0f;
+                      return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? id(hl_nacht) : 1.0f;
 
 spi:
   - id: lcd_spi
@@ -415,7 +418,7 @@ time:
               condition:
                 lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
               then:
-                - light.turn_on: {id: display_backlight, brightness: !lambda 'return ${nacht_hl}f;'}
+                - light.turn_on: {id: display_backlight, brightness: !lambda 'return id(hl_nacht);'}
       - seconds: 0
         minutes: 0
         hours: 9
@@ -504,7 +507,6 @@ substitutions:
   ha_url: !secret ha_url   # in secrets.yaml, bv. "http://192.168.1.100:8123"
   ma_url: !secret ma_url   # Music Assistant, voor de favorieten
   ma_token: !secret ma_api_token
-  nacht_hl: "0.60"       # helderheid gewone scherm 's nachts / in het donkere schema (gamma: 35% was te donker)
   c_night: "0x9A3422"    # klok in de nachtstand (gedempt rood; donkerder was onzichtbaar)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"
@@ -673,6 +675,10 @@ globals:
     initial_value: '0'
   - id: deur_tijd       # tijd van het laatste aanbellen (tekst), leeg = handmatig geopend
     type: std::string
+  - id: hl_nacht        # felheid gewone scherm 's nachts / in het donkere schema (schuif FELHEID)
+    type: float
+    restore_value: true
+    initial_value: '0.35'
   - id: avond           # avondstand: donker kleurenschema
     type: bool
     restore_value: true
@@ -1212,7 +1218,7 @@ script:
                 case ${c_blue}:   return lv_color_hex(0x1E2A4F);   // diep blauw
                 case ${c_grey}:   return lv_color_hex(0x948A7F);
                 case ${c_dline}:  return lv_color_hex(0x2A2420);
-                case ${c_off}:    return lv_color_hex(0x3A332E);   // schakelaar uit
+                case ${c_off}:    return lv_color_hex(0x6E655C);   // schakelaar uit / wekkertijd uit (leesbaar)
                 case 0xFFFFFF:    return lv_color_hex(0xD2C6B8);
                 case 0x212121:    return lv_color_hex(0xD2C6B8);   // standaard tekstkleur van LVGL
                 case ${c_night}:  return c;                        // nachtklok blijft zoals hij is
@@ -1726,7 +1732,7 @@ lvgl:
               lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
             then:
               # in het donkere schema niet lager dan de nachthelderheid (anders onleesbaar)
-              - light.turn_on: {id: display_backlight, brightness: !lambda 'return id(avond) ? ${nacht_hl}f : 0.35f;'}
+              - light.turn_on: {id: display_backlight, brightness: !lambda 'return id(avond) ? id(hl_nacht) : 0.35f;'}
     # overdag na 30 min SLAPEN
     - timeout: 30min
       then:
@@ -1940,12 +1946,12 @@ lvgl:
                 height: 64
                 styles: st_tile
                 on_click:
-                  # NORMAAL: overdag 100%, 's nachts 60% (donker schema; 35% was onleesbaar)
+                  # NORMAAL: overdag 100%, 's nachts de stand van de schuif FELHEID (standaard 35%)
                   - light.turn_on:
                       id: display_backlight
                       brightness: !lambda |-
                         auto t = id(system_time).now();
-                        return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? ${nacht_hl}f : 1.0f;
+                        return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? id(hl_nacht) : 1.0f;
                   - lvgl.widget.hide: qp
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_brightness}", text_font: f_ic22}
@@ -2027,6 +2033,38 @@ lvgl:
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_bulb}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "PER LAMP ›"}
+            # felheid van het scherm; in het donkere schema onthoudt hij dit ook voor de nacht
+            - label: {x: 24, y: 344, styles: st_mono11, text_color: "${c_sub}", text: "FELHEID SCHERM"}
+            - label: {id: qp_hlpc, x: 376, y: 344, width: 80, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
+            - slider:
+                id: qp_hl
+                x: 24
+                y: 366
+                width: 432
+                height: 24
+                min_value: 10
+                max_value: 100
+                bg_color: ${c_tile}
+                bg_opa: COVER
+                radius: 0
+                pad_top: 8
+                pad_bottom: 8
+                indicator:
+                  bg_color: ${c_red}
+                  radius: 0
+                knob:
+                  bg_color: ${c_inkbg}
+                  bg_opa: COVER
+                  radius: 0
+                  shadow_width: 0
+                  pad_all: 4
+                on_value:
+                  - lambda: |-
+                      char b[8]; snprintf(b, sizeof(b), "%d%%", (int) x);
+                      lv_label_set_text(id(qp_hlpc), b);
+                on_release:
+                  - lambda: 'if (id(avond)) id(hl_nacht) = x / 100.0f;'
+                  - light.turn_on: {id: display_backlight, brightness: !lambda 'return x / 100.0f;'}
 
       # ======== onderbalk: THUIS / WEKKER / MUZIEK / MENU / DIM (5 x 96 px)
       - obj:
@@ -2112,7 +2150,14 @@ lvgl:
                   text_color: ${c_papert}
                 on_click:
                   - lambda: |-
-                      if (lv_obj_has_flag(id(qp), LV_OBJ_FLAG_HIDDEN)) lv_obj_clear_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
+                      if (lv_obj_has_flag(id(qp), LV_OBJ_FLAG_HIDDEN)) {
+                        lv_obj_clear_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
+                        int pc = (int) lroundf(id(display_backlight).current_values.get_brightness() * 100.0f);
+                        if (pc < 10) pc = 10;
+                        lv_slider_set_value(id(qp_hl), pc, LV_ANIM_OFF);
+                        char b[8]; snprintf(b, sizeof(b), "%d%%", pc);
+                        lv_label_set_text(id(qp_hlpc), b);
+                      }
                       else lv_obj_add_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
                 widgets:
                   - label: {align: CENTER, y: -9, text: "${ic_bulb}", text_font: f_ic22}
