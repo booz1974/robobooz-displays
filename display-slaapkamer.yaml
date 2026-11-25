@@ -6,10 +6,11 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
-#   Versie 0.26 (25-11-2026): camerabeeld voordeur zoals op de woonkamer: HA verkleint het
-#   beeld tot 480x360 (4:3, zelfde maat als de woonkamer; 480x270 gaf strepen), op het
-#   scherm 360x270, elke keer een nieuw adres (t=), vaste buffer van 64 KB, niet
-#   twee tegelijk ophalen en geheugen vrijgeven bij het sluiten (was gestreept en oud).
+#   Versie 0.26 (25-11-2026): camerabeeld voordeur: de Eufy-deurbel ververst zijn beeld
+#   alleen tijdens een livestream (buiten aanbellen om was het beeld oud en gestreept).
+#   Zelf geopend via Menu: het display start kort een livestream (stopt bij sluiten of na
+#   1 min); bij aanbellen doet HA dat. Beeld pas na 4 s ophalen, door HA verkleind tot
+#   480x270, elke keer een nieuw adres (t=), buffer 64 KB, geheugen vrij bij sluiten.
 #   Versie 0.25 (25-11-2026): vormen op Thuis wisselen meer in grootte en mogen over de
 #   rand van het scherm (cirkel 100-420 px, kwartcirkel 60-260 px); er blijft altijd een
 #   behoorlijk deel zichtbaar (midden cirkel op het scherm, kwartcirkel minstens 2/3).
@@ -454,7 +455,7 @@ image:
     url: "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"
     format: JPEG
     type: RGB565
-    resize: 480x360          # zelfde maat als HA levert (4:3); anders schuiven de regels = strepen
+    resize: 480x270
     buffer_size: 65536
     update_interval: never
     on_download_finished:
@@ -696,6 +697,12 @@ globals:
   - id: deur_t0
     type: uint32_t
     initial_value: '0'
+  - id: deur_open       # moment waarop het deurbelscherm openging
+    type: uint32_t
+    initial_value: '0'
+  - id: deur_live_ik    # dit display heeft zelf een livestream gestart
+    type: bool
+    initial_value: 'false'
   - id: deur_tijd       # tijd van het laatste aanbellen (tekst), leeg = handmatig geopend
     type: std::string
   - id: hl_nacht        # felheid gewone scherm 's nachts / in het donkere schema (schuif FELHEID)
@@ -934,6 +941,12 @@ interval:
             lambda: 'return id(cur_page) == 11 && id(display_backlight).current_values.is_on();'
           then:
             - script.execute: deur_fetch
+            # eigen livestream na 1 minuut stoppen (het laatste beeld blijft staan)
+            - if:
+                condition:
+                  lambda: 'return id(deur_live_ik) && millis() - id(deur_open) > 60000;'
+                then:
+                  - script.execute: deur_stop
   # elke 3 s: is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
   - interval: 3s
     then:
@@ -948,19 +961,34 @@ interval:
 
 # ---------------------------------------------------------------- scripts
 script:
-  # ---- deurbel: vers camerabeeld ophalen, door HA verkleind tot 480x360
+  # ---- deurbel: vers camerabeeld ophalen, door HA verkleind tot 480x270.
+  # De Eufy-deurbel (batterij) ververst zijn beeld alleen tijdens een livestream; daarom
+  # pas ophalen als de stream ~4 s loopt (anders krijg je een oud, gestreept beeld).
   - id: deur_fetch
     then:
       - lambda: |-
+          if (millis() - id(deur_open) < 4000) return;                    // stream start nog
           if (id(deur_busy) && millis() - id(deur_t0) < 10000) return;   // vorige nog bezig
           std::string pic = id(cam_pic).state;
           if (pic.size() < 5 || pic[0] != '/') return;
           std::string u = std::string("${ha_url}") + pic;
-          u += std::string(u.find('?') == std::string::npos ? "?" : "&") + "width=480&height=360&t=" + to_string(millis());
+          u += std::string(u.find('?') == std::string::npos ? "?" : "&") + "width=480&height=270&t=" + to_string(millis());
           id(cam_img)->set_url(u);
           id(deur_busy) = true;
           id(deur_t0) = millis();
           id(cam_img)->update();
+  # ---- deurbel: eigen livestream stoppen (batterij sparen)
+  - id: deur_stop
+    then:
+      - if:
+          condition:
+            lambda: 'return id(deur_live_ik);'
+          then:
+            - lambda: 'id(deur_live_ik) = false;'
+            - homeassistant.action:
+                action: eufy_security.stop_p2p_livestream
+                data:
+                  entity_id: camera.voordeur
   # ---- deurbel: kop van het scherm
   - id: deur_render
     then:
@@ -3785,13 +3813,27 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 11}
         - script.execute: deur_render
-        - script.execute: deur_fetch
+        - lambda: |-
+            id(deur_open) = millis();
+            lv_obj_add_flag(id(dr_img), LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(id(dr_wait), "LIVE BEELD WORDT GESTART...");
+        # zelf geopend (niet aangebeld): zelf kort een livestream starten
+        - if:
+            condition:
+              lambda: 'return id(deur_tijd).empty();'
+            then:
+              - lambda: 'id(deur_live_ik) = true;'
+              - homeassistant.action:
+                  action: eufy_security.start_p2p_livestream
+                  data:
+                    entity_id: camera.voordeur
       on_unload:
-        # camerabeeld (geheugen) weer vrijgeven
+        # camerabeeld (geheugen) weer vrijgeven en een eigen livestream stoppen
         - lambda: |-
             lv_obj_add_flag(id(dr_img), LV_OBJ_FLAG_HIDDEN);
             id(cam_img)->release();
             id(deur_busy) = false;
+        - script.execute: deur_stop
       widgets:
         - obj:
             x: 0
@@ -3802,9 +3844,8 @@ lvgl:
             bg_color: 0x2A2F3A
             clickable: false
             widgets:
-              - label: {align: CENTER, styles: st_mono12, text_color: 0xC9CED8, text: "CAMERABEELD LADEN..."}
-        # 480x360 verkleind tot 360x270 (midden in het camerablok)
-        - image: {id: dr_img, x: 0, y: -45, src: cam_img, scale: 0.75, hidden: true, clickable: false}
+              - label: {id: dr_wait, align: CENTER, styles: st_mono12, text_color: 0xC9CED8, text: "LIVE BEELD WORDT GESTART..."}
+        - image: {id: dr_img, x: 0, y: 0, src: cam_img, hidden: true, clickable: false}
         - obj: {x: 24, y: 24, width: 10, height: 10, radius: 5, styles: st_deco, bg_color: "${c_red}", clickable: false}
         - label: {x: 42, y: 21, styles: st_mono11, text_color: "${c_papert}", text: "LIVE · VOORDEUR"}
         - label: {id: dr_now, x: 376, y: 21, width: 80, text_align: RIGHT, styles: st_mono11, text_color: "${c_papert}", text: "--:--"}
