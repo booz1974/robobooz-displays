@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.26 (25-11-2026): camerabeeld voordeur zoals op de woonkamer: HA verkleint het
+#   beeld (width/height), elke keer een nieuw adres (t=), vaste buffer van 64 KB, niet
+#   twee tegelijk ophalen en geheugen vrijgeven bij het sluiten (was gestreept en oud).
 #   Versie 0.25 (25-11-2026): vormen op Thuis wisselen meer in grootte en mogen over de
 #   rand van het scherm (cirkel 100-420 px, kwartcirkel 60-260 px); er blijft altijd een
 #   behoorlijk deel zichtbaar (midden cirkel op het scherm, kwartcirkel minstens 2/3).
@@ -442,16 +445,24 @@ http_request:
   buffer_size_tx: 2048
 
 image:
-  # camerabeeld voordeur (deurbelscherm); ververst elke 3 s zolang het scherm open is
+  # camerabeeld voordeur (deurbelscherm); ververst elke 3 s zolang het scherm open is.
+  # Home Assistant verkleint het beeld zelf (width/height), anders past het niet in het
+  # geheugen en komt het in stroken binnen; elke keer een nieuw adres (t=) tegen een oud beeld.
   - platform: online_image
     id: cam_img
     url: "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"
     format: JPEG
     type: RGB565
     resize: 480x270
+    buffer_size: 65536
+    update_interval: never
     on_download_finished:
+      - lambda: 'id(deur_busy) = false;'
       - lvgl.image.update: {id: dr_img, src: cam_img}
       - lvgl.widget.show: dr_img
+    on_error:
+      - lambda: 'id(deur_busy) = false;'
+      - logger.log: "Camerabeeld voordeur niet op te halen"
   # grote hoes op Nu speelt (url wordt gezet zodra er een hoes is)
   - platform: online_image
     id: cov_big
@@ -678,6 +689,12 @@ globals:
   - id: fav_ms          # wanneer de lijst voor het laatst is opgehaald
     type: uint32_t
     initial_value: '0'
+  - id: deur_busy       # camerabeeld wordt opgehaald
+    type: bool
+    initial_value: 'false'
+  - id: deur_t0
+    type: uint32_t
+    initial_value: '0'
   - id: deur_tijd       # tijd van het laatste aanbellen (tekst), leeg = handmatig geopend
     type: std::string
   - id: hl_nacht        # felheid gewone scherm 's nachts / in het donkere schema (schuif FELHEID)
@@ -768,15 +785,6 @@ text_sensor:
     entity_id: camera.voordeur
     attribute: entity_picture
     internal: true
-    on_value:
-      - if:
-          condition:
-            lambda: 'return x.size() > 5 && x[0] == ''/'';'
-          then:
-            - online_image.set_url:
-                id: cam_img
-                url: !lambda 'return std::string("${ha_url}") + x;'
-                update: false
   # ---- goedemorgen: afspraken van vandaag "HH:MM|tekst;..." (template-helper in HA)
   - platform: homeassistant
     id: gm_agenda
@@ -924,7 +932,7 @@ interval:
           condition:
             lambda: 'return id(cur_page) == 11 && id(display_backlight).current_values.is_on();'
           then:
-            - component.update: cam_img
+            - script.execute: deur_fetch
   # elke 3 s: is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
   - interval: 3s
     then:
@@ -939,6 +947,19 @@ interval:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # ---- deurbel: vers camerabeeld ophalen, door HA verkleind tot 480x270
+  - id: deur_fetch
+    then:
+      - lambda: |-
+          if (id(deur_busy) && millis() - id(deur_t0) < 10000) return;   // vorige nog bezig
+          std::string pic = id(cam_pic).state;
+          if (pic.size() < 5 || pic[0] != '/') return;
+          std::string u = std::string("${ha_url}") + pic;
+          u += std::string(u.find('?') == std::string::npos ? "?" : "&") + "width=480&height=270&t=" + to_string(millis());
+          id(cam_img)->set_url(u);
+          id(deur_busy) = true;
+          id(deur_t0) = millis();
+          id(cam_img)->update();
   # ---- deurbel: kop van het scherm
   - id: deur_render
     then:
@@ -3763,7 +3784,13 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 11}
         - script.execute: deur_render
-        - component.update: cam_img
+        - script.execute: deur_fetch
+      on_unload:
+        # camerabeeld (geheugen) weer vrijgeven
+        - lambda: |-
+            lv_obj_add_flag(id(dr_img), LV_OBJ_FLAG_HIDDEN);
+            id(cam_img)->release();
+            id(deur_busy) = false;
       widgets:
         - obj:
             x: 0
