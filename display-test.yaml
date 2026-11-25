@@ -48,7 +48,8 @@
 #   Natuurgeluiden, Alleen licht; PROBEER NU laat hem meteen afgaan.
 #   Gaat hij af: volledig scherm met klok, SLUIMER (- / + per 5 min, standaard 5)
 #   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
-#   100%, tot STOP of SLUIMER.
+#   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
+#   na STOP verder op het oude volume (dat regelt HA, niet het display).
 # Nachtstand: zwart, gedimde klok in donkerrood en de wekkertijd, scherm op 12%.
 #   Tik = terug naar Thuis.
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
@@ -72,6 +73,7 @@
 #   input_boolean.wekker_slaapkamer_aan / _lampen / _gaat_af,
 #   input_select.wekker_slaapkamer_dagen / _geluid,
 #   input_number.wekker_slaapkamer_sluimertijd (5..30 min, stap 5),
+#   input_boolean.wekker_slaapkamer_muziek_hervatten, input_number.wekker_slaapkamer_oud_volume,
 #   input_text.wekker_slaapkamer_speaker (nu media_player.yamaha_living_2),
 #   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
 #   light.slaapkamer_jeroen_maartje (zonsopgang), script.intercom_zend,

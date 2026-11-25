@@ -96,7 +96,7 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Weer: `weather.de_scholekster`, `input_text.weer_uren_display`, `sensor.neerslag_buienradar_regen_data`
 
 **Wekker (display test)**
-- Helpers: `input_datetime.wekker_slaapkamer_tijd`, `input_boolean.wekker_slaapkamer_aan`, `input_boolean.wekker_slaapkamer_lampen`, `input_boolean.wekker_slaapkamer_gaat_af`, `input_select.wekker_slaapkamer_dagen` (Werkdagen / Elke dag / Weekend), `input_select.wekker_slaapkamer_geluid`, `input_text.wekker_slaapkamer_speaker`, `input_number.wekker_slaapkamer_sluimertijd` (5–30 min, standaard 5)
+- Helpers: `input_datetime.wekker_slaapkamer_tijd`, `input_boolean.wekker_slaapkamer_aan`, `input_boolean.wekker_slaapkamer_lampen`, `input_boolean.wekker_slaapkamer_gaat_af`, `input_select.wekker_slaapkamer_dagen` (Werkdagen / Elke dag / Weekend), `input_select.wekker_slaapkamer_geluid`, `input_text.wekker_slaapkamer_speaker`, `input_number.wekker_slaapkamer_sluimertijd` (5–30 min, standaard 5), `input_boolean.wekker_slaapkamer_muziek_hervatten` + `input_number.wekker_slaapkamer_oud_volume` (muziek van voor de wekker gaat na STOP verder)
 - Scripts en automatisering: `script.wekker_slaapkamer_afgaan`, `script.wekker_slaapkamer_stop`, `script.wekker_slaapkamer_sluimer`, `automation.wekker_slaapkamer`; Fluisterwekker en Wekkerbrigade via `script.intercom_zend` (kanaal 12 en 9)
 - Geluiden in `www/robobooz/`: `wekker_zoemer.mp3`, `wekker_klassiek.mp3`, `wekker_alarm.mp3`, `wekker_rustig.mp3`; zonsopgang op `light.slaapkamer_jeroen_maartje`
 
