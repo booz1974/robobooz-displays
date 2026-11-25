@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.22 (25-11-2026): klok, datum en andere teksten zonder eigen kleur bleven zwart
+#   in het donkere schema (ze erfden het LVGL-zwart 0x212121); nu licht. Omlijnde knoppen
+#   (zoals PER LAMP) hebben een dichte achtergrond: de cirkels schijnen er niet meer door.
 #   Versie 0.21 (25-11-2026): klok onleesbaar in het donkere schema: gewone scherm 's nachts
 #   en gedimd in het donkere schema nu 60% (was 35%; door de gamma gaf dat bijna geen licht).
 #   Tekst en klok in het donkere schema lichter (licht zand 0xD2C6B8, grijs 0x948A7F).
@@ -1211,6 +1214,7 @@ script:
                 case ${c_dline}:  return lv_color_hex(0x2A2420);
                 case ${c_off}:    return lv_color_hex(0x3A332E);   // schakelaar uit
                 case 0xFFFFFF:    return lv_color_hex(0xD2C6B8);
+                case 0x212121:    return lv_color_hex(0xD2C6B8);   // standaard tekstkleur van LVGL
                 case ${c_night}:  return c;                        // nachtklok blijft zoals hij is
                 default:          return lv_color_make(c.red * 3 / 5, c.green * 3 / 5, c.blue * 3 / 5);
               }
@@ -1659,7 +1663,8 @@ lvgl:
       pad_all: 0
     # omlijnde knop
     - id: st_outline
-      bg_opa: TRANSP
+      bg_color: ${c_paper}      # dicht, zodat de cirkels er niet doorheen schijnen
+      bg_opa: COVER
       radius: 0
       border_width: 1
       border_color: ${c_ink}
@@ -1679,6 +1684,7 @@ lvgl:
       text_letter_space: 1
   theme:
     obj:
+      text_color: ${c_ink}      # anders erven teksten het LVGL-zwart 0x212121 (niet in het donkere schema)
       border_width: 0
       scrollable: false
       pad_all: 0
