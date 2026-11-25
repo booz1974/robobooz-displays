@@ -6,6 +6,7 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   script.bedtijd (in HA, 25-11-2026): zet nu ook woonkamer, eettafel en keuken uit.
 #   Versie 0.27 (25-11-2026): SLUITEN op de deurbel reageert al bij indrukken, stopt de
 #   eigen livestream en gaat naar Thuis; de stop na 1 minuut werkt nu ook als het
 #   deurbelscherm al weg is (batterij van de deurbel).
