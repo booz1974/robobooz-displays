@@ -7,8 +7,9 @@
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
 #   Versie 0.17 (25-11-2026): knop BEDTIJD op Thuis (onder LICHT UIT): lampen badkamer,
-#   hal, toilet, overloop, zolderoverloop en studio uit, e-deken uit, thermostaat
-#   woonkamer op 15 °C (script.bedtijd in HA). Korte bevestiging onder het weer.
+#   hal, toilet, overloop, zolderoverloop, studio en deze slaapkamer uit, alleen de
+#   e-deken-smartplug uit (als hij aan staat), thermostaat woonkamer op 15 °C
+#   (script.bedtijd in HA). Korte bevestiging onder het weer.
 #   Versie 0.16 (25-11-2026): eenmalige use_address: display-test.local weggehaald
 #   (het display heeft de nieuwe naam display-slaapkamer).
 #   Versie 0.15 (25-11-2026): FAVORIETEN (08): radio en playlists uit Music
