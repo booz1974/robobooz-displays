@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.15 (25-11-2026): FAVORIETEN (08): radio en playlists uit Music
+#   Assistant (meest gespeeld bovenaan), tabbladen RADIO / PLAYLISTS, tik = afspelen
+#   op de speler (playlists op shuffle). Via Nu speelt en via Menu (vervangt Thuis).
 #   Versie 0.14 (25-11-2026): HA-verbinding elke 3 s gecontroleerd (de melding
 #   "geen verbinding" bleef staan als de ESPHome-logviewer werd gesloten).
 #   Apparaat heet nu ook display-slaapkamer (was
@@ -54,7 +57,9 @@
 #   typemachineletter (IBM Plex Mono), vlakken en cirkels in vermiljoen en
 #   ultramarijn. Elk scherm: nummer + titel linksboven, tijd rechtsboven.
 # Pagina's: Thuis | 01 Licht | 02 Sfeer | 03 Nu speelt | 04 Kamer | 05 Weer |
-#   06 Wekker | 07 Wekkergeluid | Nachtstand | 00 Menu.
+#   06 Wekker | 07 Wekkergeluid | 08 Favorieten | Nachtstand | 00 Menu.
+# Favorieten: radio en playlists uit Music Assistant (${ma_url}, token ma_api_token),
+#   opgehaald 45 s na het opstarten en opnieuw als de lijst ouder is dan 15 min.
 # Onderbalk (op elk scherm, behalve nachtstand): THUIS / WEKKER / MUZIEK /
 #   MENU / LICHT (zwart = waar je bent). LICHT opent het paneel LAMPEN & SCHERM:
 #   lampen AAN / GEDIMD (20%) / UIT, scherm NORMAAL / NACHTSTAND (alleen de klok,
@@ -96,7 +101,7 @@
 # Hardware: touch met vaste kalibratie 0..479 (zoals Jip: de touchchip van dit
 #   paneel meldt 1024x600). Relais niet in gebruik en bewust niet ingesteld.
 #   Avondstand stuurt INVON/INVOFF (0x21/0x20) naar de ST7701S.
-# secrets.yaml: wifi_ssid, wifi_password, ha_url, plate04_api_key,
+# secrets.yaml: wifi_ssid, wifi_password, ha_url, ma_url, ma_api_token, plate04_api_key,
 #   plate04_ota_password, plate04_ap_password (zie secrets.example.yaml).
 #
 # Vereist in Home Assistant: ESPHome-integratie -> Display slaapkamer -> Configureren ->
@@ -137,6 +142,10 @@ esphome:
             brightness: !lambda 'return id(avond) ? 0.40f : 1.0f;'
         - delay: 2s
         - script.execute: avond_apply
+    - priority: -200
+      then:
+        - delay: 45s
+        - script.execute: fav_fetch
 
 external_components:
   - source:
@@ -436,6 +445,8 @@ substitutions:
   ic_windy: "\U000F059D"
   ic_hail: "\U000F0592"
   ha_url: !secret ha_url   # in secrets.yaml, bv. "http://192.168.1.100:8123"
+  ma_url: !secret ma_url   # Music Assistant, voor de favorieten
+  ma_token: !secret ma_api_token
   c_night: "0x9A3422"    # klok in de nachtstand (gedempt rood; donkerder was onzichtbaar)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"
@@ -453,6 +464,9 @@ substitutions:
   ic_invert: "\U000F0301"
   ic_bird: "\U000F15C6"
   ic_sleep: "\U000F04B2"
+  ic_star: "\U000F04CE"
+  ic_radio: "\U000F0439"
+  ic_list: "\U000F0CB8"
 
 font:
   - file: {type: gfonts, family: Inter Tight, weight: 600}
@@ -542,6 +556,9 @@ font:
       - "${ic_invert}"
       - "${ic_bird}"
       - "${ic_sleep}"
+      - "${ic_star}"
+      - "${ic_radio}"
+      - "${ic_list}"
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: f_ic30
     size: 30
@@ -549,7 +566,7 @@ font:
     glyphs: *icons
 
 globals:
-  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 klimaat, 5 weer, 6 menu, 7 wekker, 8 wekkergeluid, 9 nachtstand
+  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 kamer, 5 weer, 6 menu, 7 wekker, 8 wekkergeluid, 9 nachtstand, 10 favorieten
     type: int
     initial_value: '0'
   - id: sf_idx          # laatste sfeerkeuze (-1 = nog niets)
@@ -577,6 +594,25 @@ globals:
   - id: tijd_gezet      # eerste tijdsynchronisatie gehad
     type: bool
     initial_value: 'false'
+  # ---- favorieten uit Music Assistant (radio en playlists)
+  - id: fav_new         # binnenkomende lijst: naam, uri, soort (r/p) achter elkaar
+    type: std::vector<std::string>
+  - id: fav_list        # huidige lijst, zelfde opbouw
+    type: std::vector<std::string>
+  - id: fav_kind        # 0 = radio, 1 = playlists
+    type: int
+    initial_value: '0'
+  - id: fav_sel         # uri van wat het laatst gekozen is
+    type: std::string
+  - id: fav_click
+    type: int
+    initial_value: '-1'
+  - id: fav_ok
+    type: bool
+    initial_value: 'false'
+  - id: fav_ms          # wanneer de lijst voor het laatst is opgehaald
+    type: uint32_t
+    initial_value: '0'
   - id: avond           # avondstand: kleuren omgedraaid
     type: bool
     restore_value: true
@@ -783,6 +819,166 @@ interval:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # ---- favorieten: lijsten ophalen uit Music Assistant (meest gespeeld bovenaan)
+  - id: fav_fetch
+    mode: single
+    then:
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 60s
+      - lambda: 'id(fav_new).clear(); id(fav_ok) = true;'
+      - script.execute: {id: fav_get, kind: radio}
+      - script.wait: fav_get
+      - script.execute: {id: fav_get, kind: playlist}
+      - script.wait: fav_get
+      - lambda: |-
+          if (id(fav_ok) && !id(fav_new).empty()) { id(fav_list) = id(fav_new); id(fav_ms) = millis(); }
+          id(fav_new).clear();
+      - script.execute: fav_build
+  # ---- één lijst ophalen (kind = radio of playlist); alleen naam en uri, geen hoesjes
+  - id: fav_get
+    parameters:
+      kind: string
+    then:
+      - http_request.post:
+          url: "${ma_url}/api"
+          request_headers:
+            Content-Type: application/json
+            Authorization: "Bearer ${ma_token}"
+          body: !lambda |-
+            return std::string("{\"message_id\": \"fav_") + kind + "\", \"command\": \"music/" + kind + "s/library_items\", \"args\": {\"favorite\": true, \"order_by\": \"play_count_desc\", \"limit\": 60}}";
+          capture_response: true
+          max_response_buffer_size: 262144
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) {
+                    ESP_LOGW("fav", "%s: HTTP %d", kind.c_str(), response->status_code);
+                    id(fav_ok) = false;
+                    return;
+                  }
+                  bool arr = false;
+                  for (char c : body) {
+                    if (c == ' ' || c == '\n' || c == '\r' || c == '\t') continue;
+                    arr = (c == '[');
+                    break;
+                  }
+                  JsonDocument filter;
+                  JsonObject ef = arr ? filter.add<JsonObject>() : filter["items"].add<JsonObject>();
+                  ef["name"] = true;
+                  ef["uri"] = true;
+                  ef["item_id"] = true;
+                  JsonDocument doc;
+                  if (deserializeJson(doc, body, DeserializationOption::Filter(filter))) {
+                    ESP_LOGW("fav", "%s: JSON-fout", kind.c_str());
+                    id(fav_ok) = false;
+                    return;
+                  }
+                  JsonArray lst = arr ? doc.as<JsonArray>() : doc["items"].as<JsonArray>();
+                  int k = 0;
+                  for (JsonObject it : lst) {
+                    std::string uri = it["uri"] | "";
+                    if (uri.empty()) {
+                      std::string iid = it["item_id"] | "";
+                      if (iid.empty()) continue;
+                      uri = std::string("library://") + kind + "/" + iid;
+                    }
+                    id(fav_new).push_back(it["name"] | "");
+                    id(fav_new).push_back(uri);
+                    id(fav_new).push_back(kind == "radio" ? "r" : "p");
+                    k++;
+                  }
+                  ESP_LOGI("fav", "%s: %d favorieten", kind.c_str(), k);
+          on_error:
+            then:
+              - lambda: 'id(fav_ok) = false;'
+  # ---- tegels opbouwen voor de gekozen soort (radio of playlists)
+  - id: fav_build
+    then:
+      - lambda: |-
+          lv_obj_t *box = id(fav_box);
+          lv_obj_clean(box);
+          lv_obj_set_layout(box, LV_LAYOUT_FLEX);
+          lv_obj_set_flex_flow(box, LV_FLEX_FLOW_ROW_WRAP);
+          lv_obj_set_style_pad_row(box, 6, 0);
+          lv_obj_set_style_pad_column(box, 9, 0);
+          const lv_font_t *f15 = lv_obj_get_style_text_font(id(fav_f15), LV_PART_MAIN);
+          const lv_font_t *fm = lv_obj_get_style_text_font(id(fav_fm), LV_PART_MAIN);
+          bool radio = id(fav_kind) == 0;
+          // tabbladen
+          lv_obj_set_style_bg_color(id(fv_t0), lv_color_hex(radio ? ${c_ink} : ${c_paper}), 0);
+          lv_obj_set_style_text_color(id(fv_t0), lv_color_hex(radio ? ${c_paper} : ${c_ink}), 0);
+          lv_obj_set_style_bg_color(id(fv_t1), lv_color_hex(!radio ? ${c_ink} : ${c_paper}), 0);
+          lv_obj_set_style_text_color(id(fv_t1), lv_color_hex(!radio ? ${c_paper} : ${c_ink}), 0);
+          const auto &L = id(fav_list);
+          static const uint32_t dot[] = {${c_red}, ${c_blue}, ${c_ink}};
+          int n = 0;
+          for (size_t i = 0; i + 2 < L.size(); i += 3) {
+            if ((L[i + 2] == "r") != radio) continue;
+            bool sel = L[i + 1] == id(fav_sel);
+            lv_obj_t *b = lv_button_create(box);
+            lv_obj_remove_style_all(b);
+            lv_obj_set_size(b, 138, 64);
+            lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(${c_ink}), LV_STATE_PRESSED);
+            lv_obj_set_style_text_color(b, lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_text_color(b, lv_color_hex(${c_paper}), LV_STATE_PRESSED);
+            lv_obj_set_style_clip_corner(b, true, 0);
+            // cirkeltje rechtsboven, om en om rood / blauw / zwart
+            lv_obj_t *c = lv_obj_create(b);
+            lv_obj_remove_style_all(c);
+            lv_obj_set_size(c, 40, 40);
+            lv_obj_set_pos(c, 110, -12);
+            lv_obj_set_style_radius(c, 20, 0);
+            lv_obj_set_style_bg_opa(c, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(c, lv_color_hex(dot[n % 3]), 0);
+            lv_obj_remove_flag(c, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_t *t = lv_label_create(b);
+            lv_obj_set_style_text_font(t, f15, 0);
+            lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+            lv_obj_set_size(t, 110, 38);
+            lv_obj_set_pos(t, 10, 8);
+            lv_label_set_text(t, L[i].c_str());
+            lv_obj_t *k = lv_label_create(b);
+            lv_obj_set_style_text_font(k, fm, 0);
+            lv_obj_set_style_text_letter_space(k, 1, 0);
+            lv_obj_set_style_text_opa(k, LV_OPA_60, 0);
+            lv_obj_set_pos(k, 10, 46);
+            lv_label_set_text(k, sel ? "SPEELT" : (radio ? "RADIO" : "PLAYLIST"));
+            lv_obj_add_event_cb(b, [](lv_event_t *e) {
+              id(fav_click) = (int) (intptr_t) lv_event_get_user_data(e);
+              id(fav_tap).execute();
+            }, LV_EVENT_CLICKED, (void *) (intptr_t) i);
+            n++;
+          }
+          lv_label_set_text(id(fav_empty), n > 0 ? "" : (L.empty() ? "Favorieten worden opgehaald..." : (radio ? "Geen favoriete zenders" : "Geen favoriete playlists")));
+  # ---- tik op een favoriet: afspelen op de speler (playlists in willekeurige volgorde)
+  - id: fav_tap
+    then:
+      - lambda: |-
+          int i = id(fav_click);
+          if (i < 0 || i + 2 >= (int) id(fav_list).size()) return;
+          id(fav_sel) = id(fav_list)[i + 1];
+      - script.execute: fav_build
+      - if:
+          condition:
+            lambda: 'int i = id(fav_click); return i >= 0 && i + 2 < (int) id(fav_list).size() && id(fav_list)[i + 2] == "p";'
+          then:
+            - homeassistant.action:
+                action: media_player.shuffle_set
+                data:
+                  entity_id: ${speler}
+                  shuffle: "true"
+      - homeassistant.action:
+          action: music_assistant.play_media
+          data:
+            entity_id: ${speler}
+            media_id: !lambda 'return id(fav_sel);'
+            media_type: !lambda 'int i = id(fav_click); return std::string(i >= 0 && i + 2 < (int) id(fav_list).size() && id(fav_list)[i + 2] == "p" ? "playlist" : "radio");'
+            enqueue: replace
+
   # tijd en datum op alle schermen
   - id: clock_render
     then:
@@ -793,7 +989,7 @@ script:
           lv_label_set_text(id(h_clock), hm);
           lv_label_set_text(id(n_clock), hm);
           lv_label_set_text(id(r_clock), hm);
-          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6), id(hd_t7), id(hd_t8), id(hd_tq)};
+          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6), id(hd_t7), id(hd_t8), id(hd_t9), id(hd_tq)};
           for (auto *l : hl) lv_label_set_text(l, hm);
           static const char *dag[] = {"ZONDAG", "MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG"};
           static const char *mnd[] = {"JANUARI", "FEBRUARI", "MAART", "APRIL", "MEI", "JUNI", "JULI",
@@ -811,7 +1007,7 @@ script:
           bool wissel = (p == 9) != (id(cur_page) == 9);   // de nachtstand in of uit
           id(cur_page) = p;
           if (wissel) id(avond_apply).execute();
-          int dk = p == 0 ? 0 : ((p == 7 || p == 8) ? 1 : (p == 3 ? 2 : (p == 6 ? 3 : -1)));
+          int dk = p == 0 ? 0 : ((p == 7 || p == 8) ? 1 : ((p == 3 || p == 10) ? 2 : (p == 6 ? 3 : -1)));
           lv_obj_t *b[] = {id(dk_0), id(dk_1), id(dk_2), id(dk_3)};
           for (int k = 0; k < 4; k++) {
             bool sel = k == dk;
@@ -833,7 +1029,7 @@ script:
           laatst = muziek;
           if (muziek) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           else lv_obj_add_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid)};
+          lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid), id(pg_fav)};
           for (auto *o : pg) lv_obj_set_y(o, muziek ? 68 : 0);
 
   # avondstand: het scherm zelf keert alle kleuren om (ST7701S INVON 0x21 / INVOFF 0x20)
@@ -2342,6 +2538,17 @@ lvgl:
             text_font: f_15
             text_color: ${c_sub}
             text: ""
+        - button:
+            x: 216
+            y: 208
+            width: 240
+            height: 40
+            styles: st_outline
+            on_click:
+              - lvgl.page.show: p_fav
+            widgets:
+              - label: {x: 12, y: 13, styles: st_mono11, text: "FAVORIETEN"}
+              - label: {align: RIGHT_MID, x: -10, text: "${ic_star}", text_font: f_ic22}
         # bediening
         - button:
             x: 24
@@ -2701,7 +2908,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - lvgl.page.show: p_home
+                    - lvgl.page.show: p_fav
                   widgets:
                     - obj:
                         x: 0
@@ -2712,9 +2919,9 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_home}", text_font: f_ic30, text_color: "${c_paper}"}
-                    - label: {x: 78, y: 14, text_font: f_17, text: "Thuis"}
-                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "BEGINSCHERM"}
+                          - label: {align: CENTER, text: "${ic_star}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Favorieten"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "RADIO · PLAYLISTS"}
 
     # ================= 06 Wekker =================
     - id: p_wekker
@@ -3129,6 +3336,77 @@ lvgl:
                           - label: {align: CENTER, text: "${ic_play}", text_font: f_ic22, text_color: "${c_paper}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Probeer nu"}
                     - label: {x: 64, y: 30, styles: st_mono11, text_color: "${c_grey}", text: "GAAT METEEN AF"}
+
+    # ================= 08 Favorieten =================
+    - id: p_fav
+      styles: st_page
+      on_load:
+        - script.execute: {id: nav_mark, p: 10}
+        - script.execute: fav_build
+        # lijst ouder dan 15 min (of nog leeg): opnieuw ophalen
+        - if:
+            condition:
+              lambda: 'return id(fav_list).empty() || millis() - id(fav_ms) > 900000;'
+            then:
+              - script.execute: fav_fetch
+      widgets:
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
+        - obj:
+            id: pg_fav
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            widgets:
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "08"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "FAVORIETEN"}
+              - label: {id: hd_t9, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              # verborgen labels: alleen om de lettertypes door te geven aan de tegels
+              - label: {id: fav_f15, x: 0, y: 0, text_font: f_15, text: "", hidden: true}
+              - label: {id: fav_fm, x: 0, y: 0, styles: st_mono11, text: "", hidden: true}
+              - button:
+                  id: fv_t0
+                  x: 24
+                  y: 58
+                  width: 120
+                  height: 36
+                  styles: st_outline
+                  bg_opa: COVER
+                  bg_color: ${c_ink}
+                  text_color: ${c_paper}
+                  on_click:
+                    - lambda: 'id(fav_kind) = 0;'
+                    - script.execute: fav_build
+                  widgets:
+                    - label: {x: 12, y: 7, text: "${ic_radio}", text_font: f_ic22}
+                    - label: {x: 40, y: 11, styles: st_mono11, text: "RADIO"}
+              - button:
+                  id: fv_t1
+                  x: 152
+                  y: 58
+                  width: 140
+                  height: 36
+                  styles: st_outline
+                  bg_opa: COVER
+                  bg_color: ${c_paper}
+                  on_click:
+                    - lambda: 'id(fav_kind) = 1;'
+                    - script.execute: fav_build
+                  widgets:
+                    - label: {x: 12, y: 7, text: "${ic_list}", text_font: f_ic22}
+                    - label: {x: 40, y: 11, styles: st_mono11, text: "PLAYLISTS"}
+              - label: {id: fav_empty, x: 24, y: 120, width: 432, text_font: f_15, text_color: "${c_sub}", text: "Favorieten worden opgehaald..."}
+              # tegels (3 naast elkaar), scrollbaar
+              - obj:
+                  id: fav_box
+                  x: 24
+                  y: 104
+                  width: 432
+                  height: 240
+                  scrollable: true
+                  scroll_dir: VER
+                  scrollbar_mode: AUTO
 
     # ================= Nachtstand =================
     - id: p_nacht

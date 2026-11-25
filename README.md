@@ -11,7 +11,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
 | `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
 | `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, **Wekker** (knop op Thuis; RACE-stijl, afgaan-scherm met SLUIMER -/+ en STOP, wekkerregel in de nachtstand), nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
-| `display-slaapkamer.yaml` | Slaapkamer Maartje en Jeroen | **Nieuwe stijl "Raster & Cirkel"** (v0.14): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis (met LICHT UIT), Licht, Sfeer, Nu speelt (met hoes), Kamer, Weer, **Wekker** (+ wekkergeluid; afgaan-scherm met tijd, SLUIMER -/+ en STOP; volume 50% → 100%, Alarm 100%) en Menu. Spelerbalk bovenin, onderbalk met **LICHT** (lampen aan/gedimd/uit, scherm normaal/nachtstand/slapen, avondstand). Tikken: slapen → nachtstand (klok + wekkertijd) → normaal; 's nachts (21–6) na 1 min vanzelf slapen, avondstand en gedimd. Toont "geen verbinding met HA" als HA weg is. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
+| `display-slaapkamer.yaml` | Slaapkamer Maartje en Jeroen | **Nieuwe stijl "Raster & Cirkel"** (v0.15): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis (met LICHT UIT), Licht, Sfeer, Nu speelt (met hoes), **Favorieten** (radio en playlists uit Music Assistant), Kamer, Weer, **Wekker** (+ wekkergeluid; afgaan-scherm met tijd, SLUIMER -/+ en STOP; volume 50% → 100%, Alarm 100%) en Menu. Spelerbalk bovenin, onderbalk met **LICHT** (lampen aan/gedimd/uit, scherm normaal/nachtstand/slapen, avondstand). Tikken: slapen → nachtstand (klok + wekkertijd) → normaal; 's nachts (21–6) na 1 min vanzelf slapen, avondstand en gedimd. Toont "geen verbinding met HA" als HA weg is. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
 
 ## Functies
 
@@ -94,6 +94,7 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 **Slaapkamer (Raster & Cirkel, `display-slaapkamer.yaml`)**
 - Lampen en sfeer: `light.slaapkamer_jeroen_maartje` (groep), `light.slaapkamer_jeroen_en_maartje`, `light.slaapkamer_lichtstrip`, `scene.slaapkamer_jeroen_maartje_helder` / `_gedimd` / `_lezen` / `_ontspannen` / `_nachtlampje` / `_lentebloesem` / `_savanne_zonsondergang`
 - Speler: `media_player.yamaha_living_2` (titel, artiest, album, hoes en volume via HA; voorlopig de woonkamer)
+- Favorieten: Music Assistant op `ma_url` met `ma_api_token` (zoals de andere displays); afspelen via `music_assistant.play_media`
 - Kamer: `sensor.thermo_slaapkamer_jeroen_maartje_temperatuur_3`, `sensor.thermo_slaapkamer_jeroen_maartje_luchtvochtigheid_3`
 - Weer: `weather.de_scholekster`, `input_text.weer_uren_display`, `sensor.neerslag_buienradar_regen_data`
 
