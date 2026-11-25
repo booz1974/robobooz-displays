@@ -9,7 +9,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 | Bestand | Ruimte | Bijzonderheden |
 |---|---|---|
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
-| `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
+| `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit; na Studio uit telt het scherm af tot de smartplug uitgaat), lampen studio/zolder/burolamp, speler Studio mini |
 | `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, **Wekker** (knop op Thuis; RACE-stijl, afgaan-scherm met SLUIMER -/+ en STOP, wekkerregel in de nachtstand), nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
 | `display-slaapkamer.yaml` | Slaapkamer Maartje en Jeroen | **Nieuwe stijl "Raster & Cirkel"** (v0.27): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn; op Thuis staan de cirkel en de kwartcirkel elk kwartier ergens anders. **Avondstand** = donker kleurenschema "warm donker" (vanzelf 20:00–09:00, of met de hand in LICHT). Schuif **FELHEID SCHERM** in LICHT; in het donkere schema is dat ook de nachthelderheid. Thuis (met LICHT UIT en BEDTIJD (2 s vasthouden): lampen badkamer, hal, toilet, overlopen, studio en slaapkamer uit, tv en Yamaha uit, alleen de e-deken-smartplug uit, thermostaat 15 °C via `script.bedtijd`), Licht, Sfeer, Nu speelt (met hoes), **Favorieten** (radio en playlists uit Music Assistant), **Deurbel** (camerabeeld voordeur bij aanbellen; zelf geopend start het display kort een livestream via `eufy_security.start_p2p_livestream`), **Goedemorgen** (na de wekker: tijd, buiten, afspraken van vandaag), Kamer, Weer, **Wekker** (+ wekkergeluid; afgaan-scherm met tijd, SLUIMER -/+ en STOP; volume 20% → 50% → 80%, Alarm 60% en na 1 minuut knipperende lampen) en Menu. Spelerbalk bovenin, onderbalk met **LICHT** (lampen aan/gedimd/uit, scherm normaal/nachtstand/slapen, avondstand). Tikken: slapen → nachtstand (klok + wekkertijd) → normaal; 's nachts (21–6) na 1 min vanzelf slapen, donker schema en gedimd. Toont "geen verbinding met HA" als HA weg is. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
 
@@ -81,7 +81,7 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 **Studio**
 - Lampen en sfeer: `light.studio`, `light.burolamp`, `light.extended_color_light_1_3`, `light.extended_color_light_1_4`, `scene.studio_*`
 - Speler: `media_player.studio_mini_2`
-- ON AIR en PC: `input_boolean.studio_opname_on_air`, `script.studio_pc_starten`, `script.studio_totaal_uit`, `switch.zbeacon_ts011f_2`
+- ON AIR en PC: `input_boolean.studio_opname_on_air`, `script.studio_pc_starten`, `script.studio_totaal_uit` (status en `last_triggered` voor het aftellen; wachttijd = substitution `studio_uit_wacht`), `switch.zbeacon_ts011f_2`
 - Kamer: `sensor.thermo_studio_temperatuur`, `sensor.thermo_studio_luchtvochtigheid`
 
 **Jip**

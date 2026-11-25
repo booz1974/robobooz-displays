@@ -39,6 +39,10 @@
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: studio-scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
+# Studio en PC: Studio uit = 4 s vasthouden (script.studio_totaal_uit).
+#   Zolang dat script loopt telt het scherm af tot de smartplug uitgaat
+#   (status, knop, balk en badge; ook op de Menu-kaart). Wachttijd staat
+#   in substitution studio_uit_wacht (gelijk aan de delay in het script).
 # Weer: nu + temperatuur per uur, regen komende 2 uur met het weericoon van nu als watermerk (Buienradar, 12 balkjes
 #   van 10 min),
 #   komende dagen.
@@ -73,7 +77,8 @@
 #   input_text.ochtend_info_display, input_text.ochtend_agenda_display,
 #   sensor.neerslag_buienradar_regen_data, System Monitor-sensoren,
 #   script.lampen_random_kleuren, script.studio_pc_starten,
-#   script.studio_totaal_uit, script.intercom_zend, script.intercom_bel,
+#   script.studio_totaal_uit (ook de status en last_triggered, voor het
+#   aftellen), script.intercom_zend, script.intercom_bel,
 #   input_text.intercom_log,
 #   media_player.studio_mini_2 en /config/www/robobooz/krrrcht_in.mp3 en
 #   intro_5..8.mp3 (sfeergeluid kanaal 5-8) en intro_12.mp3
@@ -276,6 +281,8 @@ time:
     id: system_time
 
 substitutions:
+  # wachttijd in script.studio_totaal_uit tot de smartplug uitgaat (seconden)
+  studio_uit_wacht: "180"
   # huisgenoten (namen en person-entiteiten staan in secrets.yaml)
   persoon_1_naam: !secret persoon_1_naam
   persoon_1_entity: !secret persoon_1_entity
@@ -1331,6 +1338,10 @@ globals:
   - id: off_t0
     type: uint32_t
     initial_value: '0'
+  # Studio uit: tijdstip (epoch) waarop de smartplug uitgaat; 0 = er loopt niets
+  - id: off_end
+    type: int64_t
+    initial_value: '0'
   - id: big_buf
     type: uint16_t*
     initial_value: 'nullptr'
@@ -2321,7 +2332,7 @@ script:
           lv_label_set_text(id(r_cs1), "RADIO EN PLAYLISTS");
           lv_label_set_text(id(r_cs2), id(mp_any) ? "SPEELT" : "STIL");
           lv_label_set_text(id(r_cs3), "LICHTSCENES");
-          lv_label_set_text(id(r_cs4), id(onair).state ? "ON AIR · OPNAME LOOPT" : "STUDIO EN PC");
+          if (id(off_end) == 0) lv_label_set_text(id(r_cs4), id(onair).state ? "ON AIR · OPNAME LOOPT" : "STUDIO EN PC");
           float ot = id(info_out_temp).state;
           snprintf(b, sizeof(b), "BUITEN %.0f°", std::isnan(ot) ? 0.0f : ot); lv_label_set_text(id(r_cs5), b);
           float pw = id(e_power).state;
@@ -2359,10 +2370,69 @@ script:
                 id: pc_off_hint
                 text: "PC WORDT AFGESLOTEN, DAARNA GAAT DE STUDIO UIT"
             - delay: 4s
-      - lambda: 'lv_bar_set_value(id(pc_off_bar), 0, LV_ANIM_OFF);'
-      - lvgl.label.update:
-          id: pc_off_hint
-          text: "4 SECONDEN INGEDRUKT HOUDEN"
+      # loopt het uitzet-script, dan houdt het aftellen de knop bij
+      - lambda: |-
+          if (id(off_end) > 0) { id(off_count).execute(); return; }
+          lv_bar_set_value(id(pc_off_bar), 0, LV_ANIM_OFF);
+          lv_label_set_text(id(pc_off_hint), "4 SECONDEN INGEDRUKT HOUDEN");
+  # ---- Studio uit: aftellen tot de smartplug uitgaat (elke seconde vanuit interval)
+  - id: off_count
+    then:
+      - lambda: |-
+          static bool shown = false;
+          auto t = id(system_time).now();
+          int left = -1;
+          if (id(off_end) > 0 && t.is_valid()) left = (int) std::max<int64_t>(0, id(off_end) - (int64_t) t.timestamp);
+          if (left < 0) {
+            if (!shown) return;
+            // klaar of afgebroken: gewone weergave terug
+            shown = false;
+            bool on = id(pc_plug_on).state;
+            lv_label_set_text(id(pc_state), on ? "Studio staat aan" : "Studio staat uit");
+            lv_label_set_text(id(pc_badge_lbl), on ? "AAN" : "UIT");
+            lv_obj_set_style_text_color(id(pc_badge_lbl), on ? lv_color_hex(id(r_tcol)[5]) : lv_color_hex(0xFFFFFE), 0);
+            lv_obj_set_style_bg_color(id(pc_badge), on ? lv_color_hex(id(r_tcol)[2]) : lv_color_hex(id(r_tcol)[4]), 0);
+            if (!lv_obj_has_state(id(pc_off_btn), LV_STATE_PRESSED)) {
+              lv_label_set_text(id(pc_off_hint), "4 SECONDEN INGEDRUKT HOUDEN");
+              lv_bar_set_value(id(pc_off_bar), 0, LV_ANIM_OFF);
+            }
+            lv_label_set_text(id(r_cs4), id(onair).state ? "ON AIR · OPNAME LOOPT" : "STUDIO EN PC");
+            return;
+          }
+          shown = true;
+          char m[8]; snprintf(m, sizeof(m), "%d:%02d", left / 60, left % 60);
+          char b[64];
+          snprintf(b, sizeof(b), "PC sluit af, studio uit over %s", m); lv_label_set_text(id(pc_state), b);
+          lv_label_set_text(id(pc_badge_lbl), m);
+          lv_obj_set_style_text_color(id(pc_badge_lbl), lv_color_hex(0xFFFFFE), 0);
+          lv_obj_set_style_bg_color(id(pc_badge), lv_color_hex(0xD9534F), 0);
+          snprintf(b, sizeof(b), "SMARTPLUG GAAT UIT OVER %s", m);
+          if (!lv_obj_has_state(id(pc_off_btn), LV_STATE_PRESSED)) {
+            lv_label_set_text(id(pc_off_hint), b);
+            // balk loopt leeg naarmate de tijd verstrijkt
+            lv_bar_set_value(id(pc_off_bar), std::min(100, left * 100 / ${studio_uit_wacht}), LV_ANIM_OFF);
+          }
+          snprintf(b, sizeof(b), "STUDIO UIT OVER %s", m); lv_label_set_text(id(r_cs4), b);
+  # ---- Studio uit: eindtijd bepalen uit last_triggered van het script (klopt ook na een herstart van het display)
+  - id: off_calc
+    then:
+      - lambda: |-
+          if (!id(pc_off_run).state) { id(off_end) = 0; return; }
+          auto t = id(system_time).now();
+          int64_t now = t.is_valid() ? (int64_t) t.timestamp : 0;
+          int64_t start = 0;
+          int Y, M, D, h, mi, se;
+          // "2026-11-25 20:38:12.123456+00:00" of met T ertussen (HA geeft UTC)
+          if (id(pc_off_since).has_state() && sscanf(id(pc_off_since).state.c_str(), "%d-%d-%d%*c%d:%d:%d", &Y, &M, &D, &h, &mi, &se) == 6) {
+            int y = Y - (M <= 2); int era = (y >= 0 ? y : y - 399) / 400; int yoe = y - era * 400;
+            int doy = (153 * (M + (M > 2 ? -3 : 9)) + 2) / 5 + D - 1; int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+            int64_t days = (int64_t) era * 146097 + doe - 719468;
+            start = days * 86400 + h * 3600 + mi * 60 + se;
+          }
+          // onbekend of onlogisch: dan vanaf nu tellen
+          if (now > 0 && (start <= 0 || start > now + 5 || now - start > ${studio_uit_wacht} + 30)) start = now;
+          id(off_end) = start > 0 ? start + ${studio_uit_wacht} : 0;
+      - script.execute: off_count
   # ---- goedemorgen-scherm vullen
   - id: am_render
     then:
@@ -4375,6 +4445,10 @@ script:
             return txt;
 
 interval:
+  # Studio uit: elke seconde aftellen (doet niets als het script niet loopt)
+  - interval: 1s
+    then:
+      - lambda: 'if (id(off_end) > 0) id(off_count).execute();'
   # @zon-begin
   # zonnestroom: bolletjes over de lijnen laten lopen (sneller bij meer vermogen)
   - interval: 50ms
@@ -4732,6 +4806,14 @@ binary_sensor:
                       id: page_pc
                       animation: FADE_IN
                       time: 300ms
+  # Studio uit: script.studio_totaal_uit loopt (PC sluit af, smartplug gaat straks uit)
+  - platform: homeassistant
+    id: pc_off_run
+    entity_id: script.studio_totaal_uit
+    internal: true
+    trigger_on_initial_state: true
+    on_state:
+      - script.execute: off_calc
   - platform: homeassistant
     id: pc_plug_on
     entity_id: switch.zbeacon_ts011f_2
@@ -5132,6 +5214,14 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # ---- Studio uit: starttijd van het uitzet-script (voor het aftellen)
+  - platform: homeassistant
+    id: pc_off_since
+    entity_id: script.studio_totaal_uit
+    attribute: last_triggered
+    internal: true
+    on_value:
+      - script.execute: off_calc
   # ---- intercom
   - platform: homeassistant
     id: ic_log
