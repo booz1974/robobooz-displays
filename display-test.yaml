@@ -5,6 +5,18 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.11 (25-11-2026): na review tester/ontwikkelaar/gebruiker:
+#   - nachtstand-klok echt zichtbaar (40%; de schermverlichting heeft een
+#     gamma-curve, 15% was bijna uit) + kleine wekkertijd/sluimerregel; blijft staan
+#   - SLAPEN blijft uit (ging overdag na 1 min weer aan); wekkerscherm dimt nooit
+#   - herstart 's nachts: niet fel, avondstand en nachtstand na de tijdsynchronisatie
+#   - geheugen zoals woonkamer/Jip; hoes één keer ophalen; http-timeout 6 s
+#   - zichtbaar als HA weg is; wekkertijd wordt alsnog gestuurd als HA terug is
+#   - "?" / "–" bij onbekende stand i.p.v. "Uit"; volume springt niet terug
+#   - onderbalk LICHT (was DIM) opent LAMPEN & SCHERM, met PER LAMP ›
+#   - LICHT UIT-knop op Thuis; Kamer (slaapkamer-thermometer) i.p.v. Klimaat woonkamer
+#   - grotere dagknoppen en wekkerregel; bevestiging "Sluimert tot ..."
+#   - Probeer nu zwart (gaat meteen af); schermnummers 00-07 doorlopend; Latin-1-letters
 #   Versie 0.10 (25-11-2026): tik op SLAPEN (scherm uit) = altijd eerst de
 #   nachtstand, tik op de nachtstand = NORMAAL (ook overdag).
 #   Versie 0.9 (25-11-2026): DIM-paneel, standen van het scherm heten nu NORMAAL,
@@ -31,11 +43,11 @@
 # Stijl: warm papierwit, zwarte strakke letters (Inter Tight), kleine labels in
 #   typemachineletter (IBM Plex Mono), vlakken en cirkels in vermiljoen en
 #   ultramarijn. Elk scherm: nummer + titel linksboven, tijd rechtsboven.
-# Pagina's: Thuis | 01 Licht | 02 Sfeer | 03 Nu speelt | 05 Klimaat | 06 Weer |
-#   07 Wekker | 08 Wekkergeluid | Nachtstand | 00 Menu.
+# Pagina's: Thuis | 01 Licht | 02 Sfeer | 03 Nu speelt | 04 Kamer | 05 Weer |
+#   06 Wekker | 07 Wekkergeluid | Nachtstand | 00 Menu.
 # Onderbalk (op elk scherm, behalve nachtstand): THUIS / WEKKER / MUZIEK /
-#   MENU / DIM (zwart = waar je bent). DIM opent het paneel LICHT & SCHERM:
-#   lampen AAN / DIMMEN (20%) / UIT, scherm NORMAAL / NACHTSTAND (alleen de klok,
+#   MENU / LICHT (zwart = waar je bent). LICHT opent het paneel LAMPEN & SCHERM:
+#   lampen AAN / GEDIMD (20%) / UIT, scherm NORMAAL / NACHTSTAND (alleen de klok,
 #   gedimd) / SLAPEN (scherm helemaal uit) en
 #   AVONDSTAND aan/uit (de hele kleurenset omgedraaid via het scherm zelf).
 # Spelerbalk: bovenin (68 px) zolang de woonkamer speelt of gepauzeerd is:
@@ -51,8 +63,8 @@
 #   Lentebloesem, Savanne) en ALLES UIT.
 # Nu speelt: hoes, titel, artiest - album, vorige / pauze / volgende,
 #   volume - en +. Speler: media_player.yamaha_living_2 (woonkamer).
-# Klimaat: kamertemperatuur, gewenste temperatuur -/+ (0,5 °C), verwarming
-#   aan/uit (climate.living_room).
+# Kamer: temperatuur en vocht van de slaapkamer (thermometer), met een korte
+#   regel (fris / prima om te slapen / warm).
 # Weer: temperatuur, omschrijving, wind (Bft) en vocht, regen komende 2 uur
 #   (12 balkjes van 10 min, Buienradar) en de komende 6 uur.
 # Wekker: tijd -/+ uur en -/+ 5 min, aan/uit, WERKDAGEN / ELKE DAG / WEEKEND,
@@ -83,7 +95,8 @@
 #   light.slaapkamer_jeroen_en_maartje, light.slaapkamer_lichtstrip,
 #   scene.slaapkamer_jeroen_maartje_helder / _gedimd / _lezen / _ontspannen /
 #   _nachtlampje / _lentebloesem / _savanne_zonsondergang, media_player.yamaha_living_2 (+ entity_picture_local),
-#   climate.living_room, weather.de_scholekster,
+#   sensor.thermo_slaapkamer_jeroen_maartje_temperatuur_3 / _luchtvochtigheid_3,
+#   weather.de_scholekster,
 #   sensor.neerslag_buienradar_regen_data, input_text.weer_uren_display.
 # Wekker in HA: input_datetime.wekker_slaapkamer_tijd,
 #   input_boolean.wekker_slaapkamer_aan / _lampen / _gaat_af,
@@ -108,10 +121,11 @@ esphome:
       then:
         - script.execute: clock_render
         - script.execute: {id: nav_mark, p: 0}
+        # bewaarde avondstand = waarschijnlijk nacht: gedimd beginnen (de klok volgt bij tijdsync)
+        - light.turn_on:
+            id: display_backlight
+            brightness: !lambda 'return id(avond) ? 0.40f : 1.0f;'
         - delay: 2s
-        - lambda: |-
-            auto t = id(system_time).now();
-            if (t.is_valid() && (t.hour >= 21 || t.hour < 6)) id(avond) = true;
         - script.execute: avond_apply
 
 external_components:
@@ -140,6 +154,10 @@ esp32:
       CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
       CONFIG_SPIRAM_RODATA: y
       CONFIG_SPIRAM_USE_MALLOC: y
+      # zoals woonkamer/Jip: alleen kleine allocaties intern, de rest naar PSRAM,
+      # en 48 KB intern vrijhouden (anders loopt het interne RAM vol bij hoesjes)
+      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "512"
+      CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL: "49152"
 
 psram:
   mode: octal
@@ -154,6 +172,19 @@ logger:
 api:
   encryption:
     key: !secret plate04_api_key
+  # verbinding met HA tonen; een wekkertijd die niet aankwam alsnog sturen
+  on_client_connected:
+    - lambda: 'id(ha_ok) = true;'
+    - script.execute: wk_render
+    - if:
+        condition:
+          lambda: 'return id(wk_dirty);'
+        then:
+          - delay: 3s
+          - script.execute: wk_send
+  on_client_disconnected:
+    - lambda: 'id(ha_ok) = false;'
+    - script.execute: wk_render
 
 ota:
   - platform: esphome
@@ -183,7 +214,7 @@ light:
     output: gpio_backlight_pwm
     name: Schermverlichting
     id: display_backlight
-    restore_mode: ALWAYS_ON
+    restore_mode: ALWAYS_OFF   # aan via on_boot (gedimd als het nacht was)
     default_transition_length: 400ms
 
 i2c:
@@ -206,39 +237,50 @@ touchscreen:
     y_min: 0
     y_max: 479
   on_touch:
-    # scherm gedimd/uit: deze tik alleen om wakker te maken
+    # eerste tik bij een gedimd/uit scherm of in de nachtstand: alleen wakker maken,
+    # zodat je niet per ongeluk een knop raakt
     - lambda: |-
           auto &bl = id(display_backlight).current_values;
           auto t = id(system_time).now();
           bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
           float vol = nacht ? 0.35f : 1.0f;   // 's nachts is het gewone scherm gedimd
-          bool slaap = !bl.is_on() || bl.get_brightness() < vol - 0.01f || id(lvgl_main)->is_paused();
+          bool wekker = id(wk_af).state == "on";
+          bool slaap = !bl.is_on() || id(lvgl_main)->is_paused() ||
+                       (!wekker && (bl.get_brightness() < vol - 0.01f || id(cur_page) == 9));
           if (slaap) {
             lv_indev_t *in = lv_indev_get_next(nullptr);
             if (in != nullptr) lv_indev_wait_release(in);
           }
-    # scherm uit (SLAPEN): eerste tik = nachtstand (alleen de klok, gedimd)
     - if:
         condition:
-          lambda: 'return !id(display_backlight).current_values.is_on() && id(wk_af).state != "on";'
+          lambda: 'return id(wk_af).state == "on";'
+        # de wekker gaat af: scherm vol aan, verder niets (STOP en SLUIMER werken direct)
         then:
           - lvgl.resume:
-          - lvgl.widget.hide: qp
-          - lvgl.page.show: p_nacht
-          - light.turn_on: {id: display_backlight, brightness: 15%}
+          - light.turn_on: {id: display_backlight, brightness: 100%}
         else:
-          # in de nachtstand: volgende tik = gewone scherm (NORMAAL); 's nachts omgedraaid en gedimd (35%)
           - if:
               condition:
-                lambda: 'return id(cur_page) == 9;'
+                lambda: 'return !id(display_backlight).current_values.is_on();'
+              # SLAPEN (scherm uit) -> tik -> NACHTSTAND (alleen de klok, gedimd)
               then:
-                - lvgl.page.show: p_home
-          - lvgl.resume:
-          - light.turn_on:
-              id: display_backlight
-              brightness: !lambda |-
-                auto t = id(system_time).now();
-                return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
+                - lvgl.resume:
+                - lvgl.widget.hide: qp
+                - lvgl.page.show: p_nacht
+                - light.turn_on: {id: display_backlight, brightness: 40%}
+              # NACHTSTAND -> tik -> NORMAAL ('s nachts omgedraaid en gedimd, 35%)
+              else:
+                - if:
+                    condition:
+                      lambda: 'return id(cur_page) == 9;'
+                    then:
+                      - lvgl.page.show: p_home
+                - lvgl.resume:
+                - light.turn_on:
+                    id: display_backlight
+                    brightness: !lambda |-
+                      auto t = id(system_time).now();
+                      return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
 
 spi:
   - id: lcd_spi
@@ -284,6 +326,23 @@ time:
     id: system_time
     on_time_sync:
       - script.execute: clock_render
+      # eerste keer de tijd binnen (na een herstart): avondstand volgens de klok,
+      # en 's nachts meteen de nachtstand in plaats van een fel scherm
+      - if:
+          condition:
+            lambda: 'return !id(tijd_gezet);'
+          then:
+            - lambda: |-
+                id(tijd_gezet) = true;
+                auto t = id(system_time).now();
+                id(avond) = t.is_valid() && (t.hour >= 21 || t.hour < 6);
+            - script.execute: avond_apply
+            - if:
+                condition:
+                  lambda: 'return id(avond) && id(wk_af).state != "on";'
+                then:
+                  - lvgl.page.show: p_nacht
+                  - light.turn_on: {id: display_backlight, brightness: 40%}
     on_time:
       - seconds: 0
         then:
@@ -295,6 +354,12 @@ time:
         then:
           - lambda: 'id(avond) = true;'
           - script.execute: avond_apply
+          # staat het gewone scherm aan: meteen naar de nachthelderheid
+          - if:
+              condition:
+                lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
+              then:
+                - light.turn_on: {id: display_backlight, brightness: 35%}
       - seconds: 0
         minutes: 0
         hours: 6
@@ -306,8 +371,10 @@ time:
 
 # ---------------------------------------------------------------- hoes (album art)
 http_request:
-  timeout: 10s
   verify_ssl: false
+  timeout: 6s
+  buffer_size_rx: 2048
+  buffer_size_tx: 2048
 
 image:
   # grote hoes op Nu speelt (url wordt gezet zodra er een hoes is)
@@ -319,21 +386,10 @@ image:
     resize: 176x176
     on_download_finished:
       - lvgl.image.update: {id: mu_cover, src: cov_big}
-      - lvgl.widget.show: mu_cover
+      - lvgl.image.update: {id: mi_cover, src: cov_big}
+      - lvgl.widget.show: [mu_cover, mi_cover]
     on_error:
-      - lvgl.widget.hide: mu_cover
-  # kleine hoes in de spelerbalk
-  - platform: online_image
-    id: cov_mini
-    url: "http://192.168.1.100:8123/local/robobooz/commercial_break_200x200bb.jpg"
-    format: AUTO
-    type: RGB565
-    resize: 68x68
-    on_download_finished:
-      - lvgl.image.update: {id: mi_cover, src: cov_mini}
-      - lvgl.widget.show: mi_cover
-    on_error:
-      - lvgl.widget.hide: mi_cover
+      - lvgl.widget.hide: [mu_cover, mi_cover]
 
 substitutions:
   c_paper: "0xEEEBE4"    # papierwit (achtergrond)
@@ -410,7 +466,7 @@ font:
     id: f_44
     size: 44
     bpp: 4
-    glyphs: &txt ' !"#%&''()*+,-./0123456789:;?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz°·—–éèëïöüÉ’'
+    glyphs: &txt ' !"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz|°·—–’›€ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïñòóôõöøùúûüýÿ'
   - file: {type: gfonts, family: Inter Tight, weight: 600}
     id: f_26
     size: 26
@@ -503,6 +559,21 @@ globals:
   - id: wk_min          # wekkertijd in minuten na middernacht (direct bijgewerkt bij -/+)
     type: int
     initial_value: '420'
+  - id: wk_dirty        # wekkertijd nog niet bij HA aangekomen (HA was weg)
+    type: bool
+    initial_value: 'false'
+  - id: vol_ts          # laatste volumetik (ms): HA-updates even negeren
+    type: uint32_t
+    initial_value: '0'
+  - id: sluimer_tot     # sluimert tot (minuten na middernacht, -1 = niet)
+    type: int
+    initial_value: '-1'
+  - id: ha_ok           # verbonden met Home Assistant
+    type: bool
+    initial_value: 'false'
+  - id: tijd_gezet      # eerste tijdsynchronisatie gehad
+    type: bool
+    initial_value: 'false'
   - id: avond           # avondstand: kleuren omgedraaid
     type: bool
     restore_value: true
@@ -565,11 +636,6 @@ text_sensor:
     entity_id: input_text.weer_uren_display
     internal: true
     on_value: {script.execute: wx_render}
-  - platform: homeassistant
-    id: cl_mode
-    entity_id: climate.living_room
-    internal: true
-    on_value: {script.execute: cl_render}
   # hoes van de speler (HA-proxy, lokaal)
   - platform: homeassistant
     id: mp_pic
@@ -584,9 +650,6 @@ text_sensor:
             - online_image.set_url:
                 id: cov_big
                 url: !lambda 'return std::string("${ha_url}") + x;'
-            - online_image.set_url:
-                id: cov_mini
-                url: !lambda 'return std::string("${ha_url}") + x;'
           else:
             - lvgl.widget.hide: [mu_cover, mi_cover]
   # ---- wekker
@@ -597,7 +660,7 @@ text_sensor:
     on_value:
       - lambda: |-
           int h = 0, m = 0;
-          if (sscanf(x.c_str(), "%d:%d", &h, &m) == 2) id(wk_min) = h * 60 + m;
+          if (!id(wk_dirty) && sscanf(x.c_str(), "%d:%d", &h, &m) == 2) id(wk_min) = h * 60 + m;
       - script.execute: wk_render
   - platform: homeassistant
     id: wk_aan
@@ -628,9 +691,11 @@ text_sensor:
           condition:
             lambda: 'return x == "on";'
           then:
+            - lambda: 'id(sluimer_tot) = -1;'
             - lvgl.resume:
             - light.turn_on: {id: display_backlight, brightness: 100%}
             - lvgl.widget.show: ring
+            - script.execute: wk_render
           else:
             - lvgl.widget.hide: ring
 
@@ -667,7 +732,7 @@ sensor:
     attribute: volume_level
     internal: true
     on_value:
-      - lambda: 'if (!std::isnan(x)) id(vol_local) = (int) lroundf(x * 100.0f);'
+      - lambda: 'if (!std::isnan(x) && millis() - id(vol_ts) > 3000) id(vol_local) = (int) lroundf(x * 100.0f);'
       - script.execute: mp_render
   - platform: homeassistant
     id: wx_temp
@@ -687,20 +752,17 @@ sensor:
     attribute: humidity
     internal: true
     on_value: {script.execute: wx_render}
+  # kamer: thermometer slaapkamer Maartje en Jeroen
   - platform: homeassistant
     id: cl_cur
-    entity_id: climate.living_room
-    attribute: current_temperature
+    entity_id: sensor.thermo_slaapkamer_jeroen_maartje_temperatuur_3
     internal: true
     on_value: {script.execute: cl_render}
   - platform: homeassistant
-    id: cl_target
-    entity_id: climate.living_room
-    attribute: temperature
+    id: cl_hum
+    entity_id: sensor.thermo_slaapkamer_jeroen_maartje_luchtvochtigheid_3
     internal: true
     on_value: {script.execute: cl_render}
-
-# ---------------------------------------------------------------- scripts
 
 
 # ---------------------------------------------------------------- scripts
@@ -750,6 +812,9 @@ script:
       - lambda: |-
           std::string s = id(mp_st).state;
           bool muziek = (s == "playing" || s == "paused") && id(cur_page) != 3 && id(cur_page) != 9;
+          static int laatst = -1;
+          if (laatst == (int) muziek) return;
+          laatst = muziek;
           if (muziek) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           else lv_obj_add_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid)};
@@ -779,13 +844,19 @@ script:
       - lambda: |-
           char t[8]; snprintf(t, sizeof(t), "%02d:%02d", id(wk_min) / 60, id(wk_min) % 60);
           bool aan = id(wk_aan).state == "on";
+          bool bekend = id(ha_ok) && (id(wk_aan).state == "on" || id(wk_aan).state == "off");
+          char sl[32] = "";
+          if (id(sluimer_tot) >= 0) snprintf(sl, sizeof(sl), "SLUIMERT TOT %02d:%02d", id(sluimer_tot) / 60, id(sluimer_tot) % 60);
           lv_label_set_text(id(wk_big), t);
           lv_obj_set_style_text_color(id(wk_big), lv_color_hex(aan ? ${c_ink} : ${c_off}), 0);
           if (aan) lv_obj_add_state(id(wk_sw), LV_STATE_CHECKED); else lv_obj_clear_state(id(wk_sw), LV_STATE_CHECKED);
-          lv_label_set_text(id(wk_sw_l), aan ? "AAN" : "UIT");
-          lv_label_set_text(id(tl_wekker), aan ? t : "Uit");
-          std::string nl = aan ? std::string("WEKKER ") + t : std::string("");
+          lv_label_set_text(id(wk_sw_l), !bekend ? "?" : (aan ? "AAN" : "UIT"));
+          lv_label_set_text(id(tl_wekker), !bekend ? "?" : (aan ? t : "Uit"));
+          // nachtstand: klein de wekkertijd (of sluimeren), en een waarschuwing als HA weg is
+          std::string nl = sl[0] ? std::string(sl) : (aan ? std::string("WEKKER ") + t : std::string(""));
+          if (!id(ha_ok)) nl += nl.empty() ? "GEEN VERBINDING MET HA" : " · GEEN VERBINDING";
           lv_label_set_text(id(n_wekker), nl.c_str());
+          if (id(ha_ok)) lv_obj_add_flag(id(h_ha), LV_OBJ_FLAG_HIDDEN); else lv_obj_clear_flag(id(h_ha), LV_OBJ_FLAG_HIDDEN);
           // dagen
           static const char *dg[] = {"Werkdagen", "Elke dag", "Weekend"};
           lv_obj_t *db[] = {id(wk_d0), id(wk_d1), id(wk_d2)};
@@ -794,9 +865,12 @@ script:
             lv_obj_set_style_bg_color(db[k], lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
             lv_obj_set_style_text_color(db[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
           }
-          std::string dsub = id(wk_dagen).state;
-          for (auto &c : dsub) c = toupper((unsigned char) c);
-          lv_label_set_text(id(wk_info), aan ? (std::string("WEKKER AAN · ") + dsub).c_str() : "WEKKER UIT");
+          std::string dg_l = id(wk_dagen).state;
+          std::string info = !id(ha_ok) ? std::string("Geen verbinding met HA") :
+                             (sl[0] ? std::string("Sluimert tot ") + (sl + 13) :
+                             (!bekend ? std::string("Wekker: onbekend") : (aan ? "Wekker aan · " + dg_l : std::string("Wekker uit"))));
+          lv_label_set_text(id(wk_info), info.c_str());
+          lv_obj_set_style_text_color(id(wk_info), lv_color_hex(id(ha_ok) ? ${c_sub} : ${c_redt}), 0);
           // geluid
           std::string g = id(wk_geluid).state;
           lv_label_set_text(id(wk_g_name), g.c_str());
@@ -818,6 +892,7 @@ script:
     then:
       - lambda: |-
           id(wk_min) = ((id(wk_min) + d) % 1440 + 1440) % 1440;
+          id(wk_dirty) = true;   // tot HA hem heeft
       - script.execute: wk_render
       - script.execute: wk_send
   # pas 1,5 s na de laatste tik naar HA sturen (snel tikken = één keer opslaan)
@@ -825,11 +900,19 @@ script:
     mode: restart
     then:
       - delay: 1500ms
-      - homeassistant.action:
-          action: input_datetime.set_datetime
-          data:
-            entity_id: input_datetime.wekker_slaapkamer_tijd
-            time: !lambda 'char b[12]; snprintf(b, sizeof(b), "%02d:%02d:00", id(wk_min) / 60, id(wk_min) % 60); return std::string(b);'
+      - if:
+          condition:
+            lambda: 'return id(ha_ok);'
+          then:
+            - homeassistant.action:
+                action: input_datetime.set_datetime
+                data:
+                  entity_id: input_datetime.wekker_slaapkamer_tijd
+                  time: !lambda 'char b[12]; snprintf(b, sizeof(b), "%02d:%02d:00", id(wk_min) / 60, id(wk_min) % 60); return std::string(b);'
+            - delay: 3s
+            - lambda: 'id(wk_dirty) = false;'
+          # HA weg: onthouden en sturen zodra de verbinding terug is (api: on_client_connected)
+      - script.execute: wk_render
   - id: wk_pick
     parameters:
       i: int
@@ -866,7 +949,7 @@ script:
             if (on) lv_obj_add_state(sw[k], LV_STATE_CHECKED); else lv_obj_clear_state(sw[k], LV_STATE_CHECKED);
             int pct = (on && !std::isnan(br[k])) ? std::max(1, (int) lroundf(br[k] * 100.0f / 255.0f)) : 0;
             if (!lv_obj_has_state(sl[k], LV_STATE_PRESSED)) lv_slider_set_value(sl[k], pct, LV_ANIM_OFF);
-            char t[8]; if (on) snprintf(t, sizeof(t), "%d%%", pct); else snprintf(t, sizeof(t), "UIT");
+            char t[8]; if (on) snprintf(t, sizeof(t), "%d%%", pct); else snprintf(t, sizeof(t), "%s", st[k] == "off" ? "UIT" : "–");
             lv_label_set_text(pc[k], t);
           }
           char c[16];
@@ -935,7 +1018,7 @@ script:
           std::string s = id(mp_st).state;
           bool speelt = s == "playing";
           auto ok = [](const std::string &v) { return !(v.empty() || v == "unknown" || v == "unavailable" || v == "None"); };
-          std::string ti = ok(id(mp_title).state) ? id(mp_title).state : std::string(s == "idle" || s == "off" ? "Er speelt niets" : "Woonkamer");
+          std::string ti = ok(id(mp_title).state) ? id(mp_title).state : std::string(s == "playing" || s == "paused" ? "Woonkamer" : (s == "unavailable" || s == "unknown" || s.empty() ? "–" : "Er speelt niets"));
           std::string ar = ok(id(mp_artist).state) ? id(mp_artist).state : std::string("");
           std::string al = ok(id(mp_album).state) ? id(mp_album).state : std::string("");
           lv_label_set_text(id(mi_title), ti.c_str());
@@ -963,6 +1046,7 @@ script:
       - lambda: |-
           int v = id(vol_local) < 0 ? 30 : id(vol_local);
           id(vol_local) = std::max(0, std::min(100, v + d));
+          id(vol_ts) = millis();
       - script.execute: mp_render
       - homeassistant.action:
           action: media_player.volume_set
@@ -978,37 +1062,21 @@ script:
           data:
             entity_id: ${speler}
 
-  # ---- klimaat
+  # ---- kamer (slaapkamer): temperatuur, vocht en een korte slaapregel
   - id: cl_render
     then:
       - lambda: |-
-          auto fmt = [](float f, char *b, size_t n) {
-            if (std::isnan(f)) { snprintf(b, n, "–"); return; }
-            snprintf(b, n, "%.1f°", f);
-            for (char *p = b; *p; p++) if (*p == '.') *p = ',';
-          };
-          char c[16], g[16];
-          fmt(id(cl_cur).state, c, sizeof(c));
-          fmt(id(cl_target).state, g, sizeof(g));
+          float f = id(cl_cur).state, h = id(cl_hum).state;
+          char c[16];
+          if (std::isnan(f)) snprintf(c, sizeof(c), "–");
+          else { snprintf(c, sizeof(c), "%.1f°", f); for (char *q = c; *q; q++) if (*q == '.') *q = ','; }
           lv_label_set_text(id(cl_now), c);
-          lv_label_set_text(id(cl_want), g);
-          bool aan = id(cl_mode).state != "off";
-          lv_label_set_text(id(cl_mode_l), aan ? "VERWARMING AAN" : "VERWARMING UIT");
-          lv_obj_set_style_bg_color(id(cl_mode_b), lv_color_hex(aan ? ${c_red} : ${c_tile}), 0);
-  - id: cl_step
-    parameters:
-      d: float
-    then:
-      - lambda: |-
-          float t = id(cl_target).state;
-          if (std::isnan(t)) t = 20.0f;
-          t = std::max(5.0f, std::min(30.0f, t + d));
-          id(cl_target).publish_state(t);
-      - homeassistant.action:
-          action: climate.set_temperature
-          data:
-            entity_id: climate.living_room
-            temperature: !lambda 'char b[8]; snprintf(b, sizeof(b), "%.1f", id(cl_target).state); return std::string(b);'
+          char v[24];
+          if (std::isnan(h)) snprintf(v, sizeof(v), "Vocht –"); else snprintf(v, sizeof(v), "Vocht %d%%", (int) lroundf(h));
+          lv_label_set_text(id(cl_want), v);
+          const char *r = "";
+          if (!std::isnan(f)) r = f < 15.0f ? "FRIS · EXTRA DEKEN?" : (f <= 19.0f ? "PRIMA OM TE SLAPEN" : (f <= 22.0f ? "WAT WARM" : "WARM · RAAM OPEN?"));
+          lv_label_set_text(id(cl_mode_l), r);
 
   # ---- weer (Thuis-regel, Weer-pagina, regenbalkjes en komende uren)
   - id: wx_render
@@ -1088,7 +1156,8 @@ script:
           regel += " · " + kort;
           lv_label_set_text(id(h_wx), regel.c_str());
           lv_label_set_text(id(h_wx_i), icoon(cond));
-          std::string tegel = kort; if (!tegel.empty()) tegel[0] = toupper((unsigned char) tegel[0]);
+          std::string tegel = kort.rfind("regen over ", 0) == 0 ? "Regen " + kort.substr(11) : kort;
+          if (!tegel.empty()) tegel[0] = toupper((unsigned char) tegel[0]);
           lv_label_set_text(id(tl_weer), tegel.c_str());
           // weerpagina
           lv_label_set_text(id(wx_big), ts);
@@ -1189,50 +1258,42 @@ lvgl:
         bg_color: ${c_ink}
         text_color: ${c_paper}
   on_idle:
-    # 's nachts: nachtstand gaat na 20 s uit (donker)
-    - timeout: 20s
-      then:
-        - if:
-            condition:
-              lambda: |-
-                auto t = id(system_time).now();
-                return id(cur_page) == 9 && t.is_valid() && (t.hour >= 21 || t.hour < 6);
-            then:
-              - light.turn_off: display_backlight
-    # 's nachts: gewone scherm na 1 min uit (een tik geeft dan eerst de nachtstand); overdag 65%
+    # 's nachts: na 1 min niets aanraken SLAPEN (een tik geeft dan eerst de nachtstand);
+    # overdag 65%. Nooit tijdens de nachtstand of als de wekker afgaat.
     - timeout: 1min
       then:
         - if:
             condition:
-              lambda: |-
-                auto t = id(system_time).now();
-                return id(cur_page) != 9 && id(wk_af).state != "on" && t.is_valid() && (t.hour >= 21 || t.hour < 6);
+              lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
             then:
-              - lvgl.widget.hide: qp
-              - light.turn_off: display_backlight
-              - lvgl.page.show: p_nacht
-            else:
               - if:
                   condition:
-                    lambda: 'return id(cur_page) != 9;'
+                    lambda: |-
+                      auto t = id(system_time).now();
+                      return t.is_valid() && (t.hour >= 21 || t.hour < 6);
                   then:
+                    - lvgl.widget.hide: qp
+                    - light.turn_off: display_backlight
+                    - lvgl.page.show: p_nacht
+                  else:
                     - light.turn_on: {id: display_backlight, brightness: 65%}
     - timeout: 2min
       then:
         - if:
             condition:
-              lambda: 'return id(cur_page) != 9;'
+              lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
             then:
               - light.turn_on: {id: display_backlight, brightness: 35%}
+    # overdag na 30 min SLAPEN
     - timeout: 30min
       then:
         - if:
             condition:
               lambda: 'return id(cur_page) != 9 && id(wk_af).state != "on";'
             then:
-              - light.turn_off: display_backlight
               - lvgl.widget.hide: qp
-              - lvgl.page.show: p_home
+              - light.turn_off: display_backlight
+              - lvgl.page.show: p_nacht
 
   # ---- vaste lagen over alle schermen: spelerbalk (boven), paneel LICHT & SCHERM,
   #      onderbalk (y 416) en het wekkerscherm (alles bedekkend)
@@ -1270,7 +1331,15 @@ lvgl:
                       widgets:
                         - obj: {x: 28, y: -10, width: 50, height: 50, radius: 25, styles: st_deco, bg_color: "${c_red}", clickable: false}
                         - obj: {x: 0, y: 46, width: 68, height: 22, styles: st_deco, bg_color: "${c_paper}", clickable: false}
-                  - image: {id: mi_cover, x: 0, y: 0, width: 68, height: 68, src: cov_mini, hidden: true, clickable: false}
+                  # dezelfde hoes als op Nu speelt (176 px), verkleind tot 68 px en bijgesneden
+                  - obj:
+                      x: 0
+                      y: 0
+                      width: 68
+                      height: 68
+                      clickable: false
+                      widgets:
+                        - image: {id: mi_cover, x: -54, y: -54, src: cov_big, zoom: 0.39, hidden: true, clickable: false}
                   - label:
                       id: mi_title
                       x: 80
@@ -1341,7 +1410,7 @@ lvgl:
                 widgets:
                   - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22, text_color: "${c_paper}"}
 
-      # ======== paneel LICHT & SCHERM (knop DIM in de onderbalk)
+      # ======== paneel LAMPEN & SCHERM (knop LICHT rechts in de onderbalk)
       - obj:
           id: qp
           x: 0
@@ -1355,8 +1424,8 @@ lvgl:
           widgets:
             - obj: {x: 330, y: 250, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
             - obj: {x: 0, y: 47, width: 480, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
-            - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "DIM"}
-            - label: {x: 60, y: 17, styles: st_mono12, text: "LICHT & SCHERM"}
+            - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "LICHT"}
+            - label: {x: 76, y: 17, styles: st_mono12, text: "LAMPEN & SCHERM"}
             - label: {id: hd_tq, x: 300, y: 17, width: 96, text_align: RIGHT, styles: st_mono12, text: "--:--"}
             - button:
                 x: 412
@@ -1400,7 +1469,7 @@ lvgl:
                         transition: "2"
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_dim}", text_font: f_ic22}
-                  - label: {x: 12, y: 40, styles: st_mono11, text: "DIMMEN 20%"}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "GEDIMD 20%"}
             - button:
                 x: 318
                 y: 82
@@ -1428,7 +1497,12 @@ lvgl:
                 height: 64
                 styles: st_tile
                 on_click:
-                  - light.turn_on: {id: display_backlight, brightness: 100%}
+                  # NORMAAL: overdag 100%, 's nachts 35% (de avondstand blijft dan aan)
+                  - light.turn_on:
+                      id: display_backlight
+                      brightness: !lambda |-
+                        auto t = id(system_time).now();
+                        return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
                   - lvgl.widget.hide: qp
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_brightness}", text_font: f_ic22}
@@ -1442,7 +1516,7 @@ lvgl:
                 on_click:
                   - lvgl.widget.hide: qp
                   - lvgl.page.show: p_nacht
-                  - light.turn_on: {id: display_backlight, brightness: 15%}
+                  - light.turn_on: {id: display_backlight, brightness: 40%}
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_night}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "NACHTSTAND"}
@@ -1457,8 +1531,10 @@ lvgl:
                 pressed:
                   bg_color: ${c_red}
                 on_click:
+                  # SLAPEN: scherm uit; de nachtstand staat klaar voor de eerste tik
                   - lvgl.widget.hide: qp
                   - light.turn_off: display_backlight
+                  - lvgl.page.show: p_nacht
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_sleep}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "SLAPEN"}
@@ -1472,7 +1548,7 @@ lvgl:
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_invert}", text_font: f_ic22}
                   - label: {x: 48, y: 13, text_font: f_15, text: "Avondstand"}
-                  - label: {x: 48, y: 35, styles: st_mono11, text_color: "${c_sub}", text: "KLEUREN OMGEDRAAID"}
+                  - label: {x: 48, y: 35, styles: st_mono11, text_color: "${c_sub}", text: "DONKERE KLEUREN"}
                   - switch:
                       id: qp_avond
                       x: 221
@@ -1496,6 +1572,18 @@ lvgl:
                       on_change:
                         - lambda: 'id(avond) = x;'
                         - script.execute: avond_apply
+            - button:
+                x: 318
+                y: 264
+                width: 138
+                height: 64
+                styles: st_outline
+                on_click:
+                  - lvgl.widget.hide: qp
+                  - lvgl.page.show: p_licht
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_bulb}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "PER LAMP ›"}
 
       # ======== onderbalk: THUIS / WEKKER / MUZIEK / MENU / DIM (5 x 96 px)
       - obj:
@@ -1567,7 +1655,7 @@ lvgl:
                 widgets:
                   - label: {align: CENTER, y: -9, text: "${ic_grid}", text_font: f_ic22}
                   - label: {align: BOTTOM_MID, y: -7, text: "MENU", styles: st_mono11}
-            # DIM: altijd bij de hand (lampen en scherm)
+            # LICHT: altijd bij de hand (lampen en scherm)
             - button:
                 x: 384
                 y: 1
@@ -1584,8 +1672,8 @@ lvgl:
                       if (lv_obj_has_flag(id(qp), LV_OBJ_FLAG_HIDDEN)) lv_obj_clear_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
                       else lv_obj_add_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
                 widgets:
-                  - label: {align: CENTER, y: -9, text: "${ic_night}", text_font: f_ic22}
-                  - label: {align: BOTTOM_MID, y: -7, text: "DIM", styles: st_mono11}
+                  - label: {align: CENTER, y: -9, text: "${ic_bulb}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "LICHT", styles: st_mono11}
 
       # ======== de wekker gaat af: alles bedekkend
       - obj:
@@ -1640,7 +1728,12 @@ lvgl:
                       action: script.turn_on
                       data:
                         entity_id: script.wekker_slaapkamer_sluimer
+                  - lambda: |-
+                      auto t = id(system_time).now();
+                      int m = (int) lroundf(std::isnan(id(wk_sluimer).state) ? 5.0f : id(wk_sluimer).state);
+                      if (t.is_valid()) id(sluimer_tot) = (t.hour * 60 + t.minute + m) % 1440;
                   - lvgl.widget.hide: ring
+                  - script.execute: wk_render
                 widgets:
                   - label: {x: 16, y: 25, text: "${ic_snooze}", text_font: f_ic30}
                   - label: {id: r_sluimer, x: 56, y: 24, text_font: f_26, text: "Sluimer 5 min"}
@@ -1674,7 +1767,9 @@ lvgl:
                       action: script.turn_on
                       data:
                         entity_id: script.wekker_slaapkamer_stop
+                  - lambda: 'id(sluimer_tot) = -1;'
                   - lvgl.widget.hide: ring
+                  - script.execute: wk_render
                 widgets:
                   - label: {align: CENTER, y: -14, text: "${ic_alarm_off}", text_font: f_ic30}
                   - label: {align: CENTER, y: 20, text_font: f_26, text: "Stop"}
@@ -1706,6 +1801,27 @@ lvgl:
                     - obj: {x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
               - label: {id: h_date, x: 24, y: 22, styles: st_mono12, text: "–"}
               - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "SLAAPKAMER"}
+              - label: {id: h_ha, x: 120, y: 40, styles: st_mono11, text_color: "${c_redt}", text: "· GEEN VERBINDING MET HA"}
+              # LICHT UIT: de knop die je in de slaapkamer het meest nodig hebt
+              - button:
+                  x: 380
+                  y: 20
+                  width: 80
+                  height: 80
+                  radius: 40
+                  bg_color: ${c_ink}
+                  bg_opa: COVER
+                  text_color: ${c_paper}
+                  pressed:
+                    bg_color: ${c_blue}
+                  on_click:
+                    - homeassistant.action:
+                        action: light.turn_off
+                        data:
+                          entity_id: light.slaapkamer_jeroen_maartje
+                  widgets:
+                    - label: {align: CENTER, y: -9, text: "${ic_power}", text_font: f_ic22}
+                    - label: {align: CENTER, y: 16, styles: st_mono11, text: "LICHT UIT"}
               - label:
                   id: h_clock
                   x: 18
@@ -1734,7 +1850,7 @@ lvgl:
                   widgets:
                     - label: {x: 12, y: 12, text: "${ic_bulb}", text_font: f_ic22}
                     - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "LICHT"}
-                    - label: {id: tl_licht, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+                    - label: {id: tl_licht, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_15, text: "–"}
               - button:
                   x: 134
                   y: 232
@@ -1746,7 +1862,7 @@ lvgl:
                   widgets:
                     - label: {x: 12, y: 12, text: "${ic_palette}", text_font: f_ic22}
                     - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "SFEER"}
-                    - label: {id: tl_sfeer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "Kies"}
+                    - label: {id: tl_sfeer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_15, text: "Kies"}
               - button:
                   x: 244
                   y: 232
@@ -1758,7 +1874,7 @@ lvgl:
                   widgets:
                     - label: {x: 12, y: 12, text: "${ic_alarm}", text_font: f_ic22}
                     - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "WEKKER"}
-                    - label: {id: tl_wekker, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+                    - label: {id: tl_wekker, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_15, text: "–"}
               - button:
                   x: 354
                   y: 232
@@ -1770,7 +1886,7 @@ lvgl:
                   widgets:
                     - label: {x: 12, y: 12, text: "${ic_rain}", text_font: f_ic22}
                     - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "WEER"}
-                    - label: {id: tl_weer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+                    - label: {id: tl_weer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_15, text: "–"}
 
     # ================= 01 Licht =================
     - id: p_licht
@@ -2268,7 +2384,7 @@ lvgl:
               - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22}
         - label: {x: 24, y: 352, styles: st_mono11, text_color: "${c_sub}", text: "VOLUME · STAPJES VAN 5%"}
 
-    # ================= 05 Klimaat =================
+    # ================= 04 Kamer =================
     - id: p_klimaat
       styles: st_page
       on_load:
@@ -2285,51 +2401,15 @@ lvgl:
               - obj: {x: 300, y: 150, width: 240, height: 240, radius: 120, styles: st_deco, bg_color: "${c_blue}", clickable: false}
               - obj: {x: 404, y: 120, width: 60, height: 60, radius: 30, styles: st_deco, bg_color: "${c_red}", clickable: false}
               - obj: *hdr_line
-              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "05"}
-              - label: {x: 52, y: 17, styles: st_mono12, text: "KLIMAAT"}
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "04"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "KAMER"}
               - label: {id: hd_t4, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-              - label: {x: 24, y: 66, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · NU"}
-              - label: {id: cl_now, x: 20, y: 82, text_font: f_72, text_letter_space: -3, text: "–"}
-              - label: {x: 24, y: 176, styles: st_mono11, text_color: "${c_sub}", text: "GEWENST"}
-              - button:
-                  x: 24
-                  y: 196
-                  width: 56
-                  height: 56
-                  styles: st_outline
-                  on_click:
-                    - script.execute: {id: cl_step, d: -0.5}
-                  widgets:
-                    - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22}
-              - label: {id: cl_want, x: 88, y: 207, width: 104, text_align: CENTER, text_font: f_26, text: "–"}
-              - button:
-                  x: 200
-                  y: 196
-                  width: 56
-                  height: 56
-                  styles: st_outline
-                  on_click:
-                    - script.execute: {id: cl_step, d: 0.5}
-                  widgets:
-                    - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22}
-              - button:
-                  id: cl_mode_b
-                  x: 24
-                  y: 272
-                  width: 232
-                  height: 56
-                  styles: st_tile
-                  on_click:
-                    - homeassistant.action:
-                        action: climate.set_hvac_mode
-                        data:
-                          entity_id: climate.living_room
-                          hvac_mode: !lambda 'return std::string(id(cl_mode).state == "off" ? "heat" : "off");'
-                  widgets:
-                    - label: {x: 16, y: 17, text: "${ic_power}", text_font: f_ic22}
-                    - label: {id: cl_mode_l, x: 48, y: 21, styles: st_mono12, text: "VERWARMING"}
+              - label: {x: 24, y: 66, styles: st_mono12, text_color: "${c_sub}", text: "SLAAPKAMER · NU"}
+              - label: {id: cl_now, x: 20, y: 84, text_font: f_72, text_letter_space: -3, text: "–"}
+              - label: {id: cl_want, x: 24, y: 180, text_font: f_26, text: "Vocht –"}
+              - label: {id: cl_mode_l, x: 24, y: 224, styles: st_mono12, text: ""}
 
-    # ================= 06 Weer =================
+    # ================= 05 Weer =================
     - id: p_weer
       styles: st_page
       on_load:
@@ -2345,7 +2425,7 @@ lvgl:
             widgets:
               - obj: {x: 370, y: 30, width: 150, height: 150, radius: 75, styles: st_deco, bg_color: "${c_red}", clickable: false}
               - obj: *hdr_line
-              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "06"}
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "05"}
               - label: {x: 52, y: 17, styles: st_mono12, text: "WEER"}
               - label: {id: hd_t5, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
               - label: {id: wx_big, x: 20, y: 62, text_font: f_72, text_letter_space: -3, text: "–"}
@@ -2470,7 +2550,7 @@ lvgl:
                         widgets:
                           - label: {align: CENTER, text: "${ic_bulb}", text_font: f_ic30, text_color: "${c_paper}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Licht"}
-                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "3 GROEPEN"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "PLAFOND · LEDSTRIP"}
               - button:
                   x: 244
                   y: 64
@@ -2553,8 +2633,8 @@ lvgl:
                         clickable: false
                         widgets:
                           - label: {align: CENTER, text: "${ic_thermo}", text_font: f_ic30, text_color: "${c_paper}"}
-                    - label: {x: 78, y: 14, text_font: f_17, text: "Klimaat"}
-                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Kamer"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "TEMPERATUUR"}
               - button:
                   x: 244
                   y: 208
@@ -2584,7 +2664,7 @@ lvgl:
                   styles: st_tile
                   on_click:
                     - lvgl.page.show: p_nacht
-                    - light.turn_on: {id: display_backlight, brightness: 15%}
+                    - light.turn_on: {id: display_backlight, brightness: 40%}
                   widgets:
                     - obj:
                         x: 0
@@ -2620,7 +2700,7 @@ lvgl:
                     - label: {x: 78, y: 14, text_font: f_17, text: "Thuis"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "BEGINSCHERM"}
 
-    # ================= 07 Wekker =================
+    # ================= 06 Wekker =================
     - id: p_wekker
       styles: st_page
       on_load:
@@ -2636,11 +2716,11 @@ lvgl:
             widgets:
               - obj: {x: 350, y: 150, width: 260, height: 260, radius: 130, styles: st_deco, bg_color: "${c_tile}", clickable: false}
               - obj: *hdr_line
-              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "07"}
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "06"}
               - label: {x: 52, y: 17, styles: st_mono12, text: "WEKKER"}
               - label: {id: hd_t7, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
               - label: {id: wk_big, x: 20, y: 56, text_font: f_72, text_letter_space: -3, text: "07:00"}
-              - label: {id: wk_info, x: 24, y: 144, styles: st_mono11, text_color: "${c_sub}", text: ""}
+              - label: {id: wk_info, x: 24, y: 140, text_font: f_15, text_color: "${c_sub}", text: ""}
               - label: {id: wk_sw_l, x: 300, y: 84, width: 72, text_align: RIGHT, styles: st_mono12, text: "UIT"}
               - switch:
                   id: wk_sw
@@ -2717,7 +2797,7 @@ lvgl:
                   on_click:
                     - script.execute: {id: wk_days, i: 0}
                   widgets:
-                    - label: {align: CENTER, styles: st_mono12, text: "WERKDAGEN"}
+                    - label: {align: CENTER, text_font: f_17, text: "Werkdagen"}
               - button:
                   id: wk_d1
                   x: 171
@@ -2728,7 +2808,7 @@ lvgl:
                   on_click:
                     - script.execute: {id: wk_days, i: 1}
                   widgets:
-                    - label: {align: CENTER, styles: st_mono12, text: "ELKE DAG"}
+                    - label: {align: CENTER, text_font: f_17, text: "Elke dag"}
               - button:
                   id: wk_d2
                   x: 318
@@ -2739,7 +2819,7 @@ lvgl:
                   on_click:
                     - script.execute: {id: wk_days, i: 2}
                   widgets:
-                    - label: {align: CENTER, styles: st_mono12, text: "WEEKEND"}
+                    - label: {align: CENTER, text_font: f_17, text: "Weekend"}
               - button:
                   x: 24
                   y: 260
@@ -2789,7 +2869,7 @@ lvgl:
                               data:
                                 entity_id: input_boolean.wekker_slaapkamer_lampen
 
-    # ================= 08 Wekkergeluid =================
+    # ================= 07 Wekkergeluid =================
     - id: p_wgeluid
       styles: st_page
       on_load:
@@ -2804,7 +2884,7 @@ lvgl:
             height: 480
             widgets:
               - obj: *hdr_line
-              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "08"}
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "07"}
               - label: {x: 52, y: 17, styles: st_mono12, text: "WEKKERGELUID"}
               - label: {id: hd_t8, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
               - button:
@@ -3016,6 +3096,10 @@ lvgl:
                         action: script.turn_on
                         data:
                           entity_id: script.wekker_slaapkamer_afgaan
+                  bg_color: ${c_ink}
+                  text_color: ${c_paper}
+                  pressed:
+                    bg_color: ${c_red}
                   widgets:
                     - obj:
                         x: 0
@@ -3023,12 +3107,12 @@ lvgl:
                         width: 52
                         height: 52
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_red}
                         clickable: false
                         widgets:
                           - label: {align: CENTER, text: "${ic_play}", text_font: f_ic22, text_color: "${c_paper}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Probeer nu"}
-                    - label: {x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "LAAT HEM AFGAAN"}
+                    - label: {x: 64, y: 30, styles: st_mono11, text_color: "${c_grey}", text: "GAAT METEEN AF"}
 
     # ================= Nachtstand =================
     - id: p_nacht
@@ -3040,4 +3124,4 @@ lvgl:
         # alleen de klok, donker (datum en wekkertijd verborgen)
         - label: {id: n_date, x: 0, y: 96, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: "", hidden: true}
         - label: {id: n_clock, x: 0, y: 166, width: 480, text_align: CENTER, text_font: f_clock, text_letter_space: -6, text_color: "${c_night}", text: "--:--"}
-        - label: {id: n_wekker, x: 0, y: 316, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: "", hidden: true}
+        - label: {id: n_wekker, x: 0, y: 316, width: 480, text_align: CENTER, text_font: f_15, text_color: "${c_night}", text: ""}
