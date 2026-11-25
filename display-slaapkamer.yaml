@@ -6,6 +6,8 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.20 (25-11-2026): donker schema werkte niet: het kleurfilter van LVGL staat
+#   standaard uit; nu aangezet met build_flags -DLV_USE_COLOR_FILTER=1.
 #   Versie 0.19 (25-11-2026): avondstand is nu een DONKER KLEURENSCHEMA ("warm donker":
 #   bruin-zwart, zandkleurige letters, diep rood en blauw) in plaats van omgedraaide
 #   kleuren; vanzelf aan van 20:00 tot 09:00 (nachttijd voor dimmen/uit blijft 21-06).
@@ -154,6 +156,9 @@ esphome:
   min_version: 2025.7.0
   platformio_options:
     board_build.flash_mode: dio
+  # kleurfilter van LVGL aanzetten (staat standaard uit); nodig voor het donkere schema
+  build_flags:
+    - -DLV_USE_COLOR_FILTER=1
   on_boot:
     - priority: -100
       then:
