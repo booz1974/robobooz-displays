@@ -6,6 +6,11 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.19 (25-11-2026): avondstand is nu een DONKER KLEURENSCHEMA ("warm donker":
+#   bruin-zwart, zandkleurige letters, diep rood en blauw) in plaats van omgedraaide
+#   kleuren; vanzelf aan van 20:00 tot 09:00 (nachttijd voor dimmen/uit blijft 21-06).
+#   Thuis: cirkel en kwartcirkel staan elk kwartier op een andere plek en in een andere
+#   grootte; het kwart komt steeds in een ander kwadrant. Hoes: zoom -> scale.
 #   Versie 0.18 (25-11-2026): BEDTIJD pas na 2 s vasthouden (het rondje loopt vol met
 #   zwart); DEURBEL (09): bij aanbellen vanzelf het camerabeeld van de voordeur
 #   (ververst elke 3 s), "Er wordt aangebeld" + tijd, LAMP HAL AAN en SLUITEN; ook via
@@ -153,6 +158,7 @@ esphome:
     - priority: -100
       then:
         - script.execute: clock_render
+        - script.execute: deco_mix
         - script.execute: {id: nav_mark, p: 0}
         # bewaarde avondstand = waarschijnlijk nacht: gedimd beginnen (de klok volgt bij tijdsync)
         - light.turn_on:
@@ -362,11 +368,13 @@ time:
             - lambda: |-
                 id(tijd_gezet) = true;
                 auto t = id(system_time).now();
-                id(avond) = t.is_valid() && (t.hour >= 21 || t.hour < 6);
+                id(avond) = t.is_valid() && (t.hour >= 20 || t.hour < 9);
             - script.execute: avond_apply
             - if:
                 condition:
-                  lambda: 'return id(avond) && id(wk_af).state != "on";'
+                  lambda: |-
+                    auto t = id(system_time).now();
+                    return t.is_valid() && (t.hour >= 21 || t.hour < 6) && id(wk_af).state != "on";
                 then:
                   - lvgl.page.show: p_nacht
                   - light.turn_on: {id: display_backlight, brightness: 40%}
@@ -374,13 +382,23 @@ time:
       - seconds: 0
         then:
           - script.execute: clock_render
-      # avondstand vanzelf: om 21:00 aan, om 06:00 uit (met DIM kan het altijd met de hand)
+      # vormen op Thuis elk kwartier ergens anders
+      - seconds: 0
+        minutes: /15
+        then:
+          - script.execute: deco_mix
+      # donker schema vanzelf: om 20:00 aan, om 09:00 uit (met DIM kan het altijd met de hand)
+      - seconds: 0
+        minutes: 0
+        hours: 20
+        then:
+          - lambda: 'id(avond) = true;'
+          - script.execute: avond_apply
+      # 21:00 nachttijd: staat het gewone scherm aan, dan meteen gedimd
       - seconds: 0
         minutes: 0
         hours: 21
         then:
-          - lambda: 'id(avond) = true;'
-          - script.execute: avond_apply
           # staat het gewone scherm aan: meteen naar de nachthelderheid
           - if:
               condition:
@@ -389,7 +407,7 @@ time:
                 - light.turn_on: {id: display_backlight, brightness: 35%}
       - seconds: 0
         minutes: 0
-        hours: 6
+        hours: 9
         then:
           - lambda: 'id(avond) = false;'
           - script.execute: avond_apply
@@ -431,7 +449,9 @@ image:
 
 substitutions:
   c_paper: "0xEEEBE4"    # papierwit (achtergrond)
-  c_ink: "0x121212"      # zwart
+  c_ink: "0x121212"      # zwart (tekst)
+  c_inkbg: "0x121213"    # zwart als vlak (zelfde kleur; in het donkere schema donkerbruin)
+  c_papert: "0xEEEBE5"   # wit als tekst (zelfde kleur; in het donkere schema zand)
   c_tile: "0xE3DED4"     # tegel
   c_tile2: "0xD6D0C4"    # vlak in een tegel
   c_line: "0xCFC9BE"     # lijntjes
@@ -641,7 +661,7 @@ globals:
     initial_value: '0'
   - id: deur_tijd       # tijd van het laatste aanbellen (tekst), leeg = handmatig geopend
     type: std::string
-  - id: avond           # avondstand: kleuren omgedraaid
+  - id: avond           # avondstand: donker kleurenschema
     type: bool
     restore_value: true
     initial_value: 'false'
@@ -1030,12 +1050,12 @@ script:
           const lv_font_t *fm = lv_obj_get_style_text_font(id(fav_fm), LV_PART_MAIN);
           bool radio = id(fav_kind) == 0;
           // tabbladen
-          lv_obj_set_style_bg_color(id(fv_t0), lv_color_hex(radio ? ${c_ink} : ${c_paper}), 0);
-          lv_obj_set_style_text_color(id(fv_t0), lv_color_hex(radio ? ${c_paper} : ${c_ink}), 0);
-          lv_obj_set_style_bg_color(id(fv_t1), lv_color_hex(!radio ? ${c_ink} : ${c_paper}), 0);
-          lv_obj_set_style_text_color(id(fv_t1), lv_color_hex(!radio ? ${c_paper} : ${c_ink}), 0);
+          lv_obj_set_style_bg_color(id(fv_t0), lv_color_hex(radio ? ${c_inkbg} : ${c_paper}), 0);
+          lv_obj_set_style_text_color(id(fv_t0), lv_color_hex(radio ? ${c_papert} : ${c_ink}), 0);
+          lv_obj_set_style_bg_color(id(fv_t1), lv_color_hex(!radio ? ${c_inkbg} : ${c_paper}), 0);
+          lv_obj_set_style_text_color(id(fv_t1), lv_color_hex(!radio ? ${c_papert} : ${c_ink}), 0);
           const auto &L = id(fav_list);
-          static const uint32_t dot[] = {${c_red}, ${c_blue}, ${c_ink}};
+          static const uint32_t dot[] = {${c_red}, ${c_blue}, ${c_inkbg}};
           int n = 0;
           for (size_t i = 0; i + 2 < L.size(); i += 3) {
             if ((L[i + 2] == "r") != radio) continue;
@@ -1044,10 +1064,10 @@ script:
             lv_obj_remove_style_all(b);
             lv_obj_set_size(b, 138, 64);
             lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color(b, lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
-            lv_obj_set_style_bg_color(b, lv_color_hex(${c_ink}), LV_STATE_PRESSED);
-            lv_obj_set_style_text_color(b, lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
-            lv_obj_set_style_text_color(b, lv_color_hex(${c_paper}), LV_STATE_PRESSED);
+            lv_obj_set_style_bg_color(b, lv_color_hex(sel ? ${c_inkbg} : ${c_tile}), 0);
+            lv_obj_set_style_bg_color(b, lv_color_hex(${c_inkbg}), LV_STATE_PRESSED);
+            lv_obj_set_style_text_color(b, lv_color_hex(sel ? ${c_papert} : ${c_ink}), 0);
+            lv_obj_set_style_text_color(b, lv_color_hex(${c_papert}), LV_STATE_PRESSED);
             lv_obj_set_style_clip_corner(b, true, 0);
             // cirkeltje rechtsboven, om en om rood / blauw / zwart
             lv_obj_t *c = lv_obj_create(b);
@@ -1077,6 +1097,7 @@ script:
             n++;
           }
           lv_label_set_text(id(fav_empty), n > 0 ? "" : (L.empty() ? "Favorieten worden opgehaald..." : (radio ? "Geen favoriete zenders" : "Geen favoriete playlists")));
+          if (id(avond)) id(avond_apply).execute();   // nieuwe tegels ook in het donkere schema
   # ---- tik op een favoriet: afspelen op de speler (playlists in willekeurige volgorde)
   - id: fav_tap
     then:
@@ -1129,15 +1150,13 @@ script:
       p: int
     then:
       - lambda: |-
-          bool wissel = (p == 9) != (id(cur_page) == 9);   // de nachtstand in of uit
           id(cur_page) = p;
-          if (wissel) id(avond_apply).execute();
           int dk = p == 0 ? 0 : ((p == 7 || p == 8) ? 1 : ((p == 3 || p == 10) ? 2 : (p == 6 ? 3 : -1)));
           lv_obj_t *b[] = {id(dk_0), id(dk_1), id(dk_2), id(dk_3)};
           for (int k = 0; k < 4; k++) {
             bool sel = k == dk;
-            lv_obj_set_style_bg_color(b[k], lv_color_hex(sel ? ${c_ink} : ${c_paper}), 0);
-            lv_obj_set_style_text_color(b[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_bg_color(b[k], lv_color_hex(sel ? ${c_inkbg} : ${c_paper}), 0);
+            lv_obj_set_style_text_color(b[k], lv_color_hex(sel ? ${c_papert} : ${c_ink}), 0);
           }
           // nachtstand: geen onderbalk en geen paneel
           if (p == 9) { lv_obj_add_flag(id(dock), LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(id(qp), LV_OBJ_FLAG_HIDDEN); }
@@ -1157,23 +1176,92 @@ script:
           lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid), id(pg_fav), id(pg_gm)};
           for (auto *o : pg) lv_obj_set_y(o, muziek ? 68 : 0);
 
-  # avondstand: het scherm zelf keert alle kleuren om (ST7701S INVON 0x21 / INVOFF 0x20)
+  # avondstand: donker kleurenschema "warm donker" (vervangt het omdraaien van de kleuren).
+  # Een kleurfilter op elk onderdeel zet elke lichte kleur om naar zijn donkere tegenhanger;
+  # wat niet in de lijst staat wordt 40% donkerder. Zwart en de nachtklok blijven gelijk.
   - id: avond_apply
     then:
       - lambda: |-
-          // zelfde als write_command_ van de driver (geen DC-pin: 9-bits SPI, bit 8 = 0 = commando).
-          // De driver geeft de SPI na het opstarten vrij (spi_teardown), dus eerst weer aanmelden.
-          using SD = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST, esphome::spi::CLOCK_POLARITY_LOW,
-                                             esphome::spi::CLOCK_PHASE_LEADING, esphome::spi::DATA_RATE_1MHZ>;
-          SD *spi = id(my_display);
-          bool inv = id(avond) && id(cur_page) != 9;   // nachtstand blijft altijd zwart
-          spi->spi_setup();
-          spi->enable();
-          spi->write(inv ? 0x21 : 0x20, 9);
-          spi->disable();
-          spi->spi_teardown();
-          ESP_LOGI("avond", "avondstand %s (INV%s)", id(avond) ? "aan" : "uit", inv ? "ON" : "OFF");
-          if (id(avond)) lv_obj_add_state(id(qp_avond), LV_STATE_CHECKED); else lv_obj_clear_state(id(qp_avond), LV_STATE_CHECKED);
+          static lv_color_filter_dsc_t f;
+          static bool klaar = false;
+          if (!klaar) {
+            lv_color_filter_dsc_init(&f, [](const lv_color_filter_dsc_t *, lv_color_t c, lv_opa_t) -> lv_color_t {
+              switch (lv_color_to_u32(c) & 0xFFFFFF) {
+                case ${c_paper}:  return lv_color_hex(0x151210);   // achtergrond
+                case ${c_ink}:    return lv_color_hex(0xA89C8F);   // tekst
+                case ${c_inkbg}:  return lv_color_hex(0x2A2420);   // gekozen knop / donker vlak
+                case ${c_papert}: return lv_color_hex(0xB3A79A);   // tekst op een donker vlak
+                case ${c_tile}:   return lv_color_hex(0x1E1A17);   // tegel
+                case ${c_tile2}:  return lv_color_hex(0x2A2420);
+                case ${c_line}:   return lv_color_hex(0x2A2420);
+                case ${c_sub}:    return lv_color_hex(0x6E655C);   // grijze tekst
+                case ${c_red}:    return lv_color_hex(0x5A221A);   // diep rood
+                case ${c_redt}:   return lv_color_hex(0xA0473A);   // rode tekst (leesbaar)
+                case ${c_blue}:   return lv_color_hex(0x1E2A4F);   // diep blauw
+                case ${c_grey}:   return lv_color_hex(0x7A7066);
+                case ${c_dline}:  return lv_color_hex(0x2A2420);
+                case ${c_off}:    return lv_color_hex(0x3A332E);   // schakelaar uit
+                case 0xFFFFFF:    return lv_color_hex(0xB3A79A);
+                case ${c_night}:  return c;                        // nachtklok blijft zoals hij is
+                default:          return lv_color_make(c.red * 3 / 5, c.green * 3 / 5, c.blue * 3 / 5);
+              }
+            });
+            klaar = true;
+          }
+          struct W {
+            static void zet(lv_obj_t *o, lv_part_t pt, bool aan) {
+              if (aan) {
+                lv_obj_set_style_color_filter_dsc(o, &f, pt);
+                lv_obj_set_style_color_filter_opa(o, LV_OPA_COVER, pt);
+              } else {
+                lv_obj_remove_local_style_prop(o, LV_STYLE_COLOR_FILTER_OPA, pt);
+                lv_obj_remove_local_style_prop(o, LV_STYLE_COLOR_FILTER_DSC, pt);
+              }
+            }
+            static void loop(lv_obj_t *o, bool aan) {
+              zet(o, LV_PART_MAIN, aan);
+              if (lv_obj_check_type(o, &lv_switch_class) || lv_obj_check_type(o, &lv_slider_class) ||
+                  lv_obj_check_type(o, &lv_arc_class) || lv_obj_check_type(o, &lv_bar_class)) {
+                zet(o, LV_PART_INDICATOR, aan);
+                zet(o, LV_PART_KNOB, aan);
+              }
+              uint32_t n = lv_obj_get_child_count(o);
+              for (uint32_t i = 0; i < n; i++) loop(lv_obj_get_child(o, i), aan);
+            }
+          };
+          bool aan = id(avond);
+          lv_obj_t *root[] = {id(p_home)->obj, id(p_licht)->obj, id(p_sfeer)->obj, id(p_muziek)->obj,
+                              id(p_klimaat)->obj, id(p_weer)->obj, id(p_menu)->obj, id(p_wekker)->obj,
+                              id(p_wgeluid)->obj, id(p_fav)->obj, id(p_deur)->obj, id(p_gm)->obj,
+                              id(p_nacht)->obj, lv_layer_top()};
+          for (auto *o : root) { W::loop(o, aan); lv_obj_invalidate(o); }
+          ESP_LOGI("avond", "donker schema %s", aan ? "aan" : "uit");
+          if (aan) lv_obj_add_state(id(qp_avond), LV_STATE_CHECKED); else lv_obj_clear_state(id(qp_avond), LV_STATE_CHECKED);
+
+  # Thuis: cirkel en kwartcirkel op een willekeurige plek en grootte; het kwart komt
+  # elke keer in een ander kwadrant (elk kwartier en na het opstarten)
+  - id: deco_mix
+    then:
+      - lambda: |-
+          static int vorig = -1;
+          int d = 140 + random_uint32() % 151;          // cirkel 140..290 px
+          int cx = random_uint32() % 481, cy = random_uint32() % 401;
+          lv_obj_t *c = id(h_circ);
+          lv_obj_set_size(c, d, d);
+          lv_obj_set_style_radius(c, d / 2, 0);
+          lv_obj_set_pos(c, cx - d / 2, cy - d / 2);
+          int q = random_uint32() % 3;                  // 0..3, maar nooit hetzelfde als vorige keer
+          if (vorig >= 0 && q >= vorig) q++;
+          if (vorig < 0) q = random_uint32() % 4;
+          vorig = q;
+          int k = 70 + random_uint32() % 91;            // kwartcirkel 70..160 px
+          lv_obj_t *b = id(h_qbox), *r = id(h_qcirc);
+          lv_obj_set_size(b, k, k);
+          lv_obj_set_pos(b, random_uint32() % (481 - k), random_uint32() % (401 - k));
+          lv_obj_set_size(r, 2 * k, 2 * k);
+          lv_obj_set_style_radius(r, k, 0);
+          // het vierkant laat één kwart van de cirkel zien: 0 linksboven, 1 rechtsboven, 2 linksonder, 3 rechtsonder
+          lv_obj_set_pos(r, (q == 1 || q == 3) ? -k : 0, (q == 2 || q == 3) ? -k : 0);
 
   # ---- wekker: tijd, aan/uit, dagen, geluid, zonsopgang + tegel en nachtstand
   - id: wk_render
@@ -1199,8 +1287,8 @@ script:
           lv_obj_t *db[] = {id(wk_d0), id(wk_d1), id(wk_d2)};
           for (int k = 0; k < 3; k++) {
             bool sel = id(wk_dagen).state == dg[k];
-            lv_obj_set_style_bg_color(db[k], lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
-            lv_obj_set_style_text_color(db[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_bg_color(db[k], lv_color_hex(sel ? ${c_inkbg} : ${c_tile}), 0);
+            lv_obj_set_style_text_color(db[k], lv_color_hex(sel ? ${c_papert} : ${c_ink}), 0);
           }
           std::string dg_l = id(wk_dagen).state;
           std::string info = !id(ha_ok) ? std::string("Geen verbinding met HA") :
@@ -1217,8 +1305,8 @@ script:
           lv_obj_t *gs[] = {id(wg_s0), id(wg_s1), id(wg_s2), id(wg_s3), id(wg_s4), id(wg_s5), id(wg_s6), id(wg_s7), id(wg_s8)};
           for (int k = 0; k < 9; k++) {
             bool sel = g == gn[k];
-            lv_obj_set_style_bg_color(gb[k], lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
-            lv_obj_set_style_text_color(gb[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_bg_color(gb[k], lv_color_hex(sel ? ${c_inkbg} : ${c_tile}), 0);
+            lv_obj_set_style_text_color(gb[k], lv_color_hex(sel ? ${c_papert} : ${c_ink}), 0);
             lv_obj_set_style_text_color(gs[k], lv_color_hex(sel ? ${c_grey} : ${c_sub}), 0);
           }
           bool lamp = id(wk_lampen).state == "on";
@@ -1331,8 +1419,8 @@ script:
           static const char *naam[] = {"Helder", "Gedimd", "Lezen", "Ontspannen", "Nachtlampje", "Lentebloesem", "Savanne", "Alles uit"};
           for (int k = 0; k < 8; k++) {
             bool on = k == id(sf_idx);
-            lv_obj_set_style_bg_color(b[k], lv_color_hex(on ? ${c_ink} : ${c_tile}), 0);
-            lv_obj_set_style_text_color(b[k], lv_color_hex(on ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_bg_color(b[k], lv_color_hex(on ? ${c_inkbg} : ${c_tile}), 0);
+            lv_obj_set_style_text_color(b[k], lv_color_hex(on ? ${c_papert} : ${c_ink}), 0);
             lv_obj_set_style_text_color(s[k], lv_color_hex(on ? ${c_grey} : ${c_sub}), 0);
           }
           lv_label_set_text(id(tl_sfeer), id(sf_idx) >= 0 && id(sf_idx) < 8 ? naam[id(sf_idx)] : "Kies");
@@ -1594,8 +1682,8 @@ lvgl:
       bg_color: ${c_tile}
       text_color: ${c_ink}
       pressed:
-        bg_color: ${c_ink}
-        text_color: ${c_paper}
+        bg_color: ${c_inkbg}
+        text_color: ${c_papert}
   on_idle:
     # 's nachts: na 1 min niets aanraken SLAPEN (een tik geeft dan eerst de nachtstand);
     # overdag 65%. Nooit tijdens de nachtstand of als de wekker afgaat.
@@ -1645,9 +1733,9 @@ lvgl:
           y: 0
           width: 480
           height: 68
-          bg_color: ${c_ink}
+          bg_color: ${c_inkbg}
           bg_opa: COVER
-          text_color: ${c_paper}
+          text_color: ${c_papert}
           hidden: true
           widgets:
             # hoes + titel: tik = Nu speelt
@@ -1678,7 +1766,7 @@ lvgl:
                       height: 68
                       clickable: false
                       widgets:
-                        - image: {id: mi_cover, x: -54, y: -54, src: cov_big, zoom: 0.39, hidden: true, clickable: false}
+                        - image: {id: mi_cover, x: -54, y: -54, src: cov_big, scale: 0.39, hidden: true, clickable: false}
                   - label:
                       id: mi_title
                       x: 80
@@ -1723,7 +1811,7 @@ lvgl:
                 on_click:
                   - script.execute: {id: mp_volume, d: -5}
                 widgets:
-                  - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22, text_color: "${c_paper}"}
+                  - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22, text_color: "${c_papert}"}
             - label:
                 id: mi_vol
                 x: 382
@@ -1747,7 +1835,7 @@ lvgl:
                 on_click:
                   - script.execute: {id: mp_volume, d: 5}
                 widgets:
-                  - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22, text_color: "${c_paper}"}
+                  - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22, text_color: "${c_papert}"}
 
       # ======== paneel LAMPEN & SCHERM (knop LICHT rechts in de onderbalk)
       - obj:
@@ -1814,9 +1902,9 @@ lvgl:
                 y: 82
                 width: 138
                 height: 64
-                bg_color: ${c_ink}
+                bg_color: ${c_inkbg}
                 bg_opa: COVER
-                text_color: ${c_paper}
+                text_color: ${c_papert}
                 pressed:
                   bg_color: ${c_red}
                 on_click:
@@ -1864,9 +1952,9 @@ lvgl:
                 y: 182
                 width: 138
                 height: 64
-                bg_color: ${c_ink}
+                bg_color: ${c_inkbg}
                 bg_opa: COVER
-                text_color: ${c_paper}
+                text_color: ${c_papert}
                 pressed:
                   bg_color: ${c_red}
                 on_click:
@@ -1877,7 +1965,7 @@ lvgl:
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_sleep}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "SLAPEN"}
-            # avondstand: alle kleuren omgedraaid
+            # avondstand: donker kleurenschema (vanzelf 20:00 - 09:00)
             - obj:
                 x: 24
                 y: 264
@@ -1900,11 +1988,11 @@ lvgl:
                       indicator:
                         bg_opa: TRANSP
                         checked:
-                          bg_color: ${c_ink}
+                          bg_color: ${c_inkbg}
                           bg_opa: COVER
                         radius: 15
                       knob:
-                        bg_color: ${c_paper}
+                        bg_color: ${c_papert}
                         radius: 11
                         pad_all: -4
                         shadow_width: 0
@@ -1943,9 +2031,9 @@ lvgl:
                 y: 1
                 width: 96
                 height: 63
-                bg_color: ${c_ink}
+                bg_color: ${c_inkbg}
                 bg_opa: COVER
-                text_color: ${c_paper}
+                text_color: ${c_papert}
                 on_click:
                   - lvgl.widget.hide: qp
                   - lvgl.page.show: p_home
@@ -2004,8 +2092,8 @@ lvgl:
                 bg_opa: COVER
                 text_color: ${c_ink}
                 pressed:
-                  bg_color: ${c_ink}
-                  text_color: ${c_paper}
+                  bg_color: ${c_inkbg}
+                  text_color: ${c_papert}
                 on_click:
                   - lambda: |-
                       if (lv_obj_has_flag(id(qp), LV_OBJ_FLAG_HIDDEN)) lv_obj_clear_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
@@ -2057,9 +2145,9 @@ lvgl:
                 y: 236
                 width: 256
                 height: 80
-                bg_color: ${c_ink}
+                bg_color: ${c_inkbg}
                 bg_opa: COVER
-                text_color: ${c_paper}
+                text_color: ${c_papert}
                 pressed:
                   bg_color: ${c_blue}
                 on_click:
@@ -2099,8 +2187,8 @@ lvgl:
                 bg_opa: COVER
                 text_color: ${c_ink}
                 pressed:
-                  bg_color: ${c_ink}
-                  text_color: ${c_paper}
+                  bg_color: ${c_inkbg}
+                  text_color: ${c_papert}
                 on_click:
                   - homeassistant.action:
                       action: script.turn_on
@@ -2130,16 +2218,18 @@ lvgl:
             width: 480
             height: 480
             widgets:
-              - obj: {x: 314, y: -70, width: 230, height: 230, radius: 115, styles: st_deco, bg_color: "${c_red}", clickable: false}
+              # cirkel en kwartcirkel: elk kwartier op een andere plek en in een andere grootte (deco_mix)
+              - obj: {id: h_circ, x: 314, y: -70, width: 230, height: 230, radius: 115, styles: st_deco, bg_color: "${c_red}", clickable: false}
               # kwartcirkel in ultramarijn (cirkel, afgesneden door een vierkant)
               - obj:
+                  id: h_qbox
                   x: 252
                   y: 112
                   width: 110
                   height: 110
                   clickable: false
                   widgets:
-                    - obj: {x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                    - obj: {id: h_qcirc, x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
               - label: {id: h_date, x: 24, y: 22, styles: st_mono12, text: "–"}
               - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "SLAAPKAMER"}
               - label: {id: h_ha, x: 120, y: 40, styles: st_mono11, text_color: "${c_redt}", text: "· GEEN VERBINDING MET HA"}
@@ -2150,9 +2240,9 @@ lvgl:
                   width: 80
                   height: 80
                   radius: 40
-                  bg_color: ${c_ink}
+                  bg_color: ${c_inkbg}
                   bg_opa: COVER
-                  text_color: ${c_paper}
+                  text_color: ${c_papert}
                   pressed:
                     bg_color: ${c_blue}
                   on_click:
@@ -2172,7 +2262,7 @@ lvgl:
                   radius: 40
                   bg_color: ${c_blue}
                   bg_opa: COVER
-                  text_color: ${c_paper}
+                  text_color: ${c_papert}
                   pressed:
                     bg_color: ${c_blue}
                   # 2 seconden vasthouden: het rondje loopt vol met zwart, dan pas uitvoeren
@@ -2218,7 +2308,7 @@ lvgl:
                         arc_opa: TRANSP
                         pad_all: 0
                         indicator:
-                          arc_color: ${c_ink}
+                          arc_color: ${c_inkbg}
                           arc_width: 40
                           arc_rounded: false
                         knob:
@@ -2331,9 +2421,9 @@ lvgl:
                   y: 72
                   width: 104
                   height: 44
-                  bg_color: ${c_ink}
+                  bg_color: ${c_inkbg}
                   bg_opa: COVER
-                  text_color: ${c_paper}
+                  text_color: ${c_papert}
                   pressed:
                     bg_color: ${c_red}
                   on_click:
@@ -2389,7 +2479,7 @@ lvgl:
                         indicator:
                           bg_opa: TRANSP
                           checked:
-                            bg_color: ${c_ink}
+                            bg_color: ${c_inkbg}
                             bg_opa: COVER
                           radius: 15
                         knob:
@@ -2569,7 +2659,7 @@ lvgl:
                               height: 64
                               clickable: false
                               widgets:
-                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_inkbg}", clickable: false}
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
                     - label: {x: 76, y: 14, text_font: f_15, text: "Ontspannen"}
                     - label: {id: sf_s3, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
@@ -2623,7 +2713,7 @@ lvgl:
                               clickable: false
                               widgets:
                                 - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_inkbg}", clickable: false}
                     - label: {x: 76, y: 14, text_font: f_15, text: "Lentebloesem"}
                     - label: {id: sf_s5, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
               - button:
@@ -2680,7 +2770,7 @@ lvgl:
                         bg_color: ${c_tile2}
                         clickable: false
                         widgets:
-                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_inkbg}", clickable: false}
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_off}", clickable: false}
                     - label: {x: 76, y: 14, text_font: f_15, text: "Alles uit"}
                     - label: {id: sf_s7, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "UIT"}
@@ -2706,7 +2796,7 @@ lvgl:
             clickable: false
             widgets:
               - obj: {x: 76, y: -20, width: 120, height: 120, radius: 60, styles: st_deco, bg_color: "${c_red}", clickable: false}
-              - obj: {x: 0, y: 120, width: 176, height: 56, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+              - obj: {x: 0, y: 120, width: 176, height: 56, styles: st_deco, bg_color: "${c_inkbg}", clickable: false}
               - obj: {x: 0, y: 64, width: 56, height: 56, styles: st_deco, bg_color: "${c_paper}", clickable: false}
         # echte hoes (Music Assistant via HA); verborgen tot hij binnen is
         - image: {id: mu_cover, x: 24, y: 68, width: 176, height: 176, src: cov_big, hidden: true}
@@ -2961,10 +3051,10 @@ lvgl:
                         width: 64
                         height: 64
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_inkbg}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_bulb}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_bulb}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Licht"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "PLAFOND · LEDSTRIP"}
               - button:
@@ -2985,7 +3075,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_palette}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_palette}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Sfeer"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNES"}
               - button:
@@ -3006,7 +3096,7 @@ lvgl:
                         bg_color: ${c_blue}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Muziek"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "NU SPEELT"}
               - button:
@@ -3027,7 +3117,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Wekker"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "TIJD EN GELUID"}
               - button:
@@ -3048,7 +3138,7 @@ lvgl:
                         bg_color: ${c_blue}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_thermo}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_thermo}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Kamer"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "TEMPERATUUR"}
               - button:
@@ -3066,10 +3156,10 @@ lvgl:
                         width: 64
                         height: 64
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_inkbg}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_rain}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_rain}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Weer"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "REGEN EN UREN"}
               - button:
@@ -3088,10 +3178,10 @@ lvgl:
                         width: 64
                         height: 64
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_inkbg}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Voordeur"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "CAMERA"}
               - button:
@@ -3112,7 +3202,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_star}", text_font: f_ic30, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_star}", text_font: f_ic30, text_color: "${c_papert}"}
                     - label: {x: 78, y: 14, text_font: f_17, text: "Favorieten"}
                     - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "RADIO · PLAYLISTS"}
 
@@ -3150,7 +3240,7 @@ lvgl:
                   indicator:
                     bg_opa: TRANSP
                     checked:
-                      bg_color: ${c_ink}
+                      bg_color: ${c_inkbg}
                       bg_opa: COVER
                     radius: 20
                   knob:
@@ -3271,7 +3361,7 @@ lvgl:
                         indicator:
                           bg_opa: TRANSP
                           checked:
-                            bg_color: ${c_ink}
+                            bg_color: ${c_inkbg}
                             bg_opa: COVER
                           radius: 15
                         knob:
@@ -3322,7 +3412,7 @@ lvgl:
                         bg_color: ${c_blue}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_whisper}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_whisper}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Fluisterwekker"}
                     - label: {id: wg_s0, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZACHTE STEM"}
               - button:
@@ -3344,7 +3434,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_speaker}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_speaker}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Wekkerbrigade"}
                     - label: {id: wg_s1, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "VROLIJK EN HARD"}
               - button:
@@ -3363,10 +3453,10 @@ lvgl:
                         width: 52
                         height: 52
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_inkbg}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Zoemer"}
                     - label: {id: wg_s2, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "PIEP PIEP"}
               - button:
@@ -3388,7 +3478,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Klassieke wekker"}
                     - label: {id: wg_s3, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "RINKELBEL"}
               - button:
@@ -3410,7 +3500,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_siren}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_siren}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Alarm"}
                     - label: {id: wg_s4, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "SIRENE"}
               - button:
@@ -3432,7 +3522,7 @@ lvgl:
                         bg_color: ${c_blue}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_leaf}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_leaf}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Rustig wekken"}
                     - label: {id: wg_s5, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZACHTE KLOKJES"}
               - button:
@@ -3454,7 +3544,7 @@ lvgl:
                         bg_color: ${c_blue}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Muziek"}
                     - label: {id: wg_s6, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "NPO RADIO 2"}
               - button:
@@ -3473,10 +3563,10 @@ lvgl:
                         width: 52
                         height: 52
                         styles: st_deco
-                        bg_color: ${c_ink}
+                        bg_color: ${c_inkbg}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_bird}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_bird}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Natuurgeluiden"}
                     - label: {id: wg_s7, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "VOGELS EN WATER"}
               - button:
@@ -3498,7 +3588,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_sunrise}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_sunrise}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Alleen licht"}
                     - label: {id: wg_s8, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZONSOPGANG"}
               - button:
@@ -3512,8 +3602,8 @@ lvgl:
                         action: script.turn_on
                         data:
                           entity_id: script.wekker_slaapkamer_afgaan
-                  bg_color: ${c_ink}
-                  text_color: ${c_paper}
+                  bg_color: ${c_inkbg}
+                  text_color: ${c_papert}
                   pressed:
                     bg_color: ${c_red}
                   widgets:
@@ -3526,7 +3616,7 @@ lvgl:
                         bg_color: ${c_red}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_play}", text_font: f_ic22, text_color: "${c_paper}"}
+                          - label: {align: CENTER, text: "${ic_play}", text_font: f_ic22, text_color: "${c_papert}"}
                     - label: {x: 64, y: 8, text_font: f_15, text: "Probeer nu"}
                     - label: {x: 64, y: 30, styles: st_mono11, text_color: "${c_grey}", text: "GAAT METEEN AF"}
 
@@ -3566,8 +3656,8 @@ lvgl:
                   height: 36
                   styles: st_outline
                   bg_opa: COVER
-                  bg_color: ${c_ink}
-                  text_color: ${c_paper}
+                  bg_color: ${c_inkbg}
+                  text_color: ${c_papert}
                   on_click:
                     - lambda: 'id(fav_kind) = 0;'
                     - script.execute: fav_build
@@ -3621,8 +3711,8 @@ lvgl:
               - label: {align: CENTER, styles: st_mono12, text_color: 0xC9CED8, text: "CAMERABEELD LADEN..."}
         - image: {id: dr_img, x: 0, y: 0, src: cam_img, hidden: true, clickable: false}
         - obj: {x: 24, y: 24, width: 10, height: 10, radius: 5, styles: st_deco, bg_color: "${c_red}", clickable: false}
-        - label: {x: 42, y: 21, styles: st_mono11, text_color: "${c_paper}", text: "LIVE · VOORDEUR"}
-        - label: {id: dr_now, x: 376, y: 21, width: 80, text_align: RIGHT, styles: st_mono11, text_color: "${c_paper}", text: "--:--"}
+        - label: {x: 42, y: 21, styles: st_mono11, text_color: "${c_papert}", text: "LIVE · VOORDEUR"}
+        - label: {id: dr_now, x: 376, y: 21, width: 80, text_align: RIGHT, styles: st_mono11, text_color: "${c_papert}", text: "--:--"}
         - label: {id: dr_time, x: 24, y: 284, styles: st_mono12, text_color: "${c_redt}", text: ""}
         - label: {id: dr_title, x: 24, y: 302, text_font: f_26, text: "Voordeur"}
         - button:
@@ -3630,9 +3720,9 @@ lvgl:
             y: 344
             width: 212
             height: 56
-            bg_color: ${c_ink}
+            bg_color: ${c_inkbg}
             bg_opa: COVER
-            text_color: ${c_paper}
+            text_color: ${c_papert}
             pressed:
               bg_color: ${c_red}
             on_click:
@@ -3729,7 +3819,7 @@ lvgl:
     # ================= Nachtstand =================
     - id: p_nacht
       styles: st_page
-      bg_color: ${c_ink}
+      bg_color: 0x000000
       on_load:
         - script.execute: {id: nav_mark, p: 9}
       widgets:
