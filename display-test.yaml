@@ -3,8 +3,10 @@
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
-#   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
-#   nog van de woonkamer).
+#   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
+#   muziek en klimaat nog van de woonkamer).
+#   Versie 0.8 (25-11-2026): licht, sfeer en DIM-lampen naar de slaapkamer van
+#   Maartje en Jeroen (Alles, Plafond, Ledstrip; scènes slaapkamer_jeroen_maartje_*).
 #   Versie 0.7 (25-11-2026): nachtstand-klok weer zichtbaar: scherm 15% (was 6%)
 #   en klok gedempt rood 0x9A3422 (was te donker).
 #   Versie 0.6 (25-11-2026): nacht (21-6): na 1 min niets aanraken scherm uit;
@@ -38,9 +40,10 @@
 #   lukt het downloaden niet, dan blijft de abstracte hoes staan.
 # Thuis: datum, grote klok, weer + regen in één regel, vier tegels:
 #   Licht (aantal aan), Sfeer (laatste keuze), Wekker (tijd of Uit), Weer.
-# Licht: woonkamer, eettafel en keuken: schakelaar = aan/uit, balk = helderheid
+# Licht: slaapkamer: Alles, Plafond en Ledstrip: schakelaar = aan/uit, balk = helderheid
 #   (slepen en loslaten), ALLES AAN / ALLES UIT.
-# Sfeer: 6 scènes, RANDOM KLEUREN (script.lampen_random_kleuren) en ALLES UIT.
+# Sfeer: 7 scènes van de slaapkamer (Helder, Gedimd, Lezen, Ontspannen, Nachtlampje,
+#   Lentebloesem, Savanne) en ALLES UIT.
 # Nu speelt: hoes, titel, artiest - album, vorige / pauze / volgende,
 #   volume - en +. Speler: media_player.yamaha_living_2 (woonkamer).
 # Klimaat: kamertemperatuur, gewenste temperatuur -/+ (0,5 °C), verwarming
@@ -70,11 +73,10 @@
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-test -> Configureren ->
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
-# Gebruikt in Home Assistant: light.woonkamer, light.eettafel, light.keuken,
-#   scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel,
-#   scene.woonkamer_woonkamer_eettafel, scene.woonkamer_herfst_goud,
-#   scene.woonkamer_tafel, scene.woonkamer_concentreren, scene.woonkamer_fairfax,
-#   script.lampen_random_kleuren, media_player.yamaha_living_2 (+ entity_picture_local),
+# Gebruikt in Home Assistant: light.slaapkamer_jeroen_maartje (groep),
+#   light.slaapkamer_jeroen_en_maartje, light.slaapkamer_lichtstrip,
+#   scene.slaapkamer_jeroen_maartje_helder / _gedimd / _lezen / _ontspannen /
+#   _nachtlampje / _lentebloesem / _savanne_zonsondergang, media_player.yamaha_living_2 (+ entity_picture_local),
 #   climate.living_room, weather.de_scholekster,
 #   sensor.neerslag_buienradar_regen_data, input_text.weer_uren_display.
 # Wekker in HA: input_datetime.wekker_slaapkamer_tijd,
@@ -506,17 +508,17 @@ globals:
 text_sensor:
   - platform: homeassistant
     id: lt_s0
-    entity_id: light.woonkamer
+    entity_id: light.slaapkamer_jeroen_maartje
     internal: true
     on_value: {script.execute: lt_render}
   - platform: homeassistant
     id: lt_s1
-    entity_id: light.eettafel
+    entity_id: light.slaapkamer_jeroen_en_maartje
     internal: true
     on_value: {script.execute: lt_render}
   - platform: homeassistant
     id: lt_s2
-    entity_id: light.keuken
+    entity_id: light.slaapkamer_lichtstrip
     internal: true
     on_value: {script.execute: lt_render}
   - platform: homeassistant
@@ -640,19 +642,19 @@ sensor:
           lv_label_set_text(id(r_sluimer), t);
   - platform: homeassistant
     id: lt_b0
-    entity_id: light.woonkamer
+    entity_id: light.slaapkamer_jeroen_maartje
     attribute: brightness
     internal: true
     on_value: {script.execute: lt_render}
   - platform: homeassistant
     id: lt_b1
-    entity_id: light.eettafel
+    entity_id: light.slaapkamer_jeroen_en_maartje
     attribute: brightness
     internal: true
     on_value: {script.execute: lt_render}
   - platform: homeassistant
     id: lt_b2
-    entity_id: light.keuken
+    entity_id: light.slaapkamer_lichtstrip
     attribute: brightness
     internal: true
     on_value: {script.execute: lt_render}
@@ -876,7 +878,7 @@ script:
       - homeassistant.action:
           action: !lambda 'return std::string(aan ? "light.turn_on" : "light.turn_off");'
           data:
-            entity_id: !lambda 'return std::string(i == 1 ? "light.eettafel" : (i == 2 ? "light.keuken" : "light.woonkamer"));'
+            entity_id: !lambda 'return std::string(i == 1 ? "light.slaapkamer_jeroen_en_maartje" : (i == 2 ? "light.slaapkamer_lichtstrip" : "light.slaapkamer_jeroen_maartje"));'
   - id: lt_set
     parameters:
       i: int
@@ -889,12 +891,12 @@ script:
             - homeassistant.action:
                 action: light.turn_off
                 data:
-                  entity_id: !lambda 'return std::string(i == 1 ? "light.eettafel" : (i == 2 ? "light.keuken" : "light.woonkamer"));'
+                  entity_id: !lambda 'return std::string(i == 1 ? "light.slaapkamer_jeroen_en_maartje" : (i == 2 ? "light.slaapkamer_lichtstrip" : "light.slaapkamer_jeroen_maartje"));'
           else:
             - homeassistant.action:
                 action: light.turn_on
                 data:
-                  entity_id: !lambda 'return std::string(i == 1 ? "light.eettafel" : (i == 2 ? "light.keuken" : "light.woonkamer"));'
+                  entity_id: !lambda 'return std::string(i == 1 ? "light.slaapkamer_jeroen_en_maartje" : (i == 2 ? "light.slaapkamer_lichtstrip" : "light.slaapkamer_jeroen_maartje"));'
                   brightness_pct: !lambda 'return std::to_string(pct);'
 
   # ---- sfeer: laatste keuze zwart, naam op de tegel van Thuis
@@ -903,7 +905,7 @@ script:
       - lambda: |-
           lv_obj_t *b[] = {id(sf_0), id(sf_1), id(sf_2), id(sf_3), id(sf_4), id(sf_5), id(sf_6), id(sf_7)};
           lv_obj_t *s[] = {id(sf_s0), id(sf_s1), id(sf_s2), id(sf_s3), id(sf_s4), id(sf_s5), id(sf_s6), id(sf_s7)};
-          static const char *naam[] = {"Woonkamer", "WK + eettafel", "Herfstgoud", "Tafel", "Concentreren", "Fairfax", "Random", "Alles uit"};
+          static const char *naam[] = {"Helder", "Gedimd", "Lezen", "Ontspannen", "Nachtlampje", "Lentebloesem", "Savanne", "Alles uit"};
           for (int k = 0; k < 8; k++) {
             bool on = k == id(sf_idx);
             lv_obj_set_style_bg_color(b[k], lv_color_hex(on ? ${c_ink} : ${c_tile}), 0);
@@ -1363,7 +1365,7 @@ lvgl:
                   - lvgl.widget.hide: qp
                 widgets:
                   - label: {align: CENTER, text: "${ic_close}", text_font: f_ic22}
-            # lampen (nu: woonkamer, eettafel, keuken)
+            # lampen (slaapkamer Maartje en Jeroen)
             - label: {x: 24, y: 64, styles: st_mono11, text_color: "${c_sub}", text: "LAMPEN"}
             - button:
                 x: 24
@@ -1375,7 +1377,7 @@ lvgl:
                   - homeassistant.action:
                       action: light.turn_on
                       data:
-                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                        entity_id: light.slaapkamer_jeroen_maartje
                         brightness_pct: "100"
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_bulb}", text_font: f_ic22}
@@ -1390,7 +1392,7 @@ lvgl:
                   - homeassistant.action:
                       action: light.turn_on
                       data:
-                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                        entity_id: light.slaapkamer_jeroen_maartje
                         brightness_pct: "20"
                         transition: "2"
                 widgets:
@@ -1410,7 +1412,7 @@ lvgl:
                   - homeassistant.action:
                       action: light.turn_off
                       data:
-                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                        entity_id: light.slaapkamer_jeroen_maartje
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_power}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "UIT"}
@@ -1700,7 +1702,7 @@ lvgl:
                   widgets:
                     - obj: {x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
               - label: {id: h_date, x: 24, y: 22, styles: st_mono12, text: "–"}
-              - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER"}
+              - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "SLAAPKAMER"}
               - label:
                   id: h_clock
                   x: 18
@@ -1786,7 +1788,7 @@ lvgl:
               - label: {x: 52, y: 17, styles: st_mono12, text: "LICHT"}
               - label: {id: hd_t1, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
               - label: {id: lt_count, x: 24, y: 66, text_font: f_44, text_letter_space: -1, text: "–"}
-              - label: {x: 24, y: 114, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · EETTAFEL · KEUKEN"}
+              - label: {x: 24, y: 114, styles: st_mono11, text_color: "${c_sub}", text: "SLAAPKAMER · PLAFOND · LEDSTRIP"}
               - button:
                   x: 236
                   y: 72
@@ -1797,7 +1799,7 @@ lvgl:
                     - homeassistant.action:
                         action: light.turn_on
                         data:
-                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                          entity_id: light.slaapkamer_jeroen_maartje
                   widgets:
                     - label: {align: CENTER, styles: st_mono12, text: "ALLES AAN"}
               - button:
@@ -1814,7 +1816,7 @@ lvgl:
                     - homeassistant.action:
                         action: light.turn_off
                         data:
-                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                          entity_id: light.slaapkamer_jeroen_maartje
                   widgets:
                     - label: {align: CENTER, styles: st_mono12, text: "ALLES UIT"}
               # drie rijen: naam | helderheidsbalk | % | schakelaar
@@ -1827,7 +1829,7 @@ lvgl:
                   border_side: [BOTTOM]
                   border_color: ${c_line}
                   widgets:
-                    - label: {x: 0, y: 21, text_font: f_17, text: "Woonkamer"}
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Alles"}
                     - slider: &lt_slider
                         id: lt_sl0
                         x: 124
@@ -1882,7 +1884,7 @@ lvgl:
                   border_side: [BOTTOM]
                   border_color: ${c_line}
                   widgets:
-                    - label: {x: 0, y: 21, text_font: f_17, text: "Eettafel"}
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Plafond"}
                     - slider:
                         <<: *lt_slider
                         id: lt_sl1
@@ -1903,7 +1905,7 @@ lvgl:
                   border_side: [BOTTOM]
                   border_color: ${c_line}
                   widgets:
-                    - label: {x: 0, y: 21, text_font: f_17, text: "Keuken"}
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Ledstrip"}
                     - slider:
                         <<: *lt_slider
                         id: lt_sl2
@@ -1947,8 +1949,7 @@ lvgl:
                     - homeassistant.action:
                         action: scene.turn_on
                         data:
-                          # woonkamer inclusief keuken en eettafel (zoals op display woonkamer)
-                          entity_id: "scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel"
+                                entity_id: scene.slaapkamer_jeroen_maartje_helder
                     - lambda: 'id(sf_idx) = 0;'
                     - script.execute: sf_mark
                   widgets:
@@ -1963,7 +1964,7 @@ lvgl:
                         widgets:
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
                           - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Woonkamer"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Helder"}
                     - label: {id: sf_s0, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
               - button:
                   id: sf_1
@@ -1973,7 +1974,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - script.execute: {id: sf_scene, i: 1, ent: "scene.woonkamer_woonkamer_eettafel"}
+                    - script.execute: {id: sf_scene, i: 1, ent: "scene.slaapkamer_jeroen_maartje_gedimd"}
                   widgets:
                     - obj:
                         x: 0
@@ -1993,8 +1994,8 @@ lvgl:
                               clickable: false
                               widgets:
                                 - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "WK + eettafel"}
-                    - label: {id: sf_s1, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "ALLE LAMPEN"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Gedimd"}
+                    - label: {id: sf_s1, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "ZACHT"}
               - button:
                   id: sf_2
                   x: 24
@@ -2003,7 +2004,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - script.execute: {id: sf_scene, i: 2, ent: "scene.woonkamer_herfst_goud"}
+                    - script.execute: {id: sf_scene, i: 2, ent: "scene.slaapkamer_jeroen_maartje_lezen"}
                   widgets:
                     - obj:
                         x: 0
@@ -2016,7 +2017,7 @@ lvgl:
                         widgets:
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xF08A2E, clickable: false}
                           - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Herfstgoud"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Lezen"}
                     - label: {id: sf_s2, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
               - button:
                   id: sf_3
@@ -2026,7 +2027,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - script.execute: {id: sf_scene, i: 3, ent: "scene.woonkamer_tafel"}
+                    - script.execute: {id: sf_scene, i: 3, ent: "scene.slaapkamer_jeroen_maartje_ontspannen"}
                   widgets:
                     - obj:
                         x: 0
@@ -2046,7 +2047,7 @@ lvgl:
                               widgets:
                                 - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_ink}", clickable: false}
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Tafel"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Ontspannen"}
                     - label: {id: sf_s3, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
               - button:
                   id: sf_4
@@ -2056,7 +2057,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - script.execute: {id: sf_scene, i: 4, ent: "scene.woonkamer_concentreren"}
+                    - script.execute: {id: sf_scene, i: 4, ent: "scene.slaapkamer_jeroen_maartje_nachtlampje"}
                   widgets:
                     - obj:
                         x: 0
@@ -2069,8 +2070,8 @@ lvgl:
                         widgets:
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xFFFFFF, clickable: false}
                           - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Concentreren"}
-                    - label: {id: sf_s4, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "HELDER WIT"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Nachtlampje"}
+                    - label: {id: sf_s4, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "HEEL ZACHT"}
               - button:
                   id: sf_5
                   x: 244
@@ -2079,7 +2080,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - script.execute: {id: sf_scene, i: 5, ent: "scene.woonkamer_fairfax"}
+                    - script.execute: {id: sf_scene, i: 5, ent: "scene.slaapkamer_jeroen_maartje_lentebloesem"}
                   widgets:
                     - obj:
                         x: 0
@@ -2099,7 +2100,7 @@ lvgl:
                               widgets:
                                 - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
                           - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_ink}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Fairfax"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Lentebloesem"}
                     - label: {id: sf_s5, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
               - button:
                   id: sf_6
@@ -2109,12 +2110,7 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - lambda: 'id(sf_idx) = 6;'
-                    - script.execute: sf_mark
-                    - homeassistant.action:
-                        action: script.turn_on
-                        data:
-                          entity_id: script.lampen_random_kleuren
+                    - script.execute: {id: sf_scene, i: 6, ent: "scene.slaapkamer_jeroen_maartje_savanne_zonsondergang"}
                   widgets:
                     - obj:
                         x: 0
@@ -2134,8 +2130,8 @@ lvgl:
                               clickable: false
                               widgets:
                                 - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                    - label: {x: 76, y: 14, text_font: f_15, text: "Random kleuren"}
-                    - label: {id: sf_s6, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "VERRAS ME"}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Savanne"}
+                    - label: {id: sf_s6, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "ZONSONDERGANG"}
               - button:
                   id: sf_7
                   x: 244
@@ -2149,7 +2145,7 @@ lvgl:
                     - homeassistant.action:
                         action: light.turn_off
                         data:
-                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                          entity_id: light.slaapkamer_jeroen_maartje
                   widgets:
                     - obj:
                         x: 0
