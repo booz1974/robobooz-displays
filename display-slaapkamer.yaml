@@ -2,10 +2,15 @@
 # ROBOBOOZ - RASTER & CIRKEL (nieuwe stijl) voor ESPHome / LVGL
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
-# display-slaapkamer (apparaat: display-test) - Guition ESP32-S3-4848S040
-#   (480x480, 1 relais) - slaapkamerpaneel (begonnen als testpaneel),
+# display-slaapkamer - Guition ESP32-S3-4848S040 (480x480, 1 relais) -
+#   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.14 (25-11-2026): HA-verbinding elke 3 s gecontroleerd (de melding
+#   "geen verbinding" bleef staan als de ESPHome-logviewer werd gesloten).
+#   Apparaat heet nu ook display-slaapkamer (was
+#   display-test); eenmalig use_address: display-test.local voor de eerste update.
+#   Entiteit: light.display_slaapkamer_schermverlichting.
 #   Versie 0.13 (25-11-2026): bestand heet nu display-slaapkamer.yaml; het apparaat
 #   heet in ESPHome/HA nog display-test (zo blijven draadloos bijwerken en de
 #   entiteiten in HA gewoon werken). Zichtbare naam: Display slaapkamer.
@@ -94,7 +99,7 @@
 # secrets.yaml: wifi_ssid, wifi_password, ha_url, plate04_api_key,
 #   plate04_ota_password, plate04_ap_password (zie secrets.example.yaml).
 #
-# Vereist in Home Assistant: ESPHome-integratie -> display-test -> Configureren ->
+# Vereist in Home Assistant: ESPHome-integratie -> Display slaapkamer -> Configureren ->
 # "Sta het apparaat toe Home Assistant-acties uit te voeren" AAN.
 # Gebruikt in Home Assistant: light.slaapkamer_jeroen_maartje (groep),
 #   light.slaapkamer_jeroen_en_maartje, light.slaapkamer_lichtstrip,
@@ -116,8 +121,7 @@
 # =====================================================================
 
 esphome:
-  # apparaatnaam bewust nog display-test: een nieuwe naam = nieuw apparaat in HA
-  name: display-test
+  name: display-slaapkamer
   friendly_name: Display slaapkamer
   min_version: 2025.7.0
   platformio_options:
@@ -178,19 +182,9 @@ logger:
 api:
   encryption:
     key: !secret plate04_api_key
-  # verbinding met HA tonen; een wekkertijd die niet aankwam alsnog sturen
-  on_client_connected:
-    - lambda: 'id(ha_ok) = true;'
-    - script.execute: wk_render
-    - if:
-        condition:
-          lambda: 'return id(wk_dirty);'
-        then:
-          - delay: 3s
-          - script.execute: wk_send
-  on_client_disconnected:
-    - lambda: 'id(ha_ok) = false;'
-    - script.execute: wk_render
+  # verbinding met HA: zie 'interval' (ha_check). Niet via on_client_connected/
+  # disconnected: ook de logviewer van ESPHome is een client, en als die sloot
+  # leek HA weg terwijl HA gewoon verbonden was.
 
 ota:
   - platform: esphome
@@ -203,8 +197,11 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # EENMALIG bij het hernoemen (display-test -> display-slaapkamer): de eerste
+  # draadloze update gaat nog naar het oude adres. Na die update deze regel weghalen.
+  use_address: display-test.local
   ap:
-    ssid: "display test Fallback Hotspot"
+    ssid: "Display slaapkamer Fallback"
     password: !secret plate04_ap_password
 
 captive_portal:
@@ -770,6 +767,19 @@ sensor:
     internal: true
     on_value: {script.execute: cl_render}
 
+
+# elke 3 s: is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
+interval:
+  - interval: 3s
+    then:
+      - lambda: |-
+          bool nu = esphome::api::global_api_server != nullptr &&
+                    esphome::api::global_api_server->is_connected(true);
+          if (nu == id(ha_ok)) return;
+          id(ha_ok) = nu;
+          id(wk_render).execute();
+          // een wekkertijd die niet aankwam (HA was weg) alsnog sturen
+          if (nu && id(wk_dirty)) id(wk_send).execute();
 
 # ---------------------------------------------------------------- scripts
 script:

@@ -3,7 +3,7 @@
 Retro thema voor drie Guition ESP32-S3-4848S040 touch-displays (480×480) met ESPHome +
 LVGL, gekoppeld aan Home Assistant (HA) en Music Assistant (MA). Elk display is één groot
 YAML-bestand: `display-woonkamer.yaml`, `display-studio.yaml`, `display-jip.yaml` en
-`display-slaapkamer.yaml` (nieuwe stijl "Raster & Cirkel"; apparaatnaam nog `display-test`).
+`display-slaapkamer.yaml` (nieuwe stijl "Raster & Cirkel").
 De README beschrijft de functies en welke HA-entiteiten nodig zijn.
 
 ## Werkafspraken
