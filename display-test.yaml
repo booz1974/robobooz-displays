@@ -5,6 +5,8 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
 #   nog van de woonkamer).
+#   Versie 0.4 (25-11-2026): avondstand werkt: de SPI naar het scherm wordt
+#   eerst weer aangemeld (de driver geeft hem na het opstarten vrij).
 #   Versie 0.3 (25-11-2026): spelerbalk hoger (68 px, hoes 68x68) zodat titel en
 #   artiest niet meer wegvallen; wekkerpagina 4 px opgeschoven.
 #   Versie 0.2 (25-11-2026): spelerbalk bovenin met echte hoes, hoes op
@@ -693,13 +695,17 @@ script:
   - id: avond_apply
     then:
       - lambda: |-
-          // zelfde als write_command_ van de driver (geen DC-pin: 9-bits SPI, bit 8 = 0 = commando)
+          // zelfde als write_command_ van de driver (geen DC-pin: 9-bits SPI, bit 8 = 0 = commando).
+          // De driver geeft de SPI na het opstarten vrij (spi_teardown), dus eerst weer aanmelden.
           using SD = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST, esphome::spi::CLOCK_POLARITY_LOW,
                                              esphome::spi::CLOCK_PHASE_LEADING, esphome::spi::DATA_RATE_1MHZ>;
           SD *spi = id(my_display);
+          spi->spi_setup();
           spi->enable();
           spi->write(id(avond) ? 0x21 : 0x20, 9);
           spi->disable();
+          spi->spi_teardown();
+          ESP_LOGI("avond", "avondstand %s (INV%s)", id(avond) ? "aan" : "uit", id(avond) ? "ON" : "OFF");
           if (id(avond)) lv_obj_add_state(id(qp_avond), LV_STATE_CHECKED); else lv_obj_clear_state(id(qp_avond), LV_STATE_CHECKED);
 
   # ---- wekker: tijd, aan/uit, dagen, geluid, zonsopgang + tegel en nachtstand
