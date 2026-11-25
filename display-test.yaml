@@ -5,8 +5,10 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
 #   nog van de woonkamer).
+#   Versie 0.7 (25-11-2026): nachtstand-klok weer zichtbaar: scherm 15% (was 6%)
+#   en klok gedempt rood 0x9A3422 (was te donker).
 #   Versie 0.6 (25-11-2026): nacht (21-6): na 1 min niets aanraken scherm uit;
-#   eerste tik = nachtstand (alleen een donkere klok, 6%), volgende tik = gewone
+#   eerste tik = nachtstand (alleen een donkere klok, 15%), volgende tik = gewone
 #   scherm in de avondstand, gedimd (35%); nachtstand gaat na 20 s weer uit.
 #   Avondstand vanzelf om 21:00 aan en om 06:00 uit; in de nachtstand nooit omgedraaid.
 #   Versie 0.5 (25-11-2026): wekkerscherm met sluimertijd - / + (5..30 min,
@@ -54,7 +56,7 @@
 #   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
 #   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
 #   na STOP verder op het oude volume (dat regelt HA, niet het display).
-# Nachtstand: zwart met alleen een donkerrode klok, scherm op 6%. Tik = terug.
+# Nachtstand: zwart met alleen een donkerrode klok, scherm op 15%. Tik = terug.
 # Nacht (21:00-06:00): na 1 min niets aanraken gaat het scherm uit (donker).
 #   Eerste tik = nachtstand, volgende tik = gewone scherm (avondstand, 35%);
 #   de nachtstand gaat na 20 s vanzelf weer uit.
@@ -218,7 +220,7 @@ touchscreen:
           - lvgl.resume:
           - lvgl.widget.hide: qp
           - lvgl.page.show: p_nacht
-          - light.turn_on: {id: display_backlight, brightness: 6%}
+          - light.turn_on: {id: display_backlight, brightness: 15%}
         else:
           # in de nachtstand: volgende tik = gewone scherm, 's nachts omgedraaid en gedimd (35%)
           - if:
@@ -370,7 +372,7 @@ substitutions:
   ic_windy: "\U000F059D"
   ic_hail: "\U000F0592"
   ha_url: "http://192.168.1.100:8123"
-  c_night: "0x5A2016"    # klok in de nachtstand (donkerrood)
+  c_night: "0x9A3422"    # klok in de nachtstand (gedempt rood; donkerder was onzichtbaar)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"
   ic_snooze: "\U000F068E"
@@ -1435,7 +1437,7 @@ lvgl:
                 on_click:
                   - lvgl.widget.hide: qp
                   - lvgl.page.show: p_nacht
-                  - light.turn_on: {id: display_backlight, brightness: 6%}
+                  - light.turn_on: {id: display_backlight, brightness: 15%}
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_night}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "NACHTSTAND"}
@@ -2583,7 +2585,7 @@ lvgl:
                   styles: st_tile
                   on_click:
                     - lvgl.page.show: p_nacht
-                    - light.turn_on: {id: display_backlight, brightness: 6%}
+                    - light.turn_on: {id: display_backlight, brightness: 15%}
                   widgets:
                     - obj:
                         x: 0
