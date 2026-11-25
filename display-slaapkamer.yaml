@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.17 (25-11-2026): knop BEDTIJD op Thuis (onder LICHT UIT): lampen badkamer,
+#   hal, toilet, overloop, zolderoverloop en studio uit, e-deken uit, thermostaat
+#   woonkamer op 15 °C (script.bedtijd in HA). Korte bevestiging onder het weer.
 #   Versie 0.16 (25-11-2026): eenmalige use_address: display-test.local weggehaald
 #   (het display heeft de nieuwe naam display-slaapkamer).
 #   Versie 0.15 (25-11-2026): FAVORIETEN (08): radio en playlists uit Music
@@ -72,7 +75,8 @@
 #   dan 68 px omlaag. Niet op Nu speelt en niet in de nachtstand.
 # Hoes: entity_picture_local van de speler via HA (online_image, AUTO-formaat);
 #   lukt het downloaden niet, dan blijft de abstracte hoes staan.
-# Thuis: datum, grote klok, weer + regen in één regel, vier tegels:
+# Thuis: datum, grote klok, LICHT UIT (slaapkamer) en BEDTIJD (rest van het huis uit,
+#   thermostaat 15 °C), weer + regen in één regel, vier tegels:
 #   Licht (aantal aan), Sfeer (laatste keuze), Wekker (tijd of Uit), Weer.
 # Licht: slaapkamer: Alles, Plafond en Ledstrip: schakelaar = aan/uit, balk = helderheid
 #   (slepen en loslaten), ALLES AAN / ALLES UIT.
@@ -122,6 +126,7 @@
 #   input_boolean.wekker_slaapkamer_muziek_hervatten, input_number.wekker_slaapkamer_oud_volume,
 #   input_text.wekker_slaapkamer_speaker (nu media_player.yamaha_living_2),
 #   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
+#   script.bedtijd (knop BEDTIJD),
 #   light.slaapkamer_jeroen_maartje (zonsopgang), script.intercom_zend,
 #   /config/www/robobooz/wekker_zoemer.mp3, wekker_klassiek.mp3,
 #   wekker_alarm.mp3, wekker_rustig.mp3.
@@ -2033,6 +2038,31 @@ lvgl:
                   widgets:
                     - label: {align: CENTER, y: -9, text: "${ic_power}", text_font: f_ic22}
                     - label: {align: CENTER, y: 16, styles: st_mono11, text: "LICHT UIT"}
+              # BEDTIJD: rest van het huis uit en de thermostaat op 15 (script.bedtijd in HA)
+              - button:
+                  x: 380
+                  y: 106
+                  width: 80
+                  height: 80
+                  radius: 40
+                  bg_color: ${c_blue}
+                  bg_opa: COVER
+                  text_color: ${c_paper}
+                  pressed:
+                    bg_color: ${c_ink}
+                  on_click:
+                    - homeassistant.action:
+                        action: script.turn_on
+                        data:
+                          entity_id: script.bedtijd
+                    - lvgl.label.update: {id: h_ok, text: "BEDTIJD: HUIS UIT · THERMOSTAAT 15°"}
+                    - lvgl.widget.show: h_ok
+                    - delay: 6s
+                    - lvgl.widget.hide: h_ok
+                  widgets:
+                    - label: {align: CENTER, y: -9, text: "${ic_sleep}", text_font: f_ic22}
+                    - label: {align: CENTER, y: 16, styles: st_mono11, text: "BEDTIJD"}
+              - label: {id: h_ok, x: 24, y: 214, width: 432, styles: st_mono11, text_color: "${c_blue}", text: "", hidden: true}
               - label:
                   id: h_clock
                   x: 18
