@@ -5,6 +5,8 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
 #   nog van de woonkamer).
+#   Versie 0.3 (25-11-2026): spelerbalk hoger (68 px, hoes 68x68) zodat titel en
+#   artiest niet meer wegvallen; wekkerpagina 4 px opgeschoven.
 #   Versie 0.2 (25-11-2026): spelerbalk bovenin met echte hoes, hoes op
 #   Nu speelt, nieuw menu, WEKKER (+ wekkergeluid, afgaan-scherm), DIM-paneel
 #   (lampen aan/dimmen/uit, scherm helder/nachtstand/donker, avondstand),
@@ -19,9 +21,9 @@
 #   MENU / DIM (zwart = waar je bent). DIM opent het paneel LICHT & SCHERM:
 #   lampen AAN / DIMMEN (20%) / UIT, scherm HELDER / NACHTSTAND / DONKER en
 #   AVONDSTAND aan/uit (de hele kleurenset omgedraaid via het scherm zelf).
-# Spelerbalk: bovenin (56 px) zolang de woonkamer speelt of gepauzeerd is:
+# Spelerbalk: bovenin (68 px) zolang de woonkamer speelt of gepauzeerd is:
 #   hoes, titel (tik = Nu speelt), pauze, volume - en +. De schermen schuiven
-#   dan 56 px omlaag. Niet op Nu speelt en niet in de nachtstand.
+#   dan 68 px omlaag. Niet op Nu speelt en niet in de nachtstand.
 # Hoes: entity_picture_local van de speler via HA (online_image, AUTO-formaat);
 #   lukt het downloaden niet, dan blijft de abstracte hoes staan.
 # Thuis: datum, grote klok, weer + regen in één regel, vier tegels:
@@ -270,7 +272,7 @@ image:
     url: "http://192.168.1.100:8123/local/robobooz/commercial_break_200x200bb.jpg"
     format: AUTO
     type: RGB565
-    resize: 56x56
+    resize: 68x68
     on_download_finished:
       - lvgl.image.update: {id: mi_cover, src: cov_mini}
       - lvgl.widget.show: mi_cover
@@ -685,7 +687,7 @@ script:
           if (muziek) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           else lv_obj_add_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid)};
-          for (auto *o : pg) lv_obj_set_y(o, muziek ? 56 : 0);
+          for (auto *o : pg) lv_obj_set_y(o, muziek ? 68 : 0);
 
   # avondstand: het scherm zelf keert alle kleuren om (ST7701S INVON 0x21 / INVOFF 0x20)
   - id: avond_apply
@@ -1144,13 +1146,13 @@ lvgl:
   #      onderbalk (y 416) en het wekkerscherm (alles bedekkend)
   top_layer:
     widgets:
-      # ======== spelerbalk bovenin (56 px)
+      # ======== spelerbalk bovenin (68 px)
       - obj:
           id: mini
           x: 0
           y: 0
           width: 480
-          height: 56
+          height: 68
           bg_color: ${c_ink}
           bg_opa: COVER
           text_color: ${c_paper}
@@ -1160,46 +1162,46 @@ lvgl:
             - obj:
                 x: 0
                 y: 0
-                width: 276
-                height: 56
+                width: 284
+                height: 68
                 on_click:
                   - lvgl.page.show: p_muziek
                 widgets:
                   - obj:
                       x: 0
                       y: 0
-                      width: 56
-                      height: 56
+                      width: 68
+                      height: 68
                       styles: st_deco
                       bg_color: ${c_blue}
                       clickable: false
                       widgets:
-                        - obj: {x: 22, y: -8, width: 40, height: 40, radius: 20, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                        - obj: {x: 0, y: 38, width: 56, height: 18, styles: st_deco, bg_color: "${c_paper}", clickable: false}
-                  - image: {id: mi_cover, x: 0, y: 0, width: 56, height: 56, src: cov_mini, hidden: true, clickable: false}
+                        - obj: {x: 28, y: -10, width: 50, height: 50, radius: 25, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                        - obj: {x: 0, y: 46, width: 68, height: 22, styles: st_deco, bg_color: "${c_paper}", clickable: false}
+                  - image: {id: mi_cover, x: 0, y: 0, width: 68, height: 68, src: cov_mini, hidden: true, clickable: false}
                   - label:
                       id: mi_title
-                      x: 68
-                      y: 9
-                      width: 204
+                      x: 80
+                      y: 13
+                      width: 200
                       long_mode: DOT
                       text_font: f_15
                       text: "Woonkamer"
                   - label:
                       id: mi_sub
-                      x: 68
-                      y: 32
-                      width: 204
+                      x: 80
+                      y: 40
+                      width: 200
                       long_mode: DOT
                       styles: st_mono11
                       text_color: ${c_grey}
                       text: "WOONKAMER"
             - button:
-                x: 284
-                y: 8
-                width: 40
-                height: 40
-                radius: 20
+                x: 288
+                y: 12
+                width: 44
+                height: 44
+                radius: 22
                 bg_color: ${c_red}
                 bg_opa: COVER
                 pressed:
@@ -1209,10 +1211,10 @@ lvgl:
                 widgets:
                   - label: {id: mi_play_i, align: CENTER, text: "${ic_pause}", text_font: f_ic22, text_color: "${c_ink}"}
             - button:
-                x: 336
-                y: 8
+                x: 340
+                y: 12
                 width: 40
-                height: 40
+                height: 44
                 bg_opa: TRANSP
                 border_width: 1
                 border_color: ${c_dline}
@@ -1224,19 +1226,19 @@ lvgl:
                   - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22, text_color: "${c_paper}"}
             - label:
                 id: mi_vol
-                x: 380
-                y: 12
+                x: 382
+                y: 18
                 width: 44
                 text_align: CENTER
                 text_font: f_m12
                 text: "–"
-            - obj: {x: 382, y: 33, width: 40, height: 3, styles: st_deco, bg_color: "${c_dline}", clickable: false}
-            - obj: {id: mi_volbar, x: 382, y: 33, width: 14, height: 3, styles: st_deco, bg_color: "${c_red}", clickable: false}
+            - obj: {x: 384, y: 40, width: 40, height: 3, styles: st_deco, bg_color: "${c_dline}", clickable: false}
+            - obj: {id: mi_volbar, x: 384, y: 40, width: 14, height: 3, styles: st_deco, bg_color: "${c_red}", clickable: false}
             - button:
                 x: 428
-                y: 8
+                y: 12
                 width: 40
-                height: 40
+                height: 44
                 bg_opa: TRANSP
                 border_width: 1
                 border_color: ${c_dline}
@@ -1565,7 +1567,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 0}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_home
             x: 0
@@ -1657,7 +1659,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 1}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_licht
             x: 0
@@ -1807,7 +1809,7 @@ lvgl:
         - script.execute: {id: nav_mark, p: 2}
         - script.execute: sf_mark
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_sfeer
             x: 0
@@ -2159,7 +2161,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 4}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_klimaat
             x: 0
@@ -2220,7 +2222,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 5}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_weer
             x: 0
@@ -2323,7 +2325,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 6}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_menu
             x: 0
@@ -2511,7 +2513,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 7}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_wekker
             x: 0
@@ -2554,7 +2556,7 @@ lvgl:
                           entity_id: input_boolean.wekker_slaapkamer_aan
               - button:
                   x: 24
-                  y: 164
+                  y: 162
                   width: 102
                   height: 44
                   styles: st_outline
@@ -2564,7 +2566,7 @@ lvgl:
                     - label: {align: CENTER, styles: st_mono12, text: "- UUR"}
               - button:
                   x: 134
-                  y: 164
+                  y: 162
                   width: 102
                   height: 44
                   styles: st_outline
@@ -2574,7 +2576,7 @@ lvgl:
                     - label: {align: CENTER, styles: st_mono12, text: "+ UUR"}
               - button:
                   x: 244
-                  y: 164
+                  y: 162
                   width: 102
                   height: 44
                   styles: st_outline
@@ -2584,7 +2586,7 @@ lvgl:
                     - label: {align: CENTER, styles: st_mono12, text: "- 5 MIN"}
               - button:
                   x: 354
-                  y: 164
+                  y: 162
                   width: 102
                   height: 44
                   styles: st_outline
@@ -2595,7 +2597,7 @@ lvgl:
               - button:
                   id: wk_d0
                   x: 24
-                  y: 216
+                  y: 212
                   width: 138
                   height: 40
                   styles: st_tile
@@ -2606,7 +2608,7 @@ lvgl:
               - button:
                   id: wk_d1
                   x: 171
-                  y: 216
+                  y: 212
                   width: 138
                   height: 40
                   styles: st_tile
@@ -2617,7 +2619,7 @@ lvgl:
               - button:
                   id: wk_d2
                   x: 318
-                  y: 216
+                  y: 212
                   width: 138
                   height: 40
                   styles: st_tile
@@ -2627,7 +2629,7 @@ lvgl:
                     - label: {align: CENTER, styles: st_mono12, text: "WEEKEND"}
               - button:
                   x: 24
-                  y: 264
+                  y: 260
                   width: 432
                   height: 40
                   styles: st_tile
@@ -2640,7 +2642,7 @@ lvgl:
                     - label: {align: RIGHT_MID, x: -10, text: "${ic_chev}", text_font: f_ic22}
               - obj:
                   x: 24
-                  y: 312
+                  y: 308
                   width: 432
                   height: 40
                   styles: st_tile
@@ -2680,7 +2682,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 8}
       widgets:
-        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        # inhoud schuift 68 px omlaag zolang de spelerbalk bovenin staat
         - obj:
             id: pg_wgeluid
             x: 0
