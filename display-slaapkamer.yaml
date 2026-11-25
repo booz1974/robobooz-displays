@@ -7,7 +7,8 @@
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
 #   Versie 0.26 (25-11-2026): camerabeeld voordeur zoals op de woonkamer: HA verkleint het
-#   beeld (width/height), elke keer een nieuw adres (t=), vaste buffer van 64 KB, niet
+#   beeld tot 480x360 (4:3, zelfde maat als de woonkamer; 480x270 gaf strepen), op het
+#   scherm 360x270, elke keer een nieuw adres (t=), vaste buffer van 64 KB, niet
 #   twee tegelijk ophalen en geheugen vrijgeven bij het sluiten (was gestreept en oud).
 #   Versie 0.25 (25-11-2026): vormen op Thuis wisselen meer in grootte en mogen over de
 #   rand van het scherm (cirkel 100-420 px, kwartcirkel 60-260 px); er blijft altijd een
@@ -453,7 +454,7 @@ image:
     url: "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"
     format: JPEG
     type: RGB565
-    resize: 480x270
+    resize: 480x360          # zelfde maat als HA levert (4:3); anders schuiven de regels = strepen
     buffer_size: 65536
     update_interval: never
     on_download_finished:
@@ -947,7 +948,7 @@ interval:
 
 # ---------------------------------------------------------------- scripts
 script:
-  # ---- deurbel: vers camerabeeld ophalen, door HA verkleind tot 480x270
+  # ---- deurbel: vers camerabeeld ophalen, door HA verkleind tot 480x360
   - id: deur_fetch
     then:
       - lambda: |-
@@ -955,7 +956,7 @@ script:
           std::string pic = id(cam_pic).state;
           if (pic.size() < 5 || pic[0] != '/') return;
           std::string u = std::string("${ha_url}") + pic;
-          u += std::string(u.find('?') == std::string::npos ? "?" : "&") + "width=480&height=270&t=" + to_string(millis());
+          u += std::string(u.find('?') == std::string::npos ? "?" : "&") + "width=480&height=360&t=" + to_string(millis());
           id(cam_img)->set_url(u);
           id(deur_busy) = true;
           id(deur_t0) = millis();
@@ -3802,7 +3803,8 @@ lvgl:
             clickable: false
             widgets:
               - label: {align: CENTER, styles: st_mono12, text_color: 0xC9CED8, text: "CAMERABEELD LADEN..."}
-        - image: {id: dr_img, x: 0, y: 0, src: cam_img, hidden: true, clickable: false}
+        # 480x360 verkleind tot 360x270 (midden in het camerablok)
+        - image: {id: dr_img, x: 0, y: -45, src: cam_img, scale: 0.75, hidden: true, clickable: false}
         - obj: {x: 24, y: 24, width: 10, height: 10, radius: 5, styles: st_deco, bg_color: "${c_red}", clickable: false}
         - label: {x: 42, y: 21, styles: st_mono11, text_color: "${c_papert}", text: "LIVE · VOORDEUR"}
         - label: {id: dr_now, x: 376, y: 21, width: 80, text_align: RIGHT, styles: st_mono11, text_color: "${c_papert}", text: "--:--"}
