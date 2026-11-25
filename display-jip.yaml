@@ -9,8 +9,12 @@
 #           Home Assistant | Thema
 #           (+ verborgen: NIET STOREN, Wachtrij, Deurbel, Goedemorgen, Intercom,
 #            Wekker en het afgaan-scherm van de wekker)
-# Laatste wijziging (25-11-2026): WEKKER, zoals op display-test maar in RACE-stijl.
+# Laatste wijziging (25-11-2026): WEKKER, zoals op display-slaapkamer maar in RACE-stijl.
 #   Thuis heeft nu 6 knoppen (Wekker erbij, met de wekkertijd als hij aan staat).
+#   Na review tester/ontwikkelaar: HA-verbinding elke 3 s via is_connected(true)
+#   (de logviewer telt niet mee), afgaan-scherm alleen met HA (anders terug naar
+#   Thuis), dimmen loopt weer na een STOP op afstand, AAN/UIT wordt STOP tijdens
+#   sluimeren, knoppen roepen script.wekker_jip_afgaan / _sluimer / _stop aan.
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
 # Thuis: tik op het klokvak = alle lampen van Jip aan/uit; tijd, datum,
@@ -28,8 +32,11 @@
 #   5 min, standaard 5) en STOP; ook vanuit nachtstand en NIET STOREN. Zolang hij
 #   afgaat wisselt het scherm niet vanzelf en dimt het niet. Volume begint op 50%
 #   (Alarm 100%) en gaat langzaam naar 100%; muziek die al speelde gaat na STOP
-#   verder. Geluid op de kijkpaal. Alles in HA: gedeelde scripts
-#   script.wekker_afgaan / _stop / _sluimer met kamer: jip en automation.wekker_jip.
+#   verder. Geluid op de kijkpaal. Alles in HA: script.wekker_jip_afgaan / _sluimer /
+#   _stop (mode single: dubbel tikken telt één keer) geven door aan de gedeelde
+#   script.wekker_afgaan / _sluimer / _stop met kamer: jip; automation.wekker_jip;
+#   automation.wekker_na_herstart_opruimen ruimt op na een HA-herstart.
+#   Tijdens sluimeren: AAN/UIT-knop wordt STOP (sluimeren afbreken).
 #   Nachtstand: gedimd "Wekker gaat 07:00" (alleen als hij binnen 24 uur gaat)
 #   of "Sluimert tot 07:05". Het display maakt zelf geen geluid: zonder HA geen wekker.
 # Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
@@ -101,7 +108,10 @@
 #   input_text.ochtend_agenda_display, sensor.neerslag_buienradar_regen_data,
 #   wekker: input_datetime.wekker_jip_tijd, input_boolean.wekker_jip_aan / _lampen /
 #   _gaat_af, input_select.wekker_jip_dagen / _geluid, input_number.wekker_jip_sluimertijd,
-#   input_text.wekker_jip_sluimert_tot, script.wekker_afgaan / _stop / _sluimer,
+#   input_text.wekker_jip_sluimert_tot / _speaker, input_boolean.wekker_jip_muziek_hervatten,
+#   input_number.wekker_jip_oud_volume, script.wekker_jip_afgaan / _sluimer / _stop,
+#   script.wekker_afgaan / _stop / _sluimer, automation.wekker_jip,
+#   automation.wekker_na_herstart_opruimen,
 #   System Monitor-sensoren, script.lampen_random_kleuren en
 #   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3, intro_12.mp3, advert-hoes).
 # Ook gebruikt in HA: sensor.dle3a27053_pv_output_actual en
@@ -195,19 +205,8 @@ logger:
 api:
   encryption:
     key: !secret plate03_api_key
-  # wekker: verbinding met HA tonen; een wekkertijd die niet aankwam alsnog sturen
-  on_client_connected:
-    - lambda: 'id(wkj_ha) = true;'
-    - script.execute: wkj_render
-    - if:
-        condition:
-          lambda: 'return id(wkj_dirty);'
-        then:
-          - delay: 3s
-          - script.execute: wkj_send
-  on_client_disconnected:
-    - lambda: 'id(wkj_ha) = false;'
-    - script.execute: wkj_render
+  # wekker: verbinding met HA via 'interval' (3 s, is_connected(true)). Niet via
+  # on_client_connected/disconnected: ook de logviewer van ESPHome is een client.
 
 ota:
   - platform: esphome
@@ -1704,6 +1703,7 @@ script:
           bool ha = id(wkj_ha);
           bool bekend = ha && id(wkj_aan).has_state();
           bool aan = bekend && id(wkj_aan).state;
+          bool aan_laatst = id(wkj_aan).has_state() && id(wkj_aan).state;   // ook als HA even weg is
           std::string sl = id(wkj_sltot).has_state() ? id(wkj_sltot).state : std::string("");
           if (sl == "unknown" || sl == "unavailable") sl = "";
           std::string dg = id(wkj_dagen).has_state() ? id(wkj_dagen).state : std::string("");
@@ -1713,9 +1713,11 @@ script:
           // tijd en AAN/UIT
           lv_label_set_text(id(wk_big), t);
           lv_obj_set_style_text_color(id(wk_big), lv_color_hex(aan ? c[3] : c[4]), 0);
-          lv_label_set_text(id(wk_badge_lbl), !bekend ? "?" : (aan ? "AAN" : "UIT"));
-          lv_obj_set_style_bg_color(id(wk_badge), lv_color_hex(aan ? c[2] : c[4]), 0);
-          lv_obj_set_style_text_color(id(wk_badge_lbl), lv_color_hex(aan ? c[5] : 0xFFFFFE), 0);
+          // tijdens sluimeren wordt de badge STOP (sluimeren afbreken)
+          bool slm = ha && !sl.empty();
+          lv_label_set_text(id(wk_badge_lbl), slm ? "STOP" : (!bekend ? "?" : (aan ? "AAN" : "UIT")));
+          lv_obj_set_style_bg_color(id(wk_badge), lv_color_hex(slm ? 0xD9534F : (aan ? c[2] : c[4])), 0);
+          lv_obj_set_style_text_color(id(wk_badge_lbl), lv_color_hex(!slm && aan ? c[5] : 0xFFFFFE), 0);
           // statusregel
           std::string info = !ha ? std::string("Geen verbinding met HA") :
                              (!sl.empty() ? "Sluimert tot " + sl :
@@ -1751,11 +1753,11 @@ script:
           lv_obj_set_style_bg_color(id(wk_lamp_btn), lv_color_hex(lamp ? c[2] : c[1]), 0);
           lv_label_set_text(id(wk_lamp_lbl), lamp ? "LICHT MEE: AAN" : "LICHT MEE: UIT");
           // Thuis-knop: wekkertijd als hij aan staat
-          lv_label_set_text(id(r_wk_btn_lbl), !sl.empty() ? "SLUIMER" : (aan ? t : "WEKKER"));
+          lv_label_set_text(id(r_wk_btn_lbl), !sl.empty() ? "SLUIMER" : (aan_laatst ? t : "WEKKER"));
           // nachtscherm: gedimd "Wekker gaat 07:00" (alleen als hij binnen 24 uur gaat) of "Sluimert tot 07:05"
           std::string nl;
           if (!sl.empty()) nl = "Sluimert tot " + sl;
-          else if (aan) {
+          else if (aan_laatst) {
             auto n = id(system_time).now();
             if (n.is_valid()) {
               int nu = n.hour * 60 + n.minute;
@@ -1765,7 +1767,7 @@ script:
               if (gaat) nl = std::string("Wekker gaat ") + t;
             }
           }
-          if (!ha && (aan || !sl.empty())) nl += nl.empty() ? "Geen verbinding met HA" : " · geen verbinding met HA";
+          if (!ha && (aan_laatst || !sl.empty())) nl += nl.empty() ? "Geen verbinding met HA" : " · geen verbinding met HA";
           lv_label_set_text(id(nt_wekker), nl.c_str());
   - id: wkj_step
     parameters:
@@ -1791,7 +1793,7 @@ script:
                   entity_id: input_datetime.wekker_jip_tijd
                   time: !lambda 'char b[12]; snprintf(b, sizeof(b), "%02d:%02d:00", id(wkj_min) / 60, id(wkj_min) % 60); return std::string(b);'
             - delay: 3s
-            - lambda: 'id(wkj_dirty) = false;'
+            - lambda: 'if (id(wkj_ha)) id(wkj_dirty) = false;   // HA intussen weg: later opnieuw'
           # HA weg: onthouden en sturen zodra de verbinding terug is (api: on_client_connected)
       - script.execute: wkj_render
   - id: wkj_pick
@@ -3932,7 +3934,7 @@ script:
           id(cam_img)->release();
       - if:
           condition:
-            lambda: 'return id(wkj_af).state;'
+            lambda: 'return id(wkj_af).state && id(wkj_ha);'
           then:
             - lvgl.page.show:
                 id: page_wekker_af
@@ -4579,6 +4581,20 @@ script:
             return txt;
 
 interval:
+  # wekker: elke 3 s, is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
+  - interval: 3s
+    then:
+      - lambda: |-
+          bool nu = esphome::api::global_api_server != nullptr &&
+                    esphome::api::global_api_server->is_connected(true);
+          if (nu == id(wkj_ha)) return;
+          id(wkj_ha) = nu;
+          id(wkj_render).execute();
+          // een wekkertijd die niet aankwam (HA was weg) alsnog sturen
+          if (nu && id(wkj_dirty)) id(wkj_send).execute();
+          // HA weg terwijl de wekker afging: STOP werkt dan niet, dus terug naar Thuis
+          if (!nu && id(page_wekker_af)->is_showing())
+            id(lvgl_main)->show_page(id(page_rhome)->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 300);
   # @zon-begin
   # zonnestroom: bolletjes over de lijnen laten lopen (sneller bij meer vermogen)
   - interval: 50ms
@@ -4738,7 +4754,7 @@ interval:
             if (!pg->is_showing()) id(lvgl_main)->show_page(pg->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 300);
           };
           // de wekker gaat af: na 30 s niets aanraken altijd terug naar het afgaan-scherm, verder niets wisselen
-          if (id(wkj_af).state) { show(id(page_wekker_af)); return; }
+          if (id(wkj_af).state && id(wkj_ha)) { show(id(page_wekker_af)); return; }
           // kijkpaal speelt: na 30 s niets aanraken naar Nu speelt (scherm sliep: weer aan op 35%,
           // maar niet tussen 23:00 en 07:00: dan blijft een slapend scherm uit)
           if (kijkpaal_speelt && !id(onair).state) {
@@ -4972,6 +4988,8 @@ binary_sensor:
     internal: true
     trigger_on_initial_state: true
     on_state:
+      # dim-timers opnieuw laten tellen (anders blijft het scherm na een STOP op afstand fel)
+      - lambda: 'lv_display_trigger_activity(nullptr);'
       - if:
           condition:
             lambda: 'return x;'
@@ -5731,7 +5749,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !id(wkj_af).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !(id(wkj_af).state && id(wkj_ha));'
             then:
               - light.turn_on:
                   id: display_backlight
@@ -5740,7 +5758,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !id(wkj_af).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !(id(wkj_af).state && id(wkj_ha));'
             then:
               - light.turn_on:
                   id: display_backlight
@@ -5749,7 +5767,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(mp_any) && !id(bell_active) && !id(onair).state && !id(wkj_af).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(mp_any) && !id(bell_active) && !id(onair).state && !(id(wkj_af).state && id(wkj_ha));'
             then:
               - lvgl.page.show:
                   id: page_nacht
@@ -12633,10 +12651,23 @@ lvgl:
                   text_font: pl_t30
                   text_color: 0xFFFFFE
             on_click:
-              - homeassistant.action:
-                  action: input_boolean.toggle
-                  data:
-                    entity_id: input_boolean.wekker_jip_aan
+              - if:
+                  condition:
+                    lambda: |-
+                      if (!id(wkj_sltot).has_state()) return false;
+                      const std::string &v = id(wkj_sltot).state;
+                      return !v.empty() && v != "unknown" && v != "unavailable";
+                  # sluimert: tik = sluimeren stoppen
+                  then:
+                    - homeassistant.action:
+                        action: script.turn_on
+                        data:
+                          entity_id: script.wekker_jip_stop
+                  else:
+                    - homeassistant.action:
+                        action: input_boolean.toggle
+                        data:
+                          entity_id: input_boolean.wekker_jip_aan
         # wekkertijd groot
         - obj:
             x: 12
@@ -12654,14 +12685,14 @@ lvgl:
             widgets:
               - label:
                   x: 16
-                  y: 12
+                  y: 8
                   text: "WEKKERTIJD"
                   text_font: r_mono
                   text_color: 0x8B9099
               - label:
                   id: wk_big
                   align: CENTER
-                  y: 6
+                  y: 12
                   text: "07:00"
                   text_font: r_clock
                   text_color: ${c_text}
@@ -12832,9 +12863,9 @@ lvgl:
               - label: {align: LEFT_MID, x: 48, text: "PROBEER NU", text_font: r_mono, text_color: 0x46201A}
             on_click:
               - homeassistant.action:
-                  action: script.wekker_afgaan
+                  action: script.turn_on
                   data:
-                    kamer: jip
+                    entity_id: script.wekker_jip_afgaan
         # keuzevenster: wekkergeluid (tik ernaast = annuleren)
         - obj:
             id: wk_keuze
@@ -12925,7 +12956,7 @@ lvgl:
                         shadow_width: 0
                         border_width: 0
                         widgets:
-                          - label: {id: wg_n3, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Klassieke wekker", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_n3, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Klassiek", text_font: pl_t16, text_color: 0x2B2F36}
                           - label: {id: wg_s3, align: CENTER, y: 16, text: "TRING TRING", text_font: r_mono, text_color: 0x8B9099}
                         on_click:
                           - script.execute: {id: wkj_pick, i: 3}
@@ -13053,14 +13084,14 @@ lvgl:
         - label:
             id: wa_clock
             align: TOP_MID
-            y: 52
+            y: 44
             text: "--:--"
             text_font: pl_big
             text_color: ${c_text}
         - label:
             id: wa_geluid
             align: TOP_MID
-            y: 196
+            y: 202
             text: ""
             text_font: pl_t20
             text_color: ${c_sub}
@@ -13101,9 +13132,9 @@ lvgl:
               - label: {id: wa_sl_lbl, align: CENTER, y: 24, text: "Sluimer 5 min", text_font: pl_t24, text_color: 0x2B2F36}
             on_click:
               - homeassistant.action:
-                  action: script.wekker_sluimer
+                  action: script.turn_on
                   data:
-                    kamer: jip
+                    entity_id: script.wekker_jip_sluimer
         - button:
             x: 376
             y: 236
@@ -13140,9 +13171,9 @@ lvgl:
               - label: {align: CENTER, x: 40, text: "STOP", text_font: r_title, text_color: 0xFFFFFE}
             on_click:
               - homeassistant.action:
-                  action: script.wekker_stop
+                  action: script.turn_on
                   data:
-                    kamer: jip
+                    entity_id: script.wekker_jip_stop
     - id: page_favs
       # @nav-boven
       styles: pl_page
@@ -16930,6 +16961,7 @@ lvgl:
       bg_opa: COVER
       on_load:
         - script.execute: am_clock
+        - script.execute: wkj_render
         - light.turn_on:
             id: display_backlight
             brightness: 12%
