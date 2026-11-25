@@ -11,7 +11,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
 | `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
 | `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
-| `display-test.yaml` | Testpaneel | **Nieuwe stijl "Raster & Cirkel"** (stap 1): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis, Licht, Sfeer, Nu speelt, Klimaat, Weer en Menu, vaste onderbalk en zwarte spelerbalk met volume. Entiteiten van de woonkamer, geen Music Assistant-token nodig. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
+| `display-test.yaml` | Testpaneel (straks slaapkamer) | **Nieuwe stijl "Raster & Cirkel"** (v0.2): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis, Licht, Sfeer, Nu speelt (met hoes), Klimaat, Weer, **Wekker** (+ wekkergeluid, afgaan-scherm met SLUIMER/STOP), Nachtstand en Menu. Spelerbalk bovenin met hoes en volume, onderbalk met **DIM**-paneel (lampen aan/dimmen/uit, scherm helder/nachtstand/donker, **avondstand** = kleuren omgedraaid). Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
 
 ## Functies
 
@@ -94,6 +94,11 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Speler: `media_player.yamaha_living_2` (titel, artiest, album, volume via HA)
 - Klimaat: `climate.living_room`
 - Weer: `weather.de_scholekster`, `input_text.weer_uren_display`, `sensor.neerslag_buienradar_regen_data`
+
+**Wekker (display test)**
+- Helpers: `input_datetime.wekker_slaapkamer_tijd`, `input_boolean.wekker_slaapkamer_aan`, `input_boolean.wekker_slaapkamer_lampen`, `input_boolean.wekker_slaapkamer_gaat_af`, `input_select.wekker_slaapkamer_dagen` (Werkdagen / Elke dag / Weekend), `input_select.wekker_slaapkamer_geluid`, `input_text.wekker_slaapkamer_speaker`
+- Scripts en automatisering: `script.wekker_slaapkamer_afgaan`, `script.wekker_slaapkamer_stop`, `script.wekker_slaapkamer_sluimer`, `automation.wekker_slaapkamer`; Fluisterwekker en Wekkerbrigade via `script.intercom_zend` (kanaal 12 en 9)
+- Geluiden in `www/robobooz/`: `wekker_zoemer.mp3`, `wekker_klassiek.mp3`, `wekker_alarm.mp3`, `wekker_rustig.mp3`; zonsopgang op `light.slaapkamer_jeroen_maartje`
 
 **Optioneel**: Team Tracker-sensoren voor NEC/Oranje en een agenda voor NMHC (automatisch wedstrijdthema).
 

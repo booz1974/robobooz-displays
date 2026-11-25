@@ -2,36 +2,52 @@
 # ROBOBOOZ - RASTER & CIRKEL (nieuwe stijl) voor ESPHome / LVGL
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
-# display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel
-#   Versie 0.1 (25-11-2026): stap 1 van de nieuwe stijl uit de mockups
-#   "Woonkamer display – nieuwe stijl". Gebruikt de entiteiten van de woonkamer.
+# display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
+#   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
+#   nog van de woonkamer).
+#   Versie 0.2 (25-11-2026): spelerbalk bovenin met echte hoes, hoes op
+#   Nu speelt, nieuw menu, WEKKER (+ wekkergeluid, afgaan-scherm), DIM-paneel
+#   (lampen aan/dimmen/uit, scherm helder/nachtstand/donker, avondstand),
+#   nachtstand-scherm en avondstand (alle kleuren omgedraaid).
+#   Versie 0.1 (25-11-2026): stap 1 van de mockups "Woonkamer display – nieuwe stijl".
 # Stijl: warm papierwit, zwarte strakke letters (Inter Tight), kleine labels in
 #   typemachineletter (IBM Plex Mono), vlakken en cirkels in vermiljoen en
 #   ultramarijn. Elk scherm: nummer + titel linksboven, tijd rechtsboven.
 # Pagina's: Thuis | 01 Licht | 02 Sfeer | 03 Nu speelt | 05 Klimaat | 06 Weer |
-#   00 Menu. Overige schermen uit de mockups volgen in latere stappen.
-# Navigatie: onderbalk THUIS / LICHT / MUZIEK / MENU op elk scherm
-#   (zwart = waar je bent). Alles in hoogstens twee tikken.
-# Spelerbalk: zwarte balk boven de onderbalk zolang de woonkamer speelt of
-#   gepauzeerd is: titel (tik = Nu speelt), pauze, volume - en +.
-#   Niet zichtbaar op Nu speelt zelf.
+#   07 Wekker | 08 Wekkergeluid | Nachtstand | 00 Menu.
+# Onderbalk (op elk scherm, behalve nachtstand): THUIS / WEKKER / MUZIEK /
+#   MENU / DIM (zwart = waar je bent). DIM opent het paneel LICHT & SCHERM:
+#   lampen AAN / DIMMEN (20%) / UIT, scherm HELDER / NACHTSTAND / DONKER en
+#   AVONDSTAND aan/uit (de hele kleurenset omgedraaid via het scherm zelf).
+# Spelerbalk: bovenin (56 px) zolang de woonkamer speelt of gepauzeerd is:
+#   hoes, titel (tik = Nu speelt), pauze, volume - en +. De schermen schuiven
+#   dan 56 px omlaag. Niet op Nu speelt en niet in de nachtstand.
+# Hoes: entity_picture_local van de speler via HA (online_image, AUTO-formaat);
+#   lukt het downloaden niet, dan blijft de abstracte hoes staan.
 # Thuis: datum, grote klok, weer + regen in één regel, vier tegels:
-#   Licht (aantal aan), Sfeer (laatste keuze), Klimaat (kamer), Weer (regen).
+#   Licht (aantal aan), Sfeer (laatste keuze), Wekker (tijd of Uit), Weer.
 # Licht: woonkamer, eettafel en keuken: schakelaar = aan/uit, balk = helderheid
 #   (slepen en loslaten), ALLES AAN / ALLES UIT.
 # Sfeer: 6 scènes, RANDOM KLEUREN (script.lampen_random_kleuren) en ALLES UIT.
-#   De laatste keuze wordt zwart.
-# Nu speelt: abstracte hoes, titel, artiest - album, vorige / pauze / volgende,
+# Nu speelt: hoes, titel, artiest - album, vorige / pauze / volgende,
 #   volume - en +. Speler: media_player.yamaha_living_2 (woonkamer).
 # Klimaat: kamertemperatuur, gewenste temperatuur -/+ (0,5 °C), verwarming
 #   aan/uit (climate.living_room).
 # Weer: temperatuur, omschrijving, wind (Bft) en vocht, regen komende 2 uur
 #   (12 balkjes van 10 min, Buienradar) en de komende 6 uur.
-# Menu: tegels naar alle schermen + NACHT (scherm uit; tik = weer aan).
+# Wekker: tijd -/+ uur en -/+ 5 min, aan/uit, WERKDAGEN / ELKE DAG / WEEKEND,
+#   geluid (aparte pagina) en zonsopgang-licht. Wekkergeluid: Fluisterwekker,
+#   Wekkerbrigade (ElevenLabs, zoals de intercom), Zoemer, Klassieke wekker,
+#   Alarm (mp3 in /config/www/robobooz/), Rustig wekken, Muziek (NPO Radio 2),
+#   Natuurgeluiden, Alleen licht; PROBEER NU laat hem meteen afgaan.
+#   Gaat hij af: volledig scherm met klok, SLUIMER 9 MIN en STOP.
+# Nachtstand: zwart, gedimde klok in donkerrood en de wekkertijd, scherm op 12%.
+#   Tik = terug naar Thuis.
 # Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
-#   na 30 min uit.
+#   na 30 min uit (niet in de nachtstand).
 # Hardware: touch met vaste kalibratie 0..479 (zoals Jip: de touchchip van dit
 #   paneel meldt 1024x600). Relais niet in gebruik en bewust niet ingesteld.
+#   Avondstand stuurt INVON/INVOFF (0x21/0x20) naar de ST7701S.
 # secrets.yaml: wifi_ssid, wifi_password, plate04_api_key,
 #   plate04_ota_password, plate04_ap_password (zie secrets.example.yaml).
 #
@@ -41,9 +57,17 @@
 #   scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel,
 #   scene.woonkamer_woonkamer_eettafel, scene.woonkamer_herfst_goud,
 #   scene.woonkamer_tafel, scene.woonkamer_concentreren, scene.woonkamer_fairfax,
-#   script.lampen_random_kleuren, media_player.yamaha_living_2,
+#   script.lampen_random_kleuren, media_player.yamaha_living_2 (+ entity_picture_local),
 #   climate.living_room, weather.de_scholekster,
 #   sensor.neerslag_buienradar_regen_data, input_text.weer_uren_display.
+# Wekker in HA: input_datetime.wekker_slaapkamer_tijd,
+#   input_boolean.wekker_slaapkamer_aan / _lampen / _gaat_af,
+#   input_select.wekker_slaapkamer_dagen / _geluid,
+#   input_text.wekker_slaapkamer_speaker (nu media_player.yamaha_living_2),
+#   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
+#   light.slaapkamer_jeroen_maartje (zonsopgang), script.intercom_zend,
+#   /config/www/robobooz/wekker_zoemer.mp3, wekker_klassiek.mp3,
+#   wekker_alarm.mp3, wekker_rustig.mp3.
 # =====================================================================
 
 esphome:
@@ -57,8 +81,9 @@ esphome:
       then:
         - script.execute: clock_render
         - script.execute: {id: nav_mark, p: 0}
+        - delay: 2s
+        - script.execute: avond_apply
 
-# grote LVGL-config: voorkomt "dangerous relocation: l32r" bij het linken
 external_components:
   - source:
       type: local
@@ -159,6 +184,12 @@ touchscreen:
             lv_indev_t *in = lv_indev_get_next(nullptr);
             if (in != nullptr) lv_indev_wait_release(in);
           }
+    # nachtstand: elke tik = terug naar Thuis
+    - if:
+        condition:
+          lambda: 'return id(cur_page) == 9;'
+        then:
+          - lvgl.page.show: p_home
     - lvgl.resume:
     - light.turn_on:
         id: display_backlight
@@ -214,6 +245,38 @@ time:
           - script.execute: clock_render
 
 # ---------------------------------------------------------------- kleuren en iconen
+
+# ---------------------------------------------------------------- hoes (album art)
+http_request:
+  timeout: 10s
+  verify_ssl: false
+
+image:
+  # grote hoes op Nu speelt (url wordt gezet zodra er een hoes is)
+  - platform: online_image
+    id: cov_big
+    url: "http://192.168.1.100:8123/local/robobooz/commercial_break_200x200bb.jpg"
+    format: AUTO
+    type: RGB565
+    resize: 176x176
+    on_download_finished:
+      - lvgl.image.update: {id: mu_cover, src: cov_big}
+      - lvgl.widget.show: mu_cover
+    on_error:
+      - lvgl.widget.hide: mu_cover
+  # kleine hoes in de spelerbalk
+  - platform: online_image
+    id: cov_mini
+    url: "http://192.168.1.100:8123/local/robobooz/commercial_break_200x200bb.jpg"
+    format: AUTO
+    type: RGB565
+    resize: 56x56
+    on_download_finished:
+      - lvgl.image.update: {id: mi_cover, src: cov_mini}
+      - lvgl.widget.show: mi_cover
+    on_error:
+      - lvgl.widget.hide: mi_cover
+
 substitutions:
   c_paper: "0xEEEBE4"    # papierwit (achtergrond)
   c_ink: "0x121212"      # zwart
@@ -255,18 +318,36 @@ substitutions:
   ic_lightning: "\U000F0593"
   ic_windy: "\U000F059D"
   ic_hail: "\U000F0592"
+  ha_url: "http://192.168.1.100:8123"
+  c_night: "0x7A2A1C"    # klok in de nachtstand (donkerrood)
+  ic_alarm: "\U000F0020"
+  ic_alarm_off: "\U000F0023"
+  ic_snooze: "\U000F068E"
+  ic_brightness: "\U000F00DF"
+  ic_sunrise: "\U000F059C"
+  ic_bell: "\U000F009A"
+  ic_close: "\U000F0156"
+  ic_dim: "\U000F1A52"
+  ic_chev: "\U000F0142"
+  ic_leaf: "\U000F032A"
+  ic_whisper: "\U000F05CB"
+  ic_speaker: "\U000F04C3"
+  ic_siren: "\U000F078F"
+  ic_invert: "\U000F0301"
+  ic_bird: "\U000F15C6"
+  ic_sleep: "\U000F04B2"
 
 font:
   - file: {type: gfonts, family: Inter Tight, weight: 600}
     id: f_clock
     size: 132
     bpp: 4
-    glyphs: "0123456789:"
+    glyphs: "0123456789:-"
   - file: {type: gfonts, family: Inter Tight, weight: 600}
     id: f_72
     size: 72
     bpp: 4
-    glyphs: "0123456789,-–°"
+    glyphs: "0123456789:,-–°Uit"
   - file: {type: gfonts, family: Inter Tight, weight: 600}
     id: f_44
     size: 44
@@ -328,6 +409,22 @@ font:
       - "${ic_lightning}"
       - "${ic_windy}"
       - "${ic_hail}"
+      - "${ic_alarm}"
+      - "${ic_alarm_off}"
+      - "${ic_snooze}"
+      - "${ic_brightness}"
+      - "${ic_sunrise}"
+      - "${ic_bell}"
+      - "${ic_close}"
+      - "${ic_dim}"
+      - "${ic_chev}"
+      - "${ic_leaf}"
+      - "${ic_whisper}"
+      - "${ic_speaker}"
+      - "${ic_siren}"
+      - "${ic_invert}"
+      - "${ic_bird}"
+      - "${ic_sleep}"
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: f_ic30
     size: 30
@@ -335,7 +432,7 @@ font:
     glyphs: *icons
 
 globals:
-  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 klimaat, 5 weer, 6 menu
+  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 klimaat, 5 weer, 6 menu, 7 wekker, 8 wekkergeluid, 9 nachtstand
     type: int
     initial_value: '0'
   - id: sf_idx          # laatste sfeerkeuze (-1 = nog niets)
@@ -345,8 +442,14 @@ globals:
   - id: vol_local       # volume 0..100 (direct bijgewerkt bij -/+)
     type: int
     initial_value: '-1'
+  - id: wk_min          # wekkertijd in minuten na middernacht (direct bijgewerkt bij -/+)
+    type: int
+    initial_value: '420'
+  - id: avond           # avondstand: kleuren omgedraaid
+    type: bool
+    restore_value: true
+    initial_value: 'false'
 
-# ---------------------------------------------------------------- gegevens uit Home Assistant
 text_sensor:
   - platform: homeassistant
     id: lt_s0
@@ -409,6 +512,69 @@ text_sensor:
     entity_id: climate.living_room
     internal: true
     on_value: {script.execute: cl_render}
+  # hoes van de speler (HA-proxy, lokaal)
+  - platform: homeassistant
+    id: mp_pic
+    entity_id: ${speler}
+    attribute: entity_picture_local
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x.size() > 5 && x[0] == ''/'';'
+          then:
+            - online_image.set_url:
+                id: cov_big
+                url: !lambda 'return std::string("${ha_url}") + x;'
+            - online_image.set_url:
+                id: cov_mini
+                url: !lambda 'return std::string("${ha_url}") + x;'
+          else:
+            - lvgl.widget.hide: [mu_cover, mi_cover]
+  # ---- wekker
+  - platform: homeassistant
+    id: wk_tijd
+    entity_id: input_datetime.wekker_slaapkamer_tijd
+    internal: true
+    on_value:
+      - lambda: |-
+          int h = 0, m = 0;
+          if (sscanf(x.c_str(), "%d:%d", &h, &m) == 2) id(wk_min) = h * 60 + m;
+      - script.execute: wk_render
+  - platform: homeassistant
+    id: wk_aan
+    entity_id: input_boolean.wekker_slaapkamer_aan
+    internal: true
+    on_value: {script.execute: wk_render}
+  - platform: homeassistant
+    id: wk_dagen
+    entity_id: input_select.wekker_slaapkamer_dagen
+    internal: true
+    on_value: {script.execute: wk_render}
+  - platform: homeassistant
+    id: wk_geluid
+    entity_id: input_select.wekker_slaapkamer_geluid
+    internal: true
+    on_value: {script.execute: wk_render}
+  - platform: homeassistant
+    id: wk_lampen
+    entity_id: input_boolean.wekker_slaapkamer_lampen
+    internal: true
+    on_value: {script.execute: wk_render}
+  - platform: homeassistant
+    id: wk_af
+    entity_id: input_boolean.wekker_slaapkamer_gaat_af
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x == "on";'
+          then:
+            - lvgl.resume:
+            - light.turn_on: {id: display_backlight, brightness: 100%}
+            - lvgl.widget.show: ring
+          else:
+            - lvgl.widget.hide: ring
 
 sensor:
   - platform: homeassistant
@@ -469,6 +635,9 @@ sensor:
     on_value: {script.execute: cl_render}
 
 # ---------------------------------------------------------------- scripts
+
+
+# ---------------------------------------------------------------- scripts
 script:
   # tijd en datum op alle schermen
   - id: clock_render
@@ -478,39 +647,137 @@ script:
           if (!t.is_valid()) return;
           char hm[8]; snprintf(hm, sizeof(hm), "%02d:%02d", t.hour, t.minute);
           lv_label_set_text(id(h_clock), hm);
-          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6)};
+          lv_label_set_text(id(n_clock), hm);
+          lv_label_set_text(id(r_clock), hm);
+          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6), id(hd_t7), id(hd_t8), id(hd_tq)};
           for (auto *l : hl) lv_label_set_text(l, hm);
           static const char *dag[] = {"ZONDAG", "MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG"};
           static const char *mnd[] = {"JANUARI", "FEBRUARI", "MAART", "APRIL", "MEI", "JUNI", "JULI",
                                       "AUGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DECEMBER"};
           char d[40]; snprintf(d, sizeof(d), "%s %d %s", dag[(t.day_of_week + 6) % 7], t.day_of_month, mnd[(t.month + 11) % 12]);
           lv_label_set_text(id(h_date), d);
+          lv_label_set_text(id(n_date), d);
 
-  # onderbalk: zwart = huidige plek; spelerbalk tonen als er muziek is (niet op Nu speelt)
+  # onderbalk: zwart = huidige plek; spelerbalk bovenin als er muziek is
   - id: nav_mark
     parameters:
       p: int
     then:
       - lambda: |-
           id(cur_page) = p;
-          int dk = p == 0 ? 0 : (p == 1 ? 1 : (p == 3 ? 2 : (p == 6 ? 3 : -1)));
+          int dk = p == 0 ? 0 : ((p == 7 || p == 8) ? 1 : (p == 3 ? 2 : (p == 6 ? 3 : -1)));
           lv_obj_t *b[] = {id(dk_0), id(dk_1), id(dk_2), id(dk_3)};
           for (int k = 0; k < 4; k++) {
-            bool on = k == dk;
-            lv_obj_set_style_bg_color(b[k], lv_color_hex(on ? ${c_ink} : ${c_paper}), 0);
-            lv_obj_set_style_text_color(b[k], lv_color_hex(on ? ${c_paper} : ${c_ink}), 0);
+            bool sel = k == dk;
+            lv_obj_set_style_bg_color(b[k], lv_color_hex(sel ? ${c_ink} : ${c_paper}), 0);
+            lv_obj_set_style_text_color(b[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
           }
+          // nachtstand: geen onderbalk en geen paneel
+          if (p == 9) { lv_obj_add_flag(id(dock), LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(id(qp), LV_OBJ_FLAG_HIDDEN); }
+          else lv_obj_clear_flag(id(dock), LV_OBJ_FLAG_HIDDEN);
       - script.execute: mini_vis
 
   - id: mini_vis
     then:
       - lambda: |-
           std::string s = id(mp_st).state;
-          bool muziek = s == "playing" || s == "paused";
-          if (muziek && id(cur_page) != 3) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
+          bool muziek = (s == "playing" || s == "paused") && id(cur_page) != 3 && id(cur_page) != 9;
+          if (muziek) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           else lv_obj_add_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid)};
+          for (auto *o : pg) lv_obj_set_y(o, muziek ? 56 : 0);
 
-  # ---- licht
+  # avondstand: het scherm zelf keert alle kleuren om (ST7701S INVON 0x21 / INVOFF 0x20)
+  - id: avond_apply
+    then:
+      - lambda: |-
+          // zelfde als write_command_ van de driver (geen DC-pin: 9-bits SPI, bit 8 = 0 = commando)
+          using SD = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST, esphome::spi::CLOCK_POLARITY_LOW,
+                                             esphome::spi::CLOCK_PHASE_LEADING, esphome::spi::DATA_RATE_1MHZ>;
+          SD *spi = id(my_display);
+          spi->enable();
+          spi->write(id(avond) ? 0x21 : 0x20, 9);
+          spi->disable();
+          if (id(avond)) lv_obj_add_state(id(qp_avond), LV_STATE_CHECKED); else lv_obj_clear_state(id(qp_avond), LV_STATE_CHECKED);
+
+  # ---- wekker: tijd, aan/uit, dagen, geluid, zonsopgang + tegel en nachtstand
+  - id: wk_render
+    then:
+      - lambda: |-
+          char t[8]; snprintf(t, sizeof(t), "%02d:%02d", id(wk_min) / 60, id(wk_min) % 60);
+          bool aan = id(wk_aan).state == "on";
+          lv_label_set_text(id(wk_big), t);
+          lv_obj_set_style_text_color(id(wk_big), lv_color_hex(aan ? ${c_ink} : ${c_off}), 0);
+          if (aan) lv_obj_add_state(id(wk_sw), LV_STATE_CHECKED); else lv_obj_clear_state(id(wk_sw), LV_STATE_CHECKED);
+          lv_label_set_text(id(wk_sw_l), aan ? "AAN" : "UIT");
+          lv_label_set_text(id(tl_wekker), aan ? t : "Uit");
+          std::string nl = aan ? std::string("WEKKER ") + t : std::string("");
+          lv_label_set_text(id(n_wekker), nl.c_str());
+          // dagen
+          static const char *dg[] = {"Werkdagen", "Elke dag", "Weekend"};
+          lv_obj_t *db[] = {id(wk_d0), id(wk_d1), id(wk_d2)};
+          for (int k = 0; k < 3; k++) {
+            bool sel = id(wk_dagen).state == dg[k];
+            lv_obj_set_style_bg_color(db[k], lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
+            lv_obj_set_style_text_color(db[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+          }
+          std::string dsub = id(wk_dagen).state;
+          for (auto &c : dsub) c = toupper((unsigned char) c);
+          lv_label_set_text(id(wk_info), aan ? (std::string("WEKKER AAN · ") + dsub).c_str() : "WEKKER UIT");
+          // geluid
+          std::string g = id(wk_geluid).state;
+          lv_label_set_text(id(wk_g_name), g.c_str());
+          static const char *gn[] = {"Fluisterwekker", "Wekkerbrigade", "Zoemer", "Klassieke wekker", "Alarm",
+                                     "Rustig wekken", "Muziek", "Natuurgeluiden", "Alleen licht"};
+          lv_obj_t *gb[] = {id(wg_0), id(wg_1), id(wg_2), id(wg_3), id(wg_4), id(wg_5), id(wg_6), id(wg_7), id(wg_8)};
+          lv_obj_t *gs[] = {id(wg_s0), id(wg_s1), id(wg_s2), id(wg_s3), id(wg_s4), id(wg_s5), id(wg_s6), id(wg_s7), id(wg_s8)};
+          for (int k = 0; k < 9; k++) {
+            bool sel = g == gn[k];
+            lv_obj_set_style_bg_color(gb[k], lv_color_hex(sel ? ${c_ink} : ${c_tile}), 0);
+            lv_obj_set_style_text_color(gb[k], lv_color_hex(sel ? ${c_paper} : ${c_ink}), 0);
+            lv_obj_set_style_text_color(gs[k], lv_color_hex(sel ? ${c_grey} : ${c_sub}), 0);
+          }
+          bool lamp = id(wk_lampen).state == "on";
+          if (lamp) lv_obj_add_state(id(wk_lamp_sw), LV_STATE_CHECKED); else lv_obj_clear_state(id(wk_lamp_sw), LV_STATE_CHECKED);
+  - id: wk_step
+    parameters:
+      d: int
+    then:
+      - lambda: |-
+          id(wk_min) = ((id(wk_min) + d) % 1440 + 1440) % 1440;
+      - script.execute: wk_render
+      - script.execute: wk_send
+  # pas 1,5 s na de laatste tik naar HA sturen (snel tikken = één keer opslaan)
+  - id: wk_send
+    mode: restart
+    then:
+      - delay: 1500ms
+      - homeassistant.action:
+          action: input_datetime.set_datetime
+          data:
+            entity_id: input_datetime.wekker_slaapkamer_tijd
+            time: !lambda 'char b[12]; snprintf(b, sizeof(b), "%02d:%02d:00", id(wk_min) / 60, id(wk_min) % 60); return std::string(b);'
+  - id: wk_pick
+    parameters:
+      i: int
+    then:
+      - homeassistant.action:
+          action: input_select.select_option
+          data:
+            entity_id: input_select.wekker_slaapkamer_geluid
+            option: !lambda |-
+              static const char *gn[] = {"Fluisterwekker", "Wekkerbrigade", "Zoemer", "Klassieke wekker", "Alarm",
+                                         "Rustig wekken", "Muziek", "Natuurgeluiden", "Alleen licht"};
+              return std::string(gn[std::max(0, std::min(8, i))]);
+  - id: wk_days
+    parameters:
+      i: int
+    then:
+      - homeassistant.action:
+          action: input_select.select_option
+          data:
+            entity_id: input_select.wekker_slaapkamer_dagen
+            option: !lambda 'return std::string(i == 1 ? "Elke dag" : (i == 2 ? "Weekend" : "Werkdagen"));'
   - id: lt_render
     then:
       - lambda: |-
@@ -651,7 +918,6 @@ script:
           fmt(id(cl_cur).state, c, sizeof(c));
           fmt(id(cl_target).state, g, sizeof(g));
           lv_label_set_text(id(cl_now), c);
-          lv_label_set_text(id(tl_klimaat), c);
           lv_label_set_text(id(cl_want), g);
           bool aan = id(cl_mode).state != "off";
           lv_label_set_text(id(cl_mode_l), aan ? "VERWARMING AAN" : "VERWARMING UIT");
@@ -788,6 +1054,8 @@ script:
           }
 
 # ---------------------------------------------------------------- scherm
+
+
 lvgl:
   id: lvgl_main
   buffer_size: 25%
@@ -850,24 +1118,39 @@ lvgl:
   on_idle:
     - timeout: 1min
       then:
-        - light.turn_on: {id: display_backlight, brightness: 65%}
+        - if:
+            condition:
+              lambda: 'return id(cur_page) != 9;'
+            then:
+              - light.turn_on: {id: display_backlight, brightness: 65%}
     - timeout: 2min
       then:
-        - light.turn_on: {id: display_backlight, brightness: 35%}
+        - if:
+            condition:
+              lambda: 'return id(cur_page) != 9;'
+            then:
+              - light.turn_on: {id: display_backlight, brightness: 35%}
     - timeout: 30min
       then:
-        - light.turn_off: display_backlight
-        - lvgl.page.show: p_home
+        - if:
+            condition:
+              lambda: 'return id(cur_page) != 9 && id(wk_af).state != "on";'
+            then:
+              - light.turn_off: display_backlight
+              - lvgl.widget.hide: qp
+              - lvgl.page.show: p_home
 
-  # ---- vaste balken over alle schermen: spelerbalk (y 352) en onderbalk (y 416)
+  # ---- vaste lagen over alle schermen: spelerbalk (boven), paneel LICHT & SCHERM,
+  #      onderbalk (y 416) en het wekkerscherm (alles bedekkend)
   top_layer:
     widgets:
+      # ======== spelerbalk bovenin (56 px)
       - obj:
           id: mini
           x: 0
-          y: 352
+          y: 0
           width: 480
-          height: 64
+          height: 56
           bg_color: ${c_ink}
           bg_opa: COVER
           text_color: ${c_paper}
@@ -877,45 +1160,46 @@ lvgl:
             - obj:
                 x: 0
                 y: 0
-                width: 256
-                height: 64
+                width: 276
+                height: 56
                 on_click:
                   - lvgl.page.show: p_muziek
                 widgets:
                   - obj:
                       x: 0
                       y: 0
-                      width: 64
-                      height: 64
+                      width: 56
+                      height: 56
                       styles: st_deco
                       bg_color: ${c_blue}
                       clickable: false
                       widgets:
-                        - obj: {x: 26, y: -8, width: 44, height: 44, radius: 22, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                        - obj: {x: 0, y: 44, width: 64, height: 20, styles: st_deco, bg_color: "${c_paper}", clickable: false}
+                        - obj: {x: 22, y: -8, width: 40, height: 40, radius: 20, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                        - obj: {x: 0, y: 38, width: 56, height: 18, styles: st_deco, bg_color: "${c_paper}", clickable: false}
+                  - image: {id: mi_cover, x: 0, y: 0, width: 56, height: 56, src: cov_mini, hidden: true, clickable: false}
                   - label:
                       id: mi_title
-                      x: 76
-                      y: 13
-                      width: 176
+                      x: 68
+                      y: 9
+                      width: 204
                       long_mode: DOT
                       text_font: f_15
                       text: "Woonkamer"
                   - label:
                       id: mi_sub
-                      x: 76
-                      y: 37
-                      width: 176
+                      x: 68
+                      y: 32
+                      width: 204
                       long_mode: DOT
                       styles: st_mono11
                       text_color: ${c_grey}
                       text: "WOONKAMER"
             - button:
-                x: 268
-                y: 10
-                width: 44
-                height: 44
-                radius: 22
+                x: 284
+                y: 8
+                width: 40
+                height: 40
+                radius: 20
                 bg_color: ${c_red}
                 bg_opa: COVER
                 pressed:
@@ -925,10 +1209,10 @@ lvgl:
                 widgets:
                   - label: {id: mi_play_i, align: CENTER, text: "${ic_pause}", text_font: f_ic22, text_color: "${c_ink}"}
             - button:
-                x: 324
-                y: 10
-                width: 44
-                height: 44
+                x: 336
+                y: 8
+                width: 40
+                height: 40
                 bg_opa: TRANSP
                 border_width: 1
                 border_color: ${c_dline}
@@ -940,19 +1224,19 @@ lvgl:
                   - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22, text_color: "${c_paper}"}
             - label:
                 id: mi_vol
-                x: 374
-                y: 16
+                x: 380
+                y: 12
                 width: 44
                 text_align: CENTER
                 text_font: f_m12
                 text: "–"
-            - obj: {x: 376, y: 38, width: 40, height: 3, styles: st_deco, bg_color: "${c_dline}", clickable: false}
-            - obj: {id: mi_volbar, x: 376, y: 38, width: 14, height: 3, styles: st_deco, bg_color: "${c_red}", clickable: false}
+            - obj: {x: 382, y: 33, width: 40, height: 3, styles: st_deco, bg_color: "${c_dline}", clickable: false}
+            - obj: {id: mi_volbar, x: 382, y: 33, width: 14, height: 3, styles: st_deco, bg_color: "${c_red}", clickable: false}
             - button:
-                x: 424
-                y: 10
-                width: 44
-                height: 44
+                x: 428
+                y: 8
+                width: 40
+                height: 40
                 bg_opa: TRANSP
                 border_width: 1
                 border_color: ${c_dline}
@@ -963,7 +1247,165 @@ lvgl:
                 widgets:
                   - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22, text_color: "${c_paper}"}
 
+      # ======== paneel LICHT & SCHERM (knop DIM in de onderbalk)
       - obj:
+          id: qp
+          x: 0
+          y: 0
+          width: 480
+          height: 416
+          bg_color: ${c_paper}
+          bg_opa: COVER
+          text_color: ${c_ink}
+          hidden: true
+          widgets:
+            - obj: {x: 330, y: 250, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+            - obj: {x: 0, y: 47, width: 480, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
+            - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "DIM"}
+            - label: {x: 60, y: 17, styles: st_mono12, text: "LICHT & SCHERM"}
+            - label: {id: hd_tq, x: 300, y: 17, width: 96, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+            - button:
+                x: 412
+                y: 4
+                width: 56
+                height: 40
+                bg_opa: TRANSP
+                on_click:
+                  - lvgl.widget.hide: qp
+                widgets:
+                  - label: {align: CENTER, text: "${ic_close}", text_font: f_ic22}
+            # lampen (nu: woonkamer, eettafel, keuken)
+            - label: {x: 24, y: 64, styles: st_mono11, text_color: "${c_sub}", text: "LAMPEN"}
+            - button:
+                x: 24
+                y: 82
+                width: 138
+                height: 64
+                styles: st_tile
+                on_click:
+                  - homeassistant.action:
+                      action: light.turn_on
+                      data:
+                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                        brightness_pct: "100"
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_bulb}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "AAN"}
+            - button:
+                x: 171
+                y: 82
+                width: 138
+                height: 64
+                styles: st_tile
+                on_click:
+                  - homeassistant.action:
+                      action: light.turn_on
+                      data:
+                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                        brightness_pct: "20"
+                        transition: "2"
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_dim}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "DIMMEN 20%"}
+            - button:
+                x: 318
+                y: 82
+                width: 138
+                height: 64
+                bg_color: ${c_ink}
+                bg_opa: COVER
+                text_color: ${c_paper}
+                pressed:
+                  bg_color: ${c_red}
+                on_click:
+                  - homeassistant.action:
+                      action: light.turn_off
+                      data:
+                        entity_id: light.woonkamer, light.eettafel, light.keuken
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_power}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "UIT"}
+            # scherm
+            - label: {x: 24, y: 164, styles: st_mono11, text_color: "${c_sub}", text: "SCHERM"}
+            - button:
+                x: 24
+                y: 182
+                width: 138
+                height: 64
+                styles: st_tile
+                on_click:
+                  - light.turn_on: {id: display_backlight, brightness: 100%}
+                  - lvgl.widget.hide: qp
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_brightness}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "HELDER"}
+            - button:
+                x: 171
+                y: 182
+                width: 138
+                height: 64
+                styles: st_tile
+                on_click:
+                  - lvgl.widget.hide: qp
+                  - lvgl.page.show: p_nacht
+                  - light.turn_on: {id: display_backlight, brightness: 12%}
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_night}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "NACHTSTAND"}
+            - button:
+                x: 318
+                y: 182
+                width: 138
+                height: 64
+                bg_color: ${c_ink}
+                bg_opa: COVER
+                text_color: ${c_paper}
+                pressed:
+                  bg_color: ${c_red}
+                on_click:
+                  - lvgl.widget.hide: qp
+                  - light.turn_off: display_backlight
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_sleep}", text_font: f_ic22}
+                  - label: {x: 12, y: 40, styles: st_mono11, text: "DONKER"}
+            # avondstand: alle kleuren omgedraaid
+            - obj:
+                x: 24
+                y: 264
+                width: 285
+                height: 64
+                styles: st_tile
+                widgets:
+                  - label: {x: 12, y: 10, text: "${ic_invert}", text_font: f_ic22}
+                  - label: {x: 48, y: 13, text_font: f_15, text: "Avondstand"}
+                  - label: {x: 48, y: 35, styles: st_mono11, text_color: "${c_sub}", text: "KLEUREN OMGEDRAAID"}
+                  - switch:
+                      id: qp_avond
+                      x: 221
+                      y: 17
+                      width: 52
+                      height: 30
+                      bg_color: ${c_off}
+                      bg_opa: COVER
+                      radius: 15
+                      indicator:
+                        bg_opa: TRANSP
+                        checked:
+                          bg_color: ${c_ink}
+                          bg_opa: COVER
+                        radius: 15
+                      knob:
+                        bg_color: ${c_paper}
+                        radius: 11
+                        pad_all: -4
+                        shadow_width: 0
+                      on_change:
+                        - lambda: 'id(avond) = x;'
+                        - script.execute: avond_apply
+
+      # ======== onderbalk: THUIS / WEKKER / MUZIEK / MENU / DIM (5 x 96 px)
+      - obj:
+          id: dock
           x: 0
           y: 416
           width: 480
@@ -978,55 +1420,143 @@ lvgl:
                 id: dk_0
                 x: 0
                 y: 1
-                width: 120
+                width: 96
                 height: 63
                 bg_color: ${c_ink}
                 bg_opa: COVER
                 text_color: ${c_paper}
                 on_click:
+                  - lvgl.widget.hide: qp
                   - lvgl.page.show: p_home
                 widgets:
-                  - label: {align: TOP_MID, y: 10, text: "${ic_home}", text_font: f_ic22}
-                  - label: {align: BOTTOM_MID, y: -10, text: "THUIS", styles: st_mono11}
+                  - label: {align: CENTER, y: -9, text: "${ic_home}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "THUIS", styles: st_mono11}
             - button:
                 id: dk_1
-                x: 120
+                x: 96
                 y: 1
-                width: 120
+                width: 96
                 height: 63
                 bg_color: ${c_paper}
                 bg_opa: COVER
                 on_click:
-                  - lvgl.page.show: p_licht
+                  - lvgl.widget.hide: qp
+                  - lvgl.page.show: p_wekker
                 widgets:
-                  - label: {align: TOP_MID, y: 10, text: "${ic_bulb}", text_font: f_ic22}
-                  - label: {align: BOTTOM_MID, y: -10, text: "LICHT", styles: st_mono11}
+                  - label: {align: CENTER, y: -9, text: "${ic_alarm}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "WEKKER", styles: st_mono11}
             - button:
                 id: dk_2
-                x: 240
+                x: 192
                 y: 1
-                width: 120
+                width: 96
                 height: 63
                 bg_color: ${c_paper}
                 bg_opa: COVER
                 on_click:
+                  - lvgl.widget.hide: qp
                   - lvgl.page.show: p_muziek
                 widgets:
-                  - label: {align: TOP_MID, y: 10, text: "${ic_music}", text_font: f_ic22}
-                  - label: {align: BOTTOM_MID, y: -10, text: "MUZIEK", styles: st_mono11}
+                  - label: {align: CENTER, y: -9, text: "${ic_music}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "MUZIEK", styles: st_mono11}
             - button:
                 id: dk_3
-                x: 360
+                x: 288
                 y: 1
-                width: 120
+                width: 96
                 height: 63
                 bg_color: ${c_paper}
                 bg_opa: COVER
                 on_click:
+                  - lvgl.widget.hide: qp
                   - lvgl.page.show: p_menu
                 widgets:
-                  - label: {align: TOP_MID, y: 10, text: "${ic_grid}", text_font: f_ic22}
-                  - label: {align: BOTTOM_MID, y: -10, text: "MENU", styles: st_mono11}
+                  - label: {align: CENTER, y: -9, text: "${ic_grid}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "MENU", styles: st_mono11}
+            # DIM: altijd bij de hand (lampen en scherm)
+            - button:
+                x: 384
+                y: 1
+                width: 96
+                height: 63
+                bg_color: ${c_red}
+                bg_opa: COVER
+                text_color: ${c_ink}
+                pressed:
+                  bg_color: ${c_ink}
+                  text_color: ${c_paper}
+                on_click:
+                  - lambda: |-
+                      if (lv_obj_has_flag(id(qp), LV_OBJ_FLAG_HIDDEN)) lv_obj_clear_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
+                      else lv_obj_add_flag(id(qp), LV_OBJ_FLAG_HIDDEN);
+                widgets:
+                  - label: {align: CENTER, y: -9, text: "${ic_night}", text_font: f_ic22}
+                  - label: {align: BOTTOM_MID, y: -7, text: "DIM", styles: st_mono11}
+
+      # ======== de wekker gaat af: alles bedekkend
+      - obj:
+          id: ring
+          x: 0
+          y: 0
+          width: 480
+          height: 480
+          bg_color: ${c_paper}
+          bg_opa: COVER
+          text_color: ${c_ink}
+          hidden: true
+          widgets:
+            - obj: {x: 250, y: -90, width: 320, height: 320, radius: 160, styles: st_deco, bg_color: "${c_red}", clickable: false}
+            - obj:
+                x: 0
+                y: 330
+                width: 150
+                height: 150
+                clickable: false
+                widgets:
+                  - obj: {x: -150, y: 0, width: 300, height: 300, radius: 150, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+            - label: {x: 24, y: 30, styles: st_mono12, text: "GOEDEMORGEN"}
+            - label: {x: 24, y: 50, styles: st_mono11, text_color: "${c_sub}", text: "DE WEKKER GAAT AF"}
+            - label: {id: r_clock, x: 18, y: 76, text_font: f_clock, text_letter_space: -6, text: "--:--"}
+            - button:
+                x: 24
+                y: 236
+                width: 432
+                height: 80
+                bg_color: ${c_ink}
+                bg_opa: COVER
+                text_color: ${c_paper}
+                pressed:
+                  bg_color: ${c_blue}
+                on_click:
+                  - homeassistant.action:
+                      action: script.turn_on
+                      data:
+                        entity_id: script.wekker_slaapkamer_sluimer
+                  - lvgl.widget.hide: ring
+                widgets:
+                  - label: {x: 20, y: 26, text: "${ic_snooze}", text_font: f_ic30}
+                  - label: {x: 64, y: 22, text_font: f_26, text: "Sluimer 9 min"}
+            - button:
+                x: 306
+                y: 332
+                width: 128
+                height: 128
+                radius: 64
+                bg_color: ${c_red}
+                bg_opa: COVER
+                text_color: ${c_ink}
+                pressed:
+                  bg_color: ${c_ink}
+                  text_color: ${c_paper}
+                on_click:
+                  - homeassistant.action:
+                      action: script.turn_on
+                      data:
+                        entity_id: script.wekker_slaapkamer_stop
+                  - lvgl.widget.hide: ring
+                widgets:
+                  - label: {align: CENTER, y: -14, text: "${ic_alarm_off}", text_font: f_ic30}
+                  - label: {align: CENTER, y: 20, text_font: f_26, text: "Stop"}
 
   pages:
     # ================= Thuis =================
@@ -1035,83 +1565,91 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 0}
       widgets:
-        - obj: {x: 314, y: -70, width: 230, height: 230, radius: 115, styles: st_deco, bg_color: "${c_red}", clickable: false}
-        # kwartcirkel in ultramarijn (cirkel, afgesneden door een vierkant)
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
         - obj:
-            x: 252
-            y: 112
-            width: 110
-            height: 110
-            clickable: false
+            id: pg_home
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - obj: {x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-        - label: {id: h_date, x: 24, y: 22, styles: st_mono12, text: "–"}
-        - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER"}
-        - label:
-            id: h_clock
-            x: 18
-            y: 52
-            text_font: f_clock
-            text_letter_space: -6
-            text: "--:--"
-        - label: {id: h_wx_i, x: 24, y: 189, text_font: f_ic22, text: "${ic_cloudy}"}
-        - label:
-            id: h_wx
-            x: 56
-            y: 192
-            width: 400
-            long_mode: DOT
-            text_font: f_15
-            text: "–"
-        # vier tegels
-        - button:
-            x: 24
-            y: 232
-            width: 102
-            height: 104
-            styles: st_tile
-            on_click:
-              - lvgl.page.show: p_licht
-            widgets:
-              - label: {x: 12, y: 12, text: "${ic_bulb}", text_font: f_ic22}
-              - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "LICHT"}
-              - label: {id: tl_licht, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
-        - button:
-            x: 134
-            y: 232
-            width: 102
-            height: 104
-            styles: st_tile
-            on_click:
-              - lvgl.page.show: p_sfeer
-            widgets:
-              - label: {x: 12, y: 12, text: "${ic_palette}", text_font: f_ic22}
-              - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "SFEER"}
-              - label: {id: tl_sfeer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "Kies"}
-        - button:
-            x: 244
-            y: 232
-            width: 102
-            height: 104
-            styles: st_tile
-            on_click:
-              - lvgl.page.show: p_klimaat
-            widgets:
-              - label: {x: 12, y: 12, text: "${ic_thermo}", text_font: f_ic22}
-              - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "KLIMAAT"}
-              - label: {id: tl_klimaat, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
-        - button:
-            x: 354
-            y: 232
-            width: 102
-            height: 104
-            styles: st_tile
-            on_click:
-              - lvgl.page.show: p_weer
-            widgets:
-              - label: {x: 12, y: 12, text: "${ic_rain}", text_font: f_ic22}
-              - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "WEER"}
-              - label: {id: tl_weer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+              - obj: {x: 314, y: -70, width: 230, height: 230, radius: 115, styles: st_deco, bg_color: "${c_red}", clickable: false}
+              # kwartcirkel in ultramarijn (cirkel, afgesneden door een vierkant)
+              - obj:
+                  x: 252
+                  y: 112
+                  width: 110
+                  height: 110
+                  clickable: false
+                  widgets:
+                    - obj: {x: 0, y: -110, width: 220, height: 220, radius: 110, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+              - label: {id: h_date, x: 24, y: 22, styles: st_mono12, text: "–"}
+              - label: {x: 24, y: 40, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER"}
+              - label:
+                  id: h_clock
+                  x: 18
+                  y: 52
+                  text_font: f_clock
+                  text_letter_space: -6
+                  text: "--:--"
+              - label: {id: h_wx_i, x: 24, y: 189, text_font: f_ic22, text: "${ic_cloudy}"}
+              - label:
+                  id: h_wx
+                  x: 56
+                  y: 192
+                  width: 400
+                  long_mode: DOT
+                  text_font: f_15
+                  text: "–"
+              # vier tegels
+              - button:
+                  x: 24
+                  y: 232
+                  width: 102
+                  height: 104
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_licht
+                  widgets:
+                    - label: {x: 12, y: 12, text: "${ic_bulb}", text_font: f_ic22}
+                    - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "LICHT"}
+                    - label: {id: tl_licht, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+              - button:
+                  x: 134
+                  y: 232
+                  width: 102
+                  height: 104
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_sfeer
+                  widgets:
+                    - label: {x: 12, y: 12, text: "${ic_palette}", text_font: f_ic22}
+                    - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "SFEER"}
+                    - label: {id: tl_sfeer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "Kies"}
+              - button:
+                  x: 244
+                  y: 232
+                  width: 102
+                  height: 104
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_wekker
+                  widgets:
+                    - label: {x: 12, y: 12, text: "${ic_alarm}", text_font: f_ic22}
+                    - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "WEKKER"}
+                    - label: {id: tl_wekker, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
+              - button:
+                  x: 354
+                  y: 232
+                  width: 102
+                  height: 104
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_weer
+                  widgets:
+                    - label: {x: 12, y: 12, text: "${ic_rain}", text_font: f_ic22}
+                    - label: {x: 12, y: 56, styles: st_mono11, text_color: "${c_sub}", text: "WEER"}
+                    - label: {id: tl_weer, x: 12, y: 72, width: 84, long_mode: DOT, text_font: f_17, text: "–"}
 
     # ================= 01 Licht =================
     - id: p_licht
@@ -1119,140 +1657,148 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 1}
       widgets:
-        - obj: &hdr_line {x: 0, y: 47, width: 480, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
-        - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "01"}
-        - label: {x: 52, y: 17, styles: st_mono12, text: "LICHT"}
-        - label: {id: hd_t1, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-        - label: {id: lt_count, x: 24, y: 66, text_font: f_44, text_letter_space: -1, text: "–"}
-        - label: {x: 24, y: 114, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · EETTAFEL · KEUKEN"}
-        - button:
-            x: 236
-            y: 72
-            width: 108
-            height: 44
-            styles: st_outline
-            on_click:
-              - homeassistant.action:
-                  action: light.turn_on
-                  data:
-                    entity_id: light.woonkamer, light.eettafel, light.keuken
-            widgets:
-              - label: {align: CENTER, styles: st_mono12, text: "ALLES AAN"}
-        - button:
-            x: 352
-            y: 72
-            width: 104
-            height: 44
-            bg_color: ${c_ink}
-            bg_opa: COVER
-            text_color: ${c_paper}
-            pressed:
-              bg_color: ${c_red}
-            on_click:
-              - homeassistant.action:
-                  action: light.turn_off
-                  data:
-                    entity_id: light.woonkamer, light.eettafel, light.keuken
-            widgets:
-              - label: {align: CENTER, styles: st_mono12, text: "ALLES UIT"}
-        # drie rijen: naam | helderheidsbalk | % | schakelaar
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
         - obj:
-            x: 24
-            y: 140
-            width: 432
-            height: 64
-            border_width: 1
-            border_side: [BOTTOM]
-            border_color: ${c_line}
+            id: pg_licht
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - label: {x: 0, y: 21, text_font: f_17, text: "Woonkamer"}
-              - slider: &lt_slider
-                  id: lt_sl0
-                  x: 124
-                  y: 24
-                  width: 172
-                  height: 16
-                  min_value: 0
-                  max_value: 100
-                  bg_color: ${c_tile}
+              - obj: &hdr_line {x: 0, y: 47, width: 480, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "01"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "LICHT"}
+              - label: {id: hd_t1, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - label: {id: lt_count, x: 24, y: 66, text_font: f_44, text_letter_space: -1, text: "–"}
+              - label: {x: 24, y: 114, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · EETTAFEL · KEUKEN"}
+              - button:
+                  x: 236
+                  y: 72
+                  width: 108
+                  height: 44
+                  styles: st_outline
+                  on_click:
+                    - homeassistant.action:
+                        action: light.turn_on
+                        data:
+                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "ALLES AAN"}
+              - button:
+                  x: 352
+                  y: 72
+                  width: 104
+                  height: 44
+                  bg_color: ${c_ink}
                   bg_opa: COVER
-                  radius: 0
-                  pad_top: 5
-                  pad_bottom: 5
-                  indicator:
+                  text_color: ${c_paper}
+                  pressed:
                     bg_color: ${c_red}
-                    radius: 0
-                  knob:
-                    bg_opa: TRANSP
-                    shadow_width: 0
-                    pad_all: 6
-                  on_release:
-                    - script.execute: {id: lt_set, i: 0, pct: !lambda 'return (int) x;'}
-              - label: {id: lt_pc0, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
-              - switch: &lt_switch
-                  id: lt_sw0
-                  x: 380
-                  y: 17
-                  width: 52
-                  height: 30
-                  bg_color: ${c_off}
-                  bg_opa: COVER
-                  radius: 15
-                  indicator:
-                    bg_opa: TRANSP
-                    checked:
-                      bg_color: ${c_ink}
-                      bg_opa: COVER
-                    radius: 15
-                  knob:
-                    bg_color: ${c_paper}
-                    radius: 11
-                    pad_all: -4
-                    shadow_width: 0
-                  on_change:
-                    - script.execute: {id: lt_switch, i: 0, aan: !lambda 'return x;'}
-        - obj:
-            x: 24
-            y: 204
-            width: 432
-            height: 64
-            border_width: 1
-            border_side: [BOTTOM]
-            border_color: ${c_line}
-            widgets:
-              - label: {x: 0, y: 21, text_font: f_17, text: "Eettafel"}
-              - slider:
-                  <<: *lt_slider
-                  id: lt_sl1
-                  on_release:
-                    - script.execute: {id: lt_set, i: 1, pct: !lambda 'return (int) x;'}
-              - label: {id: lt_pc1, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
-              - switch:
-                  <<: *lt_switch
-                  id: lt_sw1
-                  on_change:
-                    - script.execute: {id: lt_switch, i: 1, aan: !lambda 'return x;'}
-        - obj:
-            x: 24
-            y: 268
-            width: 432
-            height: 64
-            border_width: 1
-            border_side: [BOTTOM]
-            border_color: ${c_line}
-            widgets:
-              - label: {x: 0, y: 21, text_font: f_17, text: "Keuken"}
-              - slider:
-                  <<: *lt_slider
-                  id: lt_sl2
-                  on_release:
-                    - script.execute: {id: lt_set, i: 2, pct: !lambda 'return (int) x;'}
-              - label: {id: lt_pc2, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
-              - switch:
-                  <<: *lt_switch
-                  id: lt_sw2
-                  on_change:
-                    - script.execute: {id: lt_switch, i: 2, aan: !lambda 'return x;'}
+                  on_click:
+                    - homeassistant.action:
+                        action: light.turn_off
+                        data:
+                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "ALLES UIT"}
+              # drie rijen: naam | helderheidsbalk | % | schakelaar
+              - obj:
+                  x: 24
+                  y: 140
+                  width: 432
+                  height: 64
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  widgets:
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Woonkamer"}
+                    - slider: &lt_slider
+                        id: lt_sl0
+                        x: 124
+                        y: 24
+                        width: 172
+                        height: 16
+                        min_value: 0
+                        max_value: 100
+                        bg_color: ${c_tile}
+                        bg_opa: COVER
+                        radius: 0
+                        pad_top: 5
+                        pad_bottom: 5
+                        indicator:
+                          bg_color: ${c_red}
+                          radius: 0
+                        knob:
+                          bg_opa: TRANSP
+                          shadow_width: 0
+                          pad_all: 6
+                        on_release:
+                          - script.execute: {id: lt_set, i: 0, pct: !lambda 'return (int) x;'}
+                    - label: {id: lt_pc0, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
+                    - switch: &lt_switch
+                        id: lt_sw0
+                        x: 380
+                        y: 17
+                        width: 52
+                        height: 30
+                        bg_color: ${c_off}
+                        bg_opa: COVER
+                        radius: 15
+                        indicator:
+                          bg_opa: TRANSP
+                          checked:
+                            bg_color: ${c_ink}
+                            bg_opa: COVER
+                          radius: 15
+                        knob:
+                          bg_color: ${c_paper}
+                          radius: 11
+                          pad_all: -4
+                          shadow_width: 0
+                        on_change:
+                          - script.execute: {id: lt_switch, i: 0, aan: !lambda 'return x;'}
+              - obj:
+                  x: 24
+                  y: 204
+                  width: 432
+                  height: 64
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  widgets:
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Eettafel"}
+                    - slider:
+                        <<: *lt_slider
+                        id: lt_sl1
+                        on_release:
+                          - script.execute: {id: lt_set, i: 1, pct: !lambda 'return (int) x;'}
+                    - label: {id: lt_pc1, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
+                    - switch:
+                        <<: *lt_switch
+                        id: lt_sw1
+                        on_change:
+                          - script.execute: {id: lt_switch, i: 1, aan: !lambda 'return x;'}
+              - obj:
+                  x: 24
+                  y: 268
+                  width: 432
+                  height: 64
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  widgets:
+                    - label: {x: 0, y: 21, text_font: f_17, text: "Keuken"}
+                    - slider:
+                        <<: *lt_slider
+                        id: lt_sl2
+                        on_release:
+                          - script.execute: {id: lt_set, i: 2, pct: !lambda 'return (int) x;'}
+                    - label: {id: lt_pc2, x: 300, y: 24, width: 52, text_align: RIGHT, text_font: f_m12, text_color: "${c_sub}", text: "–"}
+                    - switch:
+                        <<: *lt_switch
+                        id: lt_sw2
+                        on_change:
+                          - script.execute: {id: lt_switch, i: 2, aan: !lambda 'return x;'}
 
     # ================= 02 Sfeer =================
     - id: p_sfeer
@@ -1261,239 +1807,247 @@ lvgl:
         - script.execute: {id: nav_mark, p: 2}
         - script.execute: sf_mark
       widgets:
-        - obj: *hdr_line
-        - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "02"}
-        - label: {x: 52, y: 17, styles: st_mono12, text: "SFEER"}
-        - label: {id: hd_t2, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-        # 2 x 4 knoppen: kunstvlakje 64x64 + naam + regel
-        - button:
-            id: sf_0
-            x: 24
-            y: 64
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - homeassistant.action:
-                  action: scene.turn_on
-                  data:
-                    # woonkamer inclusief keuken en eettafel (zoals op display woonkamer)
-                    entity_id: "scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel"
-              - lambda: 'id(sf_idx) = 0;'
-              - script.execute: sf_mark
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        - obj:
+            id: pg_sfeer
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "02"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "SFEER"}
+              - label: {id: hd_t2, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              # 2 x 4 knoppen: kunstvlakje 64x64 + naam + regel
+              - button:
+                  id: sf_0
+                  x: 24
+                  y: 64
+                  width: 212
                   height: 64
-                  styles: st_deco
-                  bg_color: 0x2A2927
-                  clickable: false
-                  widgets:
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
-                    - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Woonkamer"}
-              - label: {id: sf_s0, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
-        - button:
-            id: sf_1
-            x: 244
-            y: 64
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - script.execute: {id: sf_scene, i: 1, ent: "scene.woonkamer_woonkamer_eettafel"}
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
-                  height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
-                  widgets:
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                    - obj:
-                        x: 0
-                        y: 0
-                        width: 64
-                        height: 64
-                        clickable: false
-                        widgets:
-                          - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_red}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "WK + eettafel"}
-              - label: {id: sf_s1, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "ALLE LAMPEN"}
-        - button:
-            id: sf_2
-            x: 24
-            y: 136
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - script.execute: {id: sf_scene, i: 2, ent: "scene.woonkamer_herfst_goud"}
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
-                  height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
-                  widgets:
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xF08A2E, clickable: false}
-                    - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_red}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Herfstgoud"}
-              - label: {id: sf_s2, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
-        - button:
-            id: sf_3
-            x: 244
-            y: 136
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - script.execute: {id: sf_scene, i: 3, ent: "scene.woonkamer_tafel"}
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
-                  height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
+                  styles: st_tile
+                  on_click:
+                    - homeassistant.action:
+                        action: scene.turn_on
+                        data:
+                          # woonkamer inclusief keuken en eettafel (zoals op display woonkamer)
+                          entity_id: "scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel"
+                    - lambda: 'id(sf_idx) = 0;'
+                    - script.execute: sf_mark
                   widgets:
                     - obj:
                         x: 0
                         y: 0
                         width: 64
                         height: 64
+                        styles: st_deco
+                        bg_color: 0x2A2927
                         clickable: false
                         widgets:
-                          - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_ink}", clickable: false}
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Tafel"}
-              - label: {id: sf_s3, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
-        - button:
-            id: sf_4
-            x: 24
-            y: 208
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - script.execute: {id: sf_scene, i: 4, ent: "scene.woonkamer_concentreren"}
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Woonkamer"}
+                    - label: {id: sf_s0, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
+              - button:
+                  id: sf_1
+                  x: 244
+                  y: 64
+                  width: 212
                   height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
-                  widgets:
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xFFFFFF, clickable: false}
-                    - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Concentreren"}
-              - label: {id: sf_s4, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "HELDER WIT"}
-        - button:
-            id: sf_5
-            x: 244
-            y: 208
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - script.execute: {id: sf_scene, i: 5, ent: "scene.woonkamer_fairfax"}
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
-                  height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: sf_scene, i: 1, ent: "scene.woonkamer_woonkamer_eettafel"}
                   widgets:
                     - obj:
                         x: 0
                         y: 0
                         width: 64
                         height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
                         clickable: false
                         widgets:
-                          - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_ink}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Fairfax"}
-              - label: {id: sf_s5, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
-        - button:
-            id: sf_6
-            x: 24
-            y: 280
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - lambda: 'id(sf_idx) = 6;'
-              - script.execute: sf_mark
-              - homeassistant.action:
-                  action: script.turn_on
-                  data:
-                    entity_id: script.lampen_random_kleuren
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 64
+                              height: 64
+                              clickable: false
+                              widgets:
+                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "WK + eettafel"}
+                    - label: {id: sf_s1, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "ALLE LAMPEN"}
+              - button:
+                  id: sf_2
+                  x: 24
+                  y: 136
+                  width: 212
                   height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: sf_scene, i: 2, ent: "scene.woonkamer_herfst_goud"}
                   widgets:
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
                     - obj:
                         x: 0
                         y: 0
                         width: 64
                         height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
                         clickable: false
                         widgets:
-                          - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Random kleuren"}
-              - label: {id: sf_s6, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "VERRAS ME"}
-        - button:
-            id: sf_7
-            x: 244
-            y: 280
-            width: 212
-            height: 64
-            styles: st_tile
-            on_click:
-              - lambda: 'id(sf_idx) = 7;'
-              - script.execute: sf_mark
-              - homeassistant.action:
-                  action: light.turn_off
-                  data:
-                    entity_id: light.woonkamer, light.eettafel, light.keuken
-            widgets:
-              - obj:
-                  x: 0
-                  y: 0
-                  width: 64
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xF08A2E, clickable: false}
+                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Herfstgoud"}
+                    - label: {id: sf_s2, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
+              - button:
+                  id: sf_3
+                  x: 244
+                  y: 136
+                  width: 212
                   height: 64
-                  styles: st_deco
-                  bg_color: ${c_tile2}
-                  clickable: false
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: sf_scene, i: 3, ent: "scene.woonkamer_tafel"}
                   widgets:
-                    - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_ink}", clickable: false}
-                    - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_off}", clickable: false}
-              - label: {x: 76, y: 14, text_font: f_15, text: "Alles uit"}
-              - label: {id: sf_s7, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "UIT"}
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
+                        clickable: false
+                        widgets:
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 64
+                              height: 64
+                              clickable: false
+                              widgets:
+                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Tafel"}
+                    - label: {id: sf_s3, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
+              - button:
+                  id: sf_4
+                  x: 24
+                  y: 208
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: sf_scene, i: 4, ent: "scene.woonkamer_concentreren"}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
+                        clickable: false
+                        widgets:
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: 0xFFFFFF, clickable: false}
+                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Concentreren"}
+                    - label: {id: sf_s4, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "HELDER WIT"}
+              - button:
+                  id: sf_5
+                  x: 244
+                  y: 208
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: sf_scene, i: 5, ent: "scene.woonkamer_fairfax"}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
+                        clickable: false
+                        widgets:
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 64
+                              height: 64
+                              clickable: false
+                              widgets:
+                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Fairfax"}
+                    - label: {id: sf_s5, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNE"}
+              - button:
+                  id: sf_6
+                  x: 24
+                  y: 280
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lambda: 'id(sf_idx) = 6;'
+                    - script.execute: sf_mark
+                    - homeassistant.action:
+                        action: script.turn_on
+                        data:
+                          entity_id: script.lampen_random_kleuren
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
+                        clickable: false
+                        widgets:
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_red}", clickable: false}
+                          - obj:
+                              x: 0
+                              y: 0
+                              width: 64
+                              height: 64
+                              clickable: false
+                              widgets:
+                                - obj: {x: -64, y: -64, width: 128, height: 128, radius: 64, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Random kleuren"}
+                    - label: {id: sf_s6, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "VERRAS ME"}
+              - button:
+                  id: sf_7
+                  x: 244
+                  y: 280
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lambda: 'id(sf_idx) = 7;'
+                    - script.execute: sf_mark
+                    - homeassistant.action:
+                        action: light.turn_off
+                        data:
+                          entity_id: light.woonkamer, light.eettafel, light.keuken
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_tile2}
+                        clickable: false
+                        widgets:
+                          - obj: {x: 0, y: 43, width: 32, height: 21, styles: st_deco, bg_color: "${c_ink}", clickable: false}
+                          - obj: {x: 8, y: -14, width: 64, height: 64, radius: 32, styles: st_deco, bg_color: "${c_off}", clickable: false}
+                    - label: {x: 76, y: 14, text_font: f_15, text: "Alles uit"}
+                    - label: {id: sf_s7, x: 76, y: 36, styles: st_mono11, text_color: "${c_sub}", text: "UIT"}
 
     # ================= 03 Nu speelt =================
     - id: p_muziek
@@ -1518,6 +2072,8 @@ lvgl:
               - obj: {x: 76, y: -20, width: 120, height: 120, radius: 60, styles: st_deco, bg_color: "${c_red}", clickable: false}
               - obj: {x: 0, y: 120, width: 176, height: 56, styles: st_deco, bg_color: "${c_ink}", clickable: false}
               - obj: {x: 0, y: 64, width: 56, height: 56, styles: st_deco, bg_color: "${c_paper}", clickable: false}
+        # echte hoes (Music Assistant via HA); verborgen tot hij binnen is
+        - image: {id: mu_cover, x: 24, y: 68, width: 176, height: 176, src: cov_big, hidden: true}
         - label: {x: 216, y: 70, styles: st_mono11, text_color: "${c_redt}", text: "SPELER · WOONKAMER"}
         - label:
             id: mu_title
@@ -1603,52 +2159,60 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 4}
       widgets:
-        - obj: {x: 300, y: 150, width: 240, height: 240, radius: 120, styles: st_deco, bg_color: "${c_blue}", clickable: false}
-        - obj: {x: 404, y: 120, width: 60, height: 60, radius: 30, styles: st_deco, bg_color: "${c_red}", clickable: false}
-        - obj: *hdr_line
-        - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "05"}
-        - label: {x: 52, y: 17, styles: st_mono12, text: "KLIMAAT"}
-        - label: {id: hd_t4, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-        - label: {x: 24, y: 66, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · NU"}
-        - label: {id: cl_now, x: 20, y: 82, text_font: f_72, text_letter_space: -3, text: "–"}
-        - label: {x: 24, y: 176, styles: st_mono11, text_color: "${c_sub}", text: "GEWENST"}
-        - button:
-            x: 24
-            y: 196
-            width: 56
-            height: 56
-            styles: st_outline
-            on_click:
-              - script.execute: {id: cl_step, d: -0.5}
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        - obj:
+            id: pg_klimaat
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22}
-        - label: {id: cl_want, x: 88, y: 207, width: 104, text_align: CENTER, text_font: f_26, text: "–"}
-        - button:
-            x: 200
-            y: 196
-            width: 56
-            height: 56
-            styles: st_outline
-            on_click:
-              - script.execute: {id: cl_step, d: 0.5}
-            widgets:
-              - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22}
-        - button:
-            id: cl_mode_b
-            x: 24
-            y: 272
-            width: 232
-            height: 56
-            styles: st_tile
-            on_click:
-              - homeassistant.action:
-                  action: climate.set_hvac_mode
-                  data:
-                    entity_id: climate.living_room
-                    hvac_mode: !lambda 'return std::string(id(cl_mode).state == "off" ? "heat" : "off");'
-            widgets:
-              - label: {x: 16, y: 17, text: "${ic_power}", text_font: f_ic22}
-              - label: {id: cl_mode_l, x: 48, y: 21, styles: st_mono12, text: "VERWARMING"}
+              - obj: {x: 300, y: 150, width: 240, height: 240, radius: 120, styles: st_deco, bg_color: "${c_blue}", clickable: false}
+              - obj: {x: 404, y: 120, width: 60, height: 60, radius: 30, styles: st_deco, bg_color: "${c_red}", clickable: false}
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "05"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "KLIMAAT"}
+              - label: {id: hd_t4, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - label: {x: 24, y: 66, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER · NU"}
+              - label: {id: cl_now, x: 20, y: 82, text_font: f_72, text_letter_space: -3, text: "–"}
+              - label: {x: 24, y: 176, styles: st_mono11, text_color: "${c_sub}", text: "GEWENST"}
+              - button:
+                  x: 24
+                  y: 196
+                  width: 56
+                  height: 56
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: cl_step, d: -0.5}
+                  widgets:
+                    - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic22}
+              - label: {id: cl_want, x: 88, y: 207, width: 104, text_align: CENTER, text_font: f_26, text: "–"}
+              - button:
+                  x: 200
+                  y: 196
+                  width: 56
+                  height: 56
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: cl_step, d: 0.5}
+                  widgets:
+                    - label: {align: CENTER, text: "${ic_plus}", text_font: f_ic22}
+              - button:
+                  id: cl_mode_b
+                  x: 24
+                  y: 272
+                  width: 232
+                  height: 56
+                  styles: st_tile
+                  on_click:
+                    - homeassistant.action:
+                        action: climate.set_hvac_mode
+                        data:
+                          entity_id: climate.living_room
+                          hvac_mode: !lambda 'return std::string(id(cl_mode).state == "off" ? "heat" : "off");'
+                  widgets:
+                    - label: {x: 16, y: 17, text: "${ic_power}", text_font: f_ic22}
+                    - label: {id: cl_mode_l, x: 48, y: 21, styles: st_mono12, text: "VERWARMING"}
 
     # ================= 06 Weer =================
     - id: p_weer
@@ -1656,94 +2220,102 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 5}
       widgets:
-        - obj: {x: 370, y: 30, width: 150, height: 150, radius: 75, styles: st_deco, bg_color: "${c_red}", clickable: false}
-        - obj: *hdr_line
-        - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "06"}
-        - label: {x: 52, y: 17, styles: st_mono12, text: "WEER"}
-        - label: {id: hd_t5, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-        - label: {id: wx_big, x: 20, y: 62, text_font: f_72, text_letter_space: -3, text: "–"}
-        - label: {id: wx_name, x: 150, y: 86, text_font: f_17, text: ""}
-        - label: {id: wx_extra, x: 150, y: 110, styles: st_mono11, text_color: "${c_sub}", text: ""}
-        - label: {x: 24, y: 152, styles: st_mono11, text: "REGEN · KOMENDE 2 UUR"}
-        - label: {id: wx_tip, x: 216, y: 152, width: 240, text_align: RIGHT, long_mode: DOT, styles: st_mono11, text_color: "${c_blue}", text: ""}
-        # 12 balkjes van 10 minuten (hoogte = hoeveelheid regen)
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
         - obj:
-            x: 24
-            y: 170
-            width: 432
-            height: 56
-            layout:
-              type: FLEX
-              flex_flow: ROW
-              flex_align_cross: END
-              flex_align_track: END
-              flex_align_main: SPACE_BETWEEN
+            id: pg_weer
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_0, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_1, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_2, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_3, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_4, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_5, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_6, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_7, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_8, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_9, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_10, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-              - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_11, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
-        - label: {x: 24, y: 230, styles: st_mono11, text_color: "${c_sub}", text: "NU"}
-        - label: {x: 216, y: 230, width: 48, text_align: CENTER, styles: st_mono11, text_color: "${c_sub}", text: "+1 UUR"}
-        - label: {x: 396, y: 230, width: 60, text_align: RIGHT, styles: st_mono11, text_color: "${c_sub}", text: "+2 UUR"}
-        # komende 6 uur
-        - obj: {x: 24, y: 252, width: 432, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
-        - obj:
-            x: 24
-            y: 258
-            width: 432
-            height: 90
-            layout:
-              type: FLEX
-              flex_flow: ROW
-              flex_align_main: SPACE_BETWEEN
-            widgets:
-              - obj: &wh_col
-                  width: 64
+              - obj: {x: 370, y: 30, width: 150, height: 150, radius: 75, styles: st_deco, bg_color: "${c_red}", clickable: false}
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "06"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "WEER"}
+              - label: {id: hd_t5, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - label: {id: wx_big, x: 20, y: 62, text_font: f_72, text_letter_space: -3, text: "–"}
+              - label: {id: wx_name, x: 150, y: 86, text_font: f_17, text: ""}
+              - label: {id: wx_extra, x: 150, y: 110, styles: st_mono11, text_color: "${c_sub}", text: ""}
+              - label: {x: 24, y: 152, styles: st_mono11, text: "REGEN · KOMENDE 2 UUR"}
+              - label: {id: wx_tip, x: 216, y: 152, width: 240, text_align: RIGHT, long_mode: DOT, styles: st_mono11, text_color: "${c_blue}", text: ""}
+              # 12 balkjes van 10 minuten (hoogte = hoeveelheid regen)
+              - obj:
+                  x: 24
+                  y: 170
+                  width: 432
+                  height: 56
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_cross: END
+                    flex_align_track: END
+                    flex_align_main: SPACE_BETWEEN
+                  widgets:
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_0, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_1, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_2, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_3, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_4, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_5, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_6, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_7, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_8, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_9, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_10, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+                    - obj: {width: 32, height: 56, styles: st_deco, bg_color: "${c_tile}", clickable: false, widgets: [{obj: {id: rb_11, align: BOTTOM_MID, width: 32, height: 0, styles: st_deco, bg_color: "${c_blue}", clickable: false}}]}
+              - label: {x: 24, y: 230, styles: st_mono11, text_color: "${c_sub}", text: "NU"}
+              - label: {x: 216, y: 230, width: 48, text_align: CENTER, styles: st_mono11, text_color: "${c_sub}", text: "+1 UUR"}
+              - label: {x: 396, y: 230, width: 60, text_align: RIGHT, styles: st_mono11, text_color: "${c_sub}", text: "+2 UUR"}
+              # komende 6 uur
+              - obj: {x: 24, y: 252, width: 432, height: 1, styles: st_deco, bg_color: "${c_line}", clickable: false}
+              - obj:
+                  x: 24
+                  y: 258
+                  width: 432
                   height: 90
-                  layout: {type: FLEX, flex_flow: COLUMN, flex_align_cross: CENTER, pad_row: 4}
+                  layout:
+                    type: FLEX
+                    flex_flow: ROW
+                    flex_align_main: SPACE_BETWEEN
                   widgets:
-                    - label: {id: wh_u0, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i0, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t0, text_font: f_15, text: ""}
-              - obj:
-                  <<: *wh_col
-                  widgets:
-                    - label: {id: wh_u1, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i1, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t1, text_font: f_15, text: ""}
-              - obj:
-                  <<: *wh_col
-                  widgets:
-                    - label: {id: wh_u2, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i2, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t2, text_font: f_15, text: ""}
-              - obj:
-                  <<: *wh_col
-                  widgets:
-                    - label: {id: wh_u3, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i3, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t3, text_font: f_15, text: ""}
-              - obj:
-                  <<: *wh_col
-                  widgets:
-                    - label: {id: wh_u4, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i4, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t4, text_font: f_15, text: ""}
-              - obj:
-                  <<: *wh_col
-                  widgets:
-                    - label: {id: wh_u5, styles: st_mono11, text_color: "${c_sub}", text: ""}
-                    - label: {id: wh_i5, text_font: f_ic30, text: ""}
-                    - label: {id: wh_t5, text_font: f_15, text: ""}
+                    - obj: &wh_col
+                        width: 64
+                        height: 90
+                        layout: {type: FLEX, flex_flow: COLUMN, flex_align_cross: CENTER, pad_row: 4}
+                        widgets:
+                          - label: {id: wh_u0, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i0, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t0, text_font: f_15, text: ""}
+                    - obj:
+                        <<: *wh_col
+                        widgets:
+                          - label: {id: wh_u1, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i1, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t1, text_font: f_15, text: ""}
+                    - obj:
+                        <<: *wh_col
+                        widgets:
+                          - label: {id: wh_u2, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i2, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t2, text_font: f_15, text: ""}
+                    - obj:
+                        <<: *wh_col
+                        widgets:
+                          - label: {id: wh_u3, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i3, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t3, text_font: f_15, text: ""}
+                    - obj:
+                        <<: *wh_col
+                        widgets:
+                          - label: {id: wh_u4, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i4, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t4, text_font: f_15, text: ""}
+                    - obj:
+                        <<: *wh_col
+                        widgets:
+                          - label: {id: wh_u5, styles: st_mono11, text_color: "${c_sub}", text: ""}
+                          - label: {id: wh_i5, text_font: f_ic30, text: ""}
+                          - label: {id: wh_t5, text_font: f_15, text: ""}
 
     # ================= 00 Menu =================
     - id: p_menu
@@ -1751,101 +2323,606 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 6}
       widgets:
-        - obj: *hdr_line
-        - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "00"}
-        - label: {x: 52, y: 17, styles: st_mono12, text: "MENU"}
-        - label: {id: hd_t6, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
-        - button:
-            x: 24
-            y: 64
-            width: 102
-            height: 64
-            bg_color: ${c_ink}
-            bg_opa: COVER
-            text_color: ${c_paper}
-            pressed:
-              bg_color: ${c_red}
-            on_click: [lvgl.page.show: p_licht]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_bulb}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "LICHT"}
-        - button:
-            x: 134
-            y: 64
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click: [lvgl.page.show: p_sfeer]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_palette}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "SFEER"}
-        - button:
-            x: 244
-            y: 64
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click: [lvgl.page.show: p_muziek]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_music}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "MUZIEK"}
-        - button:
-            x: 354
-            y: 64
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click: [lvgl.page.show: p_klimaat]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_thermo}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "KLIMAAT"}
-        - button:
-            x: 24
-            y: 136
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click: [lvgl.page.show: p_weer]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_rain}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "WEER"}
-        - button:
-            x: 134
-            y: 136
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click: [lvgl.page.show: p_home]
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_home}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "THUIS"}
-        - button:
-            x: 244
-            y: 136
-            width: 102
-            height: 64
-            styles: st_tile
-            on_click:
-              - light.turn_off: display_backlight
-            widgets:
-              - label: {x: 10, y: 10, text: "${ic_night}", text_font: f_ic22}
-              - label: {x: 10, y: 40, styles: st_mono11, text: "NACHT"}
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
         - obj:
-            x: 354
-            y: 136
-            width: 102
-            height: 64
-            styles: st_deco
-            bg_color: ${c_blue}
-            clickable: false
+            id: pg_menu
+            x: 0
+            y: 0
+            width: 480
+            height: 480
             widgets:
-              - obj: {x: 50, y: -26, width: 72, height: 72, radius: 36, styles: st_deco, bg_color: "${c_red}", clickable: false}
-        - label: {x: 24, y: 222, width: 432, styles: st_mono11, text_color: "${c_sub}", text: "RASTER & CIRKEL · STAP 1"}
-        - label:
-            x: 24
-            y: 242
-            width: 432
-            text_font: f_15
-            text_color: ${c_sub}
-            long_mode: WRAP
-            text: "Energie, zon, huis, tv, planten, intercom en systeem komen in een volgende stap."
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "00"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "MENU"}
+              - label: {id: hd_t6, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - button:
+                  x: 24
+                  y: 64
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_licht
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_bulb}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Licht"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "3 GROEPEN"}
+              - button:
+                  x: 244
+                  y: 64
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_sfeer
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_palette}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Sfeer"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "SCÈNES"}
+              - button:
+                  x: 24
+                  y: 136
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_muziek
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_blue}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Muziek"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "NU SPEELT"}
+              - button:
+                  x: 244
+                  y: 136
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_wekker
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Wekker"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "TIJD EN GELUID"}
+              - button:
+                  x: 24
+                  y: 208
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_klimaat
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_blue}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_thermo}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Klimaat"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "WOONKAMER"}
+              - button:
+                  x: 244
+                  y: 208
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_weer
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_rain}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Weer"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "REGEN EN UREN"}
+              - button:
+                  x: 24
+                  y: 280
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_nacht
+                    - light.turn_on: {id: display_backlight, brightness: 12%}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_night}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Nachtstand"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "KLOK GEDIMD"}
+              - button:
+                  x: 244
+                  y: 280
+                  width: 212
+                  height: 64
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_home
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 64
+                        height: 64
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_home}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Thuis"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "BEGINSCHERM"}
+
+    # ================= 07 Wekker =================
+    - id: p_wekker
+      styles: st_page
+      on_load:
+        - script.execute: {id: nav_mark, p: 7}
+      widgets:
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        - obj:
+            id: pg_wekker
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            widgets:
+              - obj: {x: 350, y: 150, width: 260, height: 260, radius: 130, styles: st_deco, bg_color: "${c_tile}", clickable: false}
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "07"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "WEKKER"}
+              - label: {id: hd_t7, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - label: {id: wk_big, x: 20, y: 56, text_font: f_72, text_letter_space: -3, text: "07:00"}
+              - label: {id: wk_info, x: 24, y: 144, styles: st_mono11, text_color: "${c_sub}", text: ""}
+              - label: {id: wk_sw_l, x: 300, y: 84, width: 72, text_align: RIGHT, styles: st_mono12, text: "UIT"}
+              - switch:
+                  id: wk_sw
+                  x: 384
+                  y: 72
+                  width: 72
+                  height: 40
+                  bg_color: ${c_off}
+                  bg_opa: COVER
+                  radius: 20
+                  indicator:
+                    bg_opa: TRANSP
+                    checked:
+                      bg_color: ${c_ink}
+                      bg_opa: COVER
+                    radius: 20
+                  knob:
+                    bg_color: ${c_paper}
+                    radius: 16
+                    pad_all: -4
+                    shadow_width: 0
+                  on_change:
+                    - homeassistant.action:
+                        action: !lambda 'return std::string(x ? "input_boolean.turn_on" : "input_boolean.turn_off");'
+                        data:
+                          entity_id: input_boolean.wekker_slaapkamer_aan
+              - button:
+                  x: 24
+                  y: 164
+                  width: 102
+                  height: 44
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: wk_step, d: -60}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "- UUR"}
+              - button:
+                  x: 134
+                  y: 164
+                  width: 102
+                  height: 44
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: wk_step, d: 60}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "+ UUR"}
+              - button:
+                  x: 244
+                  y: 164
+                  width: 102
+                  height: 44
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: wk_step, d: -5}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "- 5 MIN"}
+              - button:
+                  x: 354
+                  y: 164
+                  width: 102
+                  height: 44
+                  styles: st_outline
+                  on_click:
+                    - script.execute: {id: wk_step, d: 5}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "+ 5 MIN"}
+              - button:
+                  id: wk_d0
+                  x: 24
+                  y: 216
+                  width: 138
+                  height: 40
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_days, i: 0}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "WERKDAGEN"}
+              - button:
+                  id: wk_d1
+                  x: 171
+                  y: 216
+                  width: 138
+                  height: 40
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_days, i: 1}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "ELKE DAG"}
+              - button:
+                  id: wk_d2
+                  x: 318
+                  y: 216
+                  width: 138
+                  height: 40
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_days, i: 2}
+                  widgets:
+                    - label: {align: CENTER, styles: st_mono12, text: "WEEKEND"}
+              - button:
+                  x: 24
+                  y: 264
+                  width: 432
+                  height: 40
+                  styles: st_tile
+                  on_click:
+                    - lvgl.page.show: p_wgeluid
+                  widgets:
+                    - label: {x: 12, y: 8, text: "${ic_bell}", text_font: f_ic22}
+                    - label: {x: 48, y: 13, styles: st_mono11, text_color: "${c_sub}", text: "GELUID"}
+                    - label: {id: wk_g_name, x: 120, y: 10, width: 260, long_mode: DOT, text_font: f_15, text: "–"}
+                    - label: {align: RIGHT_MID, x: -10, text: "${ic_chev}", text_font: f_ic22}
+              - obj:
+                  x: 24
+                  y: 312
+                  width: 432
+                  height: 40
+                  styles: st_tile
+                  widgets:
+                    - label: {x: 12, y: 8, text: "${ic_sunrise}", text_font: f_ic22}
+                    - label: {x: 48, y: 10, text_font: f_15, text: "Zonsopgang-licht"}
+                    - label: {x: 196, y: 13, styles: st_mono11, text_color: "${c_sub}", text: "5 MIN NAAR 100%"}
+                    - switch:
+                        id: wk_lamp_sw
+                        x: 372
+                        y: 5
+                        width: 52
+                        height: 30
+                        bg_color: ${c_off}
+                        bg_opa: COVER
+                        radius: 15
+                        indicator:
+                          bg_opa: TRANSP
+                          checked:
+                            bg_color: ${c_ink}
+                            bg_opa: COVER
+                          radius: 15
+                        knob:
+                          bg_color: ${c_paper}
+                          radius: 11
+                          pad_all: -4
+                          shadow_width: 0
+                        on_change:
+                          - homeassistant.action:
+                              action: !lambda 'return std::string(x ? "input_boolean.turn_on" : "input_boolean.turn_off");'
+                              data:
+                                entity_id: input_boolean.wekker_slaapkamer_lampen
+
+    # ================= 08 Wekkergeluid =================
+    - id: p_wgeluid
+      styles: st_page
+      on_load:
+        - script.execute: {id: nav_mark, p: 8}
+      widgets:
+        # inhoud schuift 56 px omlaag zolang de spelerbalk bovenin staat
+        - obj:
+            id: pg_wgeluid
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            widgets:
+              - obj: *hdr_line
+              - label: {x: 24, y: 17, styles: st_mono12, text_color: "${c_redt}", text: "08"}
+              - label: {x: 52, y: 17, styles: st_mono12, text: "WEKKERGELUID"}
+              - label: {id: hd_t8, x: 376, y: 17, width: 80, text_align: RIGHT, styles: st_mono12, text: "--:--"}
+              - button:
+                  id: wg_0
+                  x: 24
+                  y: 56
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 0}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_blue}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_whisper}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Fluisterwekker"}
+                    - label: {id: wg_s0, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZACHTE STEM"}
+              - button:
+                  id: wg_1
+                  x: 244
+                  y: 56
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 1}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_speaker}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Wekkerbrigade"}
+                    - label: {id: wg_s1, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "VROLIJK EN HARD"}
+              - button:
+                  id: wg_2
+                  x: 24
+                  y: 116
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 2}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_alarm}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Zoemer"}
+                    - label: {id: wg_s2, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "PIEP PIEP"}
+              - button:
+                  id: wg_3
+                  x: 244
+                  y: 116
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 3}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Klassieke wekker"}
+                    - label: {id: wg_s3, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "RINKELBEL"}
+              - button:
+                  id: wg_4
+                  x: 24
+                  y: 176
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 4}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_siren}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Alarm"}
+                    - label: {id: wg_s4, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "SIRENE"}
+              - button:
+                  id: wg_5
+                  x: 244
+                  y: 176
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 5}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_blue}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_leaf}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Rustig wekken"}
+                    - label: {id: wg_s5, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZACHTE KLOKJES"}
+              - button:
+                  id: wg_6
+                  x: 24
+                  y: 236
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 6}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_blue}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_music}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Muziek"}
+                    - label: {id: wg_s6, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "NPO RADIO 2"}
+              - button:
+                  id: wg_7
+                  x: 244
+                  y: 236
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 7}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_bird}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Natuurgeluiden"}
+                    - label: {id: wg_s7, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "VOGELS EN WATER"}
+              - button:
+                  id: wg_8
+                  x: 24
+                  y: 296
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - script.execute: {id: wk_pick, i: 8}
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_red}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_sunrise}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Alleen licht"}
+                    - label: {id: wg_s8, x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "ZONSOPGANG"}
+              - button:
+                  x: 244
+                  y: 296
+                  width: 212
+                  height: 52
+                  styles: st_tile
+                  on_click:
+                    - homeassistant.action:
+                        action: script.turn_on
+                        data:
+                          entity_id: script.wekker_slaapkamer_afgaan
+                  widgets:
+                    - obj:
+                        x: 0
+                        y: 0
+                        width: 52
+                        height: 52
+                        styles: st_deco
+                        bg_color: ${c_ink}
+                        clickable: false
+                        widgets:
+                          - label: {align: CENTER, text: "${ic_play}", text_font: f_ic22, text_color: "${c_paper}"}
+                    - label: {x: 64, y: 8, text_font: f_15, text: "Probeer nu"}
+                    - label: {x: 64, y: 30, styles: st_mono11, text_color: "${c_sub}", text: "LAAT HEM AFGAAN"}
+
+    # ================= Nachtstand =================
+    - id: p_nacht
+      styles: st_page
+      bg_color: ${c_ink}
+      on_load:
+        - script.execute: {id: nav_mark, p: 9}
+      widgets:
+        - label: {id: n_date, x: 0, y: 96, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: ""}
+        - label: {id: n_clock, x: 0, y: 150, width: 480, text_align: CENTER, text_font: f_clock, text_letter_space: -6, text_color: "${c_night}", text: "--:--"}
+        - label: {id: n_wekker, x: 0, y: 316, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: ""}
+        - label: {x: 0, y: 440, width: 480, text_align: CENTER, styles: st_mono11, text_color: 0x3A1810, text: "TIK = TERUG"}
