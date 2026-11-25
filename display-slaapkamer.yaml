@@ -8,6 +8,7 @@
 #   muziek en klimaat nog van de woonkamer).
 #   Versie 0.21 (25-11-2026): klok onleesbaar in het donkere schema: gewone scherm 's nachts
 #   en gedimd in het donkere schema nu 60% (was 35%; door de gamma gaf dat bijna geen licht).
+#   Tekst en klok in het donkere schema lichter (licht zand 0xD2C6B8, grijs 0x948A7F).
 #   Versie 0.20 (25-11-2026): donker schema werkte niet: het kleurfilter van LVGL staat
 #   standaard uit; nu aangezet met build_flags -DLV_USE_COLOR_FILTER=1.
 #   Versie 0.19 (25-11-2026): avondstand is nu een DONKER KLEURENSCHEMA ("warm donker":
@@ -1196,20 +1197,20 @@ script:
             lv_color_filter_dsc_init(&f, [](const lv_color_filter_dsc_t *, lv_color_t c, lv_opa_t) -> lv_color_t {
               switch (lv_color_to_u32(c) & 0xFFFFFF) {
                 case ${c_paper}:  return lv_color_hex(0x151210);   // achtergrond
-                case ${c_ink}:    return lv_color_hex(0xA89C8F);   // tekst
+                case ${c_ink}:    return lv_color_hex(0xD2C6B8);   // tekst en klok (licht zand)
                 case ${c_inkbg}:  return lv_color_hex(0x2A2420);   // gekozen knop / donker vlak
-                case ${c_papert}: return lv_color_hex(0xB3A79A);   // tekst op een donker vlak
+                case ${c_papert}: return lv_color_hex(0xD2C6B8);   // tekst op een donker vlak
                 case ${c_tile}:   return lv_color_hex(0x1E1A17);   // tegel
                 case ${c_tile2}:  return lv_color_hex(0x2A2420);
                 case ${c_line}:   return lv_color_hex(0x2A2420);
-                case ${c_sub}:    return lv_color_hex(0x6E655C);   // grijze tekst
+                case ${c_sub}:    return lv_color_hex(0x948A7F);   // grijze tekst
                 case ${c_red}:    return lv_color_hex(0x5A221A);   // diep rood
-                case ${c_redt}:   return lv_color_hex(0xA0473A);   // rode tekst (leesbaar)
+                case ${c_redt}:   return lv_color_hex(0xC0604F);   // rode tekst (leesbaar)
                 case ${c_blue}:   return lv_color_hex(0x1E2A4F);   // diep blauw
-                case ${c_grey}:   return lv_color_hex(0x7A7066);
+                case ${c_grey}:   return lv_color_hex(0x948A7F);
                 case ${c_dline}:  return lv_color_hex(0x2A2420);
                 case ${c_off}:    return lv_color_hex(0x3A332E);   // schakelaar uit
-                case 0xFFFFFF:    return lv_color_hex(0xB3A79A);
+                case 0xFFFFFF:    return lv_color_hex(0xD2C6B8);
                 case ${c_night}:  return c;                        // nachtklok blijft zoals hij is
                 default:          return lv_color_make(c.red * 3 / 5, c.green * 3 / 5, c.blue * 3 / 5);
               }
