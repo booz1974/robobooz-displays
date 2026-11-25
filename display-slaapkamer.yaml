@@ -6,13 +6,15 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.16 (25-11-2026): eenmalige use_address: display-test.local weggehaald
+#   (het display heeft de nieuwe naam display-slaapkamer).
 #   Versie 0.15 (25-11-2026): FAVORIETEN (08): radio en playlists uit Music
 #   Assistant (meest gespeeld bovenaan), tabbladen RADIO / PLAYLISTS, tik = afspelen
 #   op de speler (playlists op shuffle). Via Nu speelt en via Menu (vervangt Thuis).
 #   Versie 0.14 (25-11-2026): HA-verbinding elke 3 s gecontroleerd (de melding
 #   "geen verbinding" bleef staan als de ESPHome-logviewer werd gesloten).
 #   Apparaat heet nu ook display-slaapkamer (was
-#   display-test); eenmalig use_address: display-test.local voor de eerste update.
+#   display-test).
 #   Entiteit: light.display_slaapkamer_schermverlichting.
 #   Versie 0.13 (25-11-2026): bestand heet nu display-slaapkamer.yaml; het apparaat
 #   heet in ESPHome/HA nog display-test (zo blijven draadloos bijwerken en de
@@ -206,9 +208,6 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  # EENMALIG bij het hernoemen (display-test -> display-slaapkamer): de eerste
-  # draadloze update gaat nog naar het oude adres. Na die update deze regel weghalen.
-  use_address: display-test.local
   ap:
     ssid: "Display slaapkamer Fallback"
     password: !secret plate04_ap_password
