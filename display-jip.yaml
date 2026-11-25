@@ -7,14 +7,31 @@
 # Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, alleen kijkpaal) |
 #           Sfeer | Kachel | Weer | Energie (+ Zonnestroom) | Info | Nachtstand |
 #           Home Assistant | Thema
-#           (+ verborgen: NIET STOREN, Wachtrij, Deurbel, Goedemorgen, Intercom)
+#           (+ verborgen: NIET STOREN, Wachtrij, Deurbel, Goedemorgen, Intercom,
+#            Wekker en het afgaan-scherm van de wekker)
+# Laatste wijziging (25-11-2026): WEKKER, zoals op display-test maar in RACE-stijl.
+#   Thuis heeft nu 6 knoppen (Wekker erbij, met de wekkertijd als hij aan staat).
 # Navigatie: rechtsboven THUIS (accentkleur) en MENU op elke pagina;
 #   vegen naar links/rechts kan ook.
 # Thuis: tik op het klokvak = alle lampen van Jip aan/uit; tijd, datum,
 #   3 nieuwsregels en een finishvlag; weer, kamertegel (temperatuur kamer;
 #   vonkjes = kachel aan, vlokjes = uit; tik = Kachel), energie met
 #   energiekosten van vandaag en ZON/NET live, hoes met VU-meter.
-#   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Menu.
+#   Knoppen onderin: Lampen | Favoriet | Sfeer | Kachel | Wekker | Menu.
+# Wekker (11 / WEKKER, knop op Thuis): tijd -1/+1 uur en -5/+5 min (1,5 s na de
+#   laatste tik naar HA; was HA weg, dan alsnog zodra HA terug is), AAN/UIT
+#   rechtsboven, WERKDAGEN / ELKE DAG / WEEKEND, GELUID (venster met
+#   Fluisterwekker, Wekkerbrigade, Zoemer, Klassieke wekker, Alarm, Rustig wekken,
+#   Muziek, Natuurgeluiden, Alleen licht), LICHT MEE (zonsopgang op
+#   light.slaapkamer_jip_2) en PROBEER NU.
+#   Gaat hij af: scherm vol aan, afgaan-scherm met de tijd, SLUIMER (- / + per
+#   5 min, standaard 5) en STOP; ook vanuit nachtstand en NIET STOREN. Zolang hij
+#   afgaat wisselt het scherm niet vanzelf en dimt het niet. Volume begint op 50%
+#   (Alarm 100%) en gaat langzaam naar 100%; muziek die al speelde gaat na STOP
+#   verder. Geluid op de kijkpaal. Alles in HA: gedeelde scripts
+#   script.wekker_afgaan / _stop / _sluimer met kamer: jip en automation.wekker_jip.
+#   Nachtstand: gedimd "Wekker gaat 07:00" (alleen als hij binnen 24 uur gaat)
+#   of "Sluimert tot 07:05". Het display maakt zelf geen geluid: zonder HA geen wekker.
 # Zonnestroom (@zon-blokken, gelijk aan woonkamer): tik op 'Bespaard door
 #   zon vandaag' op Energie; omvormer + P1 live, 'goed moment om te wassen'.
 #   Vakjes zon/huis/net in de tegelkleur van het thema (zon was onleesbaar).
@@ -82,6 +99,9 @@
 #   input_text.server_hist_temp, input_text.weer_uren_display,
 #   input_text.weer_dagen_display, input_text.ochtend_info_display,
 #   input_text.ochtend_agenda_display, sensor.neerslag_buienradar_regen_data,
+#   wekker: input_datetime.wekker_jip_tijd, input_boolean.wekker_jip_aan / _lampen /
+#   _gaat_af, input_select.wekker_jip_dagen / _geluid, input_number.wekker_jip_sluimertijd,
+#   input_text.wekker_jip_sluimert_tot, script.wekker_afgaan / _stop / _sluimer,
 #   System Monitor-sensoren, script.lampen_random_kleuren en
 #   /config/www/robobooz/ (krrrcht_in.mp3, intro_5..8.mp3, intro_12.mp3, advert-hoes).
 # Ook gebruikt in HA: sensor.dle3a27053_pv_output_actual en
@@ -175,6 +195,19 @@ logger:
 api:
   encryption:
     key: !secret plate03_api_key
+  # wekker: verbinding met HA tonen; een wekkertijd die niet aankwam alsnog sturen
+  on_client_connected:
+    - lambda: 'id(wkj_ha) = true;'
+    - script.execute: wkj_render
+    - if:
+        condition:
+          lambda: 'return id(wkj_dirty);'
+        then:
+          - delay: 3s
+          - script.execute: wkj_send
+  on_client_disconnected:
+    - lambda: 'id(wkj_ha) = false;'
+    - script.execute: wkj_render
 
 ota:
   - platform: esphome
@@ -391,6 +424,9 @@ substitutions:
   mdi_tower:           "\U000F0D3E"
   mdi_washer:          "\U000F072A"
   mdi_globe_light:     "\U000F066F"   # hangende bol, als discobal
+  mdi_alarm:           "\U000F0020"
+  mdi_alarm_snooze:    "\U000F068E"
+  mdi_alarm_off:       "\U000F0023"
   # deel van de naam van de Hue-speler in Music Assistant ("Hue: disco woonkamer")
   disco_match: "disco woonkamer"
 
@@ -496,6 +532,9 @@ font:
       - "${mdi_tower}"
       - "${mdi_washer}"
       - "${mdi_globe_light}"
+      - "${mdi_alarm}"
+      - "${mdi_alarm_snooze}"
+      - "${mdi_alarm_off}"
   - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     id: r_bigico
     size: 190
@@ -1237,6 +1276,16 @@ image:
 
 # ---------------------------------------------------------------- globals
 globals:
+  # ---- wekker Jip
+  - id: wkj_min         # wekkertijd in minuten na middernacht (direct bijgewerkt bij -/+)
+    type: int
+    initial_value: '420'
+  - id: wkj_dirty       # wekkertijd nog niet bij HA aangekomen (HA was weg)
+    type: bool
+    initial_value: 'false'
+  - id: wkj_ha          # verbonden met Home Assistant
+    type: bool
+    initial_value: 'false'
   # @zon-begin
   - id: zs_flow
     type: std::array<float, 3>
@@ -1647,6 +1696,126 @@ globals:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # ---- wekker Jip: alles op de wekkerpagina, het afgaan-scherm, de Thuis-knop en het nachtscherm
+  - id: wkj_render
+    then:
+      - lambda: |-
+          char t[8]; snprintf(t, sizeof(t), "%02d:%02d", id(wkj_min) / 60, id(wkj_min) % 60);
+          bool ha = id(wkj_ha);
+          bool bekend = ha && id(wkj_aan).has_state();
+          bool aan = bekend && id(wkj_aan).state;
+          std::string sl = id(wkj_sltot).has_state() ? id(wkj_sltot).state : std::string("");
+          if (sl == "unknown" || sl == "unavailable") sl = "";
+          std::string dg = id(wkj_dagen).has_state() ? id(wkj_dagen).state : std::string("");
+          std::string g = id(wkj_geluid).has_state() ? id(wkj_geluid).state : std::string("");
+          if (g == "unknown" || g == "unavailable") g = "";
+          const uint32_t *c = id(r_tcol).data();
+          // tijd en AAN/UIT
+          lv_label_set_text(id(wk_big), t);
+          lv_obj_set_style_text_color(id(wk_big), lv_color_hex(aan ? c[3] : c[4]), 0);
+          lv_label_set_text(id(wk_badge_lbl), !bekend ? "?" : (aan ? "AAN" : "UIT"));
+          lv_obj_set_style_bg_color(id(wk_badge), lv_color_hex(aan ? c[2] : c[4]), 0);
+          lv_obj_set_style_text_color(id(wk_badge_lbl), lv_color_hex(aan ? c[5] : 0xFFFFFE), 0);
+          // statusregel
+          std::string info = !ha ? std::string("Geen verbinding met HA") :
+                             (!sl.empty() ? "Sluimert tot " + sl :
+                             (!bekend ? std::string("Wekker: onbekend") :
+                             (aan ? "Wekker gaat " + std::string(t) + (dg.empty() ? std::string("") : " · " + dg) : std::string("Wekker staat uit"))));
+          lv_label_set_text(id(wk_info), info.c_str());
+          lv_obj_set_style_text_color(id(wk_info), lv_color_hex(ha ? c[4] : 0xD9534F), 0);
+          // dagen
+          static const char *dn[] = {"Werkdagen", "Elke dag", "Weekend"};
+          lv_obj_t *db[] = {id(wk_d0), id(wk_d1), id(wk_d2)};
+          lv_obj_t *dl[] = {id(wk_d0l), id(wk_d1l), id(wk_d2l)};
+          for (int k = 0; k < 3; k++) {
+            bool sel = dg == dn[k];
+            lv_obj_set_style_bg_color(db[k], lv_color_hex(sel ? c[20] : c[1]), 0);
+            lv_obj_set_style_text_color(dl[k], lv_color_hex(sel ? c[21] : c[3]), 0);
+          }
+          // geluid (pagina, keuzevenster en afgaan-scherm)
+          lv_label_set_text(id(wk_g_name), g.empty() ? "–" : g.c_str());
+          lv_label_set_text(id(wa_geluid), g.empty() ? "" : g.c_str());
+          static const char *gn[] = {"Fluisterwekker", "Wekkerbrigade", "Zoemer", "Klassieke wekker", "Alarm",
+                                     "Rustig wekken", "Muziek", "Natuurgeluiden", "Alleen licht"};
+          lv_obj_t *gb[] = {id(wg_0), id(wg_1), id(wg_2), id(wg_3), id(wg_4), id(wg_5), id(wg_6), id(wg_7), id(wg_8)};
+          lv_obj_t *gl[] = {id(wg_n0), id(wg_n1), id(wg_n2), id(wg_n3), id(wg_n4), id(wg_n5), id(wg_n6), id(wg_n7), id(wg_n8)};
+          lv_obj_t *gs[] = {id(wg_s0), id(wg_s1), id(wg_s2), id(wg_s3), id(wg_s4), id(wg_s5), id(wg_s6), id(wg_s7), id(wg_s8)};
+          for (int k = 0; k < 9; k++) {
+            bool sel = g == gn[k];
+            lv_obj_set_style_bg_color(gb[k], lv_color_hex(sel ? c[20] : c[1]), 0);
+            lv_obj_set_style_text_color(gl[k], lv_color_hex(sel ? c[21] : c[3]), 0);
+            lv_obj_set_style_text_color(gs[k], lv_color_hex(sel ? c[21] : c[4]), 0);
+          }
+          // zonsopgang-licht
+          bool lamp = id(wkj_lampen).has_state() && id(wkj_lampen).state;
+          lv_obj_set_style_bg_color(id(wk_lamp_btn), lv_color_hex(lamp ? c[2] : c[1]), 0);
+          lv_label_set_text(id(wk_lamp_lbl), lamp ? "LICHT MEE: AAN" : "LICHT MEE: UIT");
+          // Thuis-knop: wekkertijd als hij aan staat
+          lv_label_set_text(id(r_wk_btn_lbl), !sl.empty() ? "SLUIMER" : (aan ? t : "WEKKER"));
+          // nachtscherm: gedimd "Wekker gaat 07:00" (alleen als hij binnen 24 uur gaat) of "Sluimert tot 07:05"
+          std::string nl;
+          if (!sl.empty()) nl = "Sluimert tot " + sl;
+          else if (aan) {
+            auto n = id(system_time).now();
+            if (n.is_valid()) {
+              int nu = n.hour * 60 + n.minute;
+              int d = id(wkj_min) > nu ? n.day_of_week : (n.day_of_week % 7) + 1;   // 1 = zondag .. 7 = zaterdag
+              bool werk = d >= 2 && d <= 6;
+              bool gaat = dg == "Elke dag" || (dg == "Werkdagen" && werk) || (dg == "Weekend" && !werk);
+              if (gaat) nl = std::string("Wekker gaat ") + t;
+            }
+          }
+          if (!ha && (aan || !sl.empty())) nl += nl.empty() ? "Geen verbinding met HA" : " · geen verbinding met HA";
+          lv_label_set_text(id(nt_wekker), nl.c_str());
+  - id: wkj_step
+    parameters:
+      d: int
+    then:
+      - lambda: |-
+          id(wkj_min) = ((id(wkj_min) + d) % 1440 + 1440) % 1440;
+          id(wkj_dirty) = true;   // tot HA hem heeft
+      - script.execute: wkj_render
+      - script.execute: wkj_send
+  # pas 1,5 s na de laatste tik naar HA sturen (snel tikken = één keer opslaan)
+  - id: wkj_send
+    mode: restart
+    then:
+      - delay: 1500ms
+      - if:
+          condition:
+            lambda: 'return id(wkj_ha);'
+          then:
+            - homeassistant.action:
+                action: input_datetime.set_datetime
+                data:
+                  entity_id: input_datetime.wekker_jip_tijd
+                  time: !lambda 'char b[12]; snprintf(b, sizeof(b), "%02d:%02d:00", id(wkj_min) / 60, id(wkj_min) % 60); return std::string(b);'
+            - delay: 3s
+            - lambda: 'id(wkj_dirty) = false;'
+          # HA weg: onthouden en sturen zodra de verbinding terug is (api: on_client_connected)
+      - script.execute: wkj_render
+  - id: wkj_pick
+    parameters:
+      i: int
+    then:
+      - lvgl.widget.hide: wk_keuze
+      - homeassistant.action:
+          action: input_select.select_option
+          data:
+            entity_id: input_select.wekker_jip_geluid
+            option: !lambda |-
+              static const char *gn[] = {"Fluisterwekker", "Wekkerbrigade", "Zoemer", "Klassieke wekker", "Alarm",
+                                         "Rustig wekken", "Muziek", "Natuurgeluiden", "Alleen licht"};
+              return std::string(gn[std::max(0, std::min(8, i))]);
+  - id: wkj_days
+    parameters:
+      i: int
+    then:
+      - homeassistant.action:
+          action: input_select.select_option
+          data:
+            entity_id: input_select.wekker_jip_dagen
+            option: !lambda 'return std::string(i == 1 ? "Elke dag" : (i == 2 ? "Weekend" : "Werkdagen"));'
   # ================= RETRO =================
   - id: r_all_lights
     mode: single
@@ -2539,6 +2708,9 @@ script:
             walk(id(page_player)->obj, true);
             walk(id(page_pc)->obj, true);
             App.feed_wdt();
+            walk(id(page_wekker)->obj, true);
+            walk(id(page_wekker_af)->obj, true);
+            App.feed_wdt();
             App.feed_wdt();
           } else {
             walk(lv_screen_active(), false);
@@ -2641,6 +2813,7 @@ script:
           full: true
       - script.wait: night_remap
       - lambda: 'id(theme_prev) = id(theme_idx);'
+      - script.execute: wkj_render
 
   # ---- radio: hoes van het huidige nummer opzoeken
   - id: rad_lookup
@@ -3757,10 +3930,19 @@ script:
           // deurbelfoto (345 KB) weer vrijgeven
           lv_obj_add_flag(id(bell_view), LV_OBJ_FLAG_HIDDEN);
           id(cam_img)->release();
-      - lvgl.page.show:
-          id: page_rhome
-          animation: FADE_IN
-          time: 300ms
+      - if:
+          condition:
+            lambda: 'return id(wkj_af).state;'
+          then:
+            - lvgl.page.show:
+                id: page_wekker_af
+                animation: FADE_IN
+                time: 300ms
+          else:
+            - lvgl.page.show:
+                id: page_rhome
+                animation: FADE_IN
+                time: 300ms
 
   - id: ma_poll
     mode: single
@@ -4555,6 +4737,8 @@ interval:
           auto show = [](esphome::lvgl::LvPageType *pg) {
             if (!pg->is_showing()) id(lvgl_main)->show_page(pg->index, LV_SCREEN_LOAD_ANIM_FADE_IN, 300);
           };
+          // de wekker gaat af: na 30 s niets aanraken altijd terug naar het afgaan-scherm, verder niets wisselen
+          if (id(wkj_af).state) { show(id(page_wekker_af)); return; }
           // kijkpaal speelt: na 30 s niets aanraken naar Nu speelt (scherm sliep: weer aan op 35%,
           // maar niet tussen 23:00 en 07:00: dan blijft een slapend scherm uit)
           if (kijkpaal_speelt && !id(onair).state) {
@@ -4696,6 +4880,11 @@ interval:
       - lambda: |-
           if (id(page_rhome)->is_showing()) id(r_home_render).execute();
           if (id(page_rlamp)->is_showing()) id(r_lamp_render).execute();
+          // afgaan-scherm: klok
+          if (id(page_wekker_af)->is_showing()) {
+            auto t = id(system_time).now();
+            if (t.is_valid()) { char b[8]; snprintf(b, sizeof(b), "%02d:%02d", t.hour, t.minute); lv_label_set_text(id(wa_clock), b); }
+          }
   - interval: 10s
     then:
       - script.execute: r_ticker
@@ -4707,7 +4896,7 @@ interval:
           lv_obj_t *scr = lv_screen_active();
           if (scr == last) return;
           last = scr;
-          if (scr == id(page_music)->obj || scr == id(page_bell)->obj || scr == id(page_nacht)->obj) return;
+          if (scr == id(page_music)->obj || scr == id(page_bell)->obj || scr == id(page_nacht)->obj || scr == id(page_wekker_af)->obj) return;
           uint32_t n = lv_obj_get_child_count(scr);
           if (n > 60) return;
           int step = 0;
@@ -4730,7 +4919,7 @@ interval:
             step++;
           }
           // kop-streep
-          lv_obj_t *hb[] = {id(r_hb1), id(r_hb2), id(r_hb3), id(r_hbx_favs), id(r_hbx_music), id(r_hbx_scenes), id(r_hbx_pc), id(r_hbx_energy), id(r_hbx_info)};
+          lv_obj_t *hb[] = {id(r_hb1), id(r_hb2), id(r_hb3), id(r_hbx_favs), id(r_hbx_music), id(r_hbx_scenes), id(r_hbx_pc), id(r_hbx_energy), id(r_hbx_info), id(r_hbx_wk)};
           for (auto *o : hb) {
             if (lv_obj_get_screen(o) != scr) continue;
             lv_anim_t a; lv_anim_init(&a); lv_anim_set_var(&a, o);
@@ -4762,8 +4951,51 @@ interval:
   # klok op goedemorgen- en nachtscherm
   - interval: 10s
     then:
-      - lambda: 'if (id(page_morgen)->is_showing() || id(page_nacht)->is_showing()) id(am_clock).execute();'
+      - lambda: |-
+          if (id(page_morgen)->is_showing() || id(page_nacht)->is_showing()) id(am_clock).execute();
+          if (id(page_nacht)->is_showing()) id(wkj_render).execute();   // wekkerregel (24-uursvenster)
 binary_sensor:
+  # ---- wekker Jip (gedeelde scripts script.wekker_* met kamer: jip)
+  - platform: homeassistant
+    id: wkj_aan
+    entity_id: input_boolean.wekker_jip_aan
+    internal: true
+    on_state: {script.execute: wkj_render}
+  - platform: homeassistant
+    id: wkj_lampen
+    entity_id: input_boolean.wekker_jip_lampen
+    internal: true
+    on_state: {script.execute: wkj_render}
+  - platform: homeassistant
+    id: wkj_af
+    entity_id: input_boolean.wekker_jip_gaat_af
+    internal: true
+    trigger_on_initial_state: true
+    on_state:
+      - if:
+          condition:
+            lambda: 'return x;'
+          # de wekker gaat af: scherm vol aan en het afgaan-scherm (ook vanuit nachtstand of NIET STOREN)
+          then:
+            - lvgl.resume:
+            - light.turn_on:
+                id: display_backlight
+                brightness: 100%
+            - lvgl.widget.hide: wk_keuze
+            - script.execute: wkj_render
+            - lvgl.page.show:
+                id: page_wekker_af
+                animation: FADE_IN
+                time: 200ms
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(page_wekker_af)->is_showing();'
+                then:
+                  - lvgl.page.show:
+                      id: page_rhome
+                      animation: FADE_IN
+                      time: 300ms
   # niet storen (input_boolean.jip_niet_storen): rood scherm en geen deurbelbeeld
   - platform: homeassistant
     id: onair
@@ -4962,6 +5194,15 @@ binary_sensor:
           id: info_regen_icon
           text_color: !lambda 'return x ? lv_color_hex(0xE5736A) : lv_color_hex(id(r_tcol)[4]);'
 sensor:
+  # ---- wekker Jip: sluimertijd (5..30 min, stap 5)
+  - platform: homeassistant
+    id: wkj_sluimer
+    entity_id: input_number.wekker_jip_sluimertijd
+    internal: true
+    on_value:
+      - lambda: |-
+          char t[24]; snprintf(t, sizeof(t), "Sluimer %d min", std::isnan(x) ? 5 : (int) lroundf(x));
+          lv_label_set_text(id(wa_sl_lbl), t);
   # diagnose: hoeveel stapel de hoofdtaak minimaal vrij hield en hoeveel intern RAM er vrij is
   - platform: template
     name: "Stapel hoofdtaak vrij"
@@ -5239,6 +5480,31 @@ sensor:
             std::string s(b); for (auto &c : s) if (c == '.') c = ',';
             return s;
 text_sensor:
+  # ---- wekker Jip
+  - platform: homeassistant
+    id: wkj_tijd
+    entity_id: input_datetime.wekker_jip_tijd
+    internal: true
+    on_value:
+      - lambda: |-
+          int h = 0, m = 0;
+          if (!id(wkj_dirty) && sscanf(x.c_str(), "%d:%d", &h, &m) == 2) id(wkj_min) = h * 60 + m;
+      - script.execute: wkj_render
+  - platform: homeassistant
+    id: wkj_dagen
+    entity_id: input_select.wekker_jip_dagen
+    internal: true
+    on_value: {script.execute: wkj_render}
+  - platform: homeassistant
+    id: wkj_geluid
+    entity_id: input_select.wekker_jip_geluid
+    internal: true
+    on_value: {script.execute: wkj_render}
+  - platform: homeassistant
+    id: wkj_sltot
+    entity_id: input_text.wekker_jip_sluimert_tot
+    internal: true
+    on_value: {script.execute: wkj_render}
   # ---- intercom
   - platform: homeassistant
     id: ic_log
@@ -5465,7 +5731,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !id(wkj_af).state;'
             then:
               - light.turn_on:
                   id: display_backlight
@@ -5474,7 +5740,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(onair).state && !id(wkj_af).state;'
             then:
               - light.turn_on:
                   id: display_backlight
@@ -5483,7 +5749,7 @@ lvgl:
       then:
         - if:
             condition:
-              lambda: 'return !id(page_nacht)->is_showing() && !id(mp_any) && !id(bell_active) && !id(onair).state;'
+              lambda: 'return !id(page_nacht)->is_showing() && !id(mp_any) && !id(bell_active) && !id(onair).state && !id(wkj_af).state;'
             then:
               - lvgl.page.show:
                   id: page_nacht
@@ -6769,9 +7035,9 @@ lvgl:
             bg_opa: COVER
             clickable: false
         - button:
-            x: 14
+            x: 12
             y: 392
-            width: 86
+            width: 71
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6799,9 +7065,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 106
+            x: 89
             y: 392
-            width: 86
+            width: 71
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6829,9 +7095,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 198
+            x: 166
             y: 392
-            width: 86
+            width: 71
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6859,9 +7125,9 @@ lvgl:
                   animation: FADE_IN
                   time: 200ms
         - button:
-            x: 290
+            x: 243
             y: 392
-            width: 86
+            width: 71
             height: 56
             radius: 14
             bg_color: 0xECEEF1
@@ -6888,10 +7154,42 @@ lvgl:
                   id: page_pc
                   animation: FADE_IN
                   time: 200ms
+        # Wekker (tekst = wekkertijd als hij aan staat)
         - button:
-            x: 382
+            x: 320
             y: 392
-            width: 86
+            width: 71
+            height: 56
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            pressed:
+              bg_color: 0xFFFFFF
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -8
+                  text: "${mdi_alarm}"
+                  text_font: pl_icon28
+                  text_color: 0x2B2F36
+              - label:
+                  id: r_wk_btn_lbl
+                  align: CENTER
+                  y: 16
+                  text: "WEKKER"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+            on_click:
+              - lvgl.page.show:
+                  id: page_wekker
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            x: 397
+            y: 392
+            width: 71
             height: 56
             radius: 14
             bg_color: 0xE8745C
@@ -12223,6 +12521,628 @@ lvgl:
                           - lambda: |-
                               char b[24]; snprintf(b, sizeof(b), "GEWENST %d°", id(pc_tw));
                               lv_label_set_text(id(pc_t_set), b);
+    # ================= 11 Wekker (eigen helpers wekker_jip_*, gedeelde scripts script.wekker_*) =================
+    - id: page_wekker
+      skip: true
+      styles: pl_page
+      scrollable: false
+      on_load:
+        - script.execute: wkj_render
+      on_unload:
+        - lvgl.widget.hide: wk_keuze
+      widgets:
+        # RETRO: altijd terug naar THUIS of het MENU
+        - button:
+            align: TOP_RIGHT
+            x: -10
+            y: 6
+            width: 78
+            height: 28
+            radius: 14
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "THUIS"
+                  text_font: r_mono
+                  text_color: 0x46201A
+            on_click:
+              - lvgl.page.show:
+                  id: page_rhome
+                  animation: FADE_IN
+                  time: 200ms
+        - button:
+            align: TOP_RIGHT
+            x: -92
+            y: 6
+            width: 74
+            height: 28
+            radius: 14
+            bg_color: 0xECEEF1
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            ext_click_area: 6
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "MENU"
+                  text_font: r_mono
+                  text_color: 0x2B2F36
+            on_click:
+              - lvgl.page.show:
+                  id: page_rmenu
+                  animation: FADE_IN
+                  time: 200ms
+        - label:
+            x: 18
+            y: 12
+            text: "11 / WEKKER"
+            text_font: r_mono
+            text_color: 0x8B9099
+        - obj:
+            id: r_hbx_wk
+            x: 18
+            y: 30
+            width: 120
+            height: 3
+            radius: 0
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            x: 18
+            y: 42
+            text: "WEKKER"
+            text_font: r_title
+            text_color: 0x2B2F36
+        - label:
+            id: wk_info
+            x: 20
+            y: 86
+            width: 330
+            long_mode: DOT
+            text: ""
+            text_font: pl_t16
+            text_color: ${c_sub}
+        # AAN / UIT rechtsboven (tik = wisselen)
+        - button:
+            id: wk_badge
+            align: TOP_RIGHT
+            x: -16
+            y: 48
+            width: 110
+            height: 52
+            radius: 14
+            pad_all: 0
+            border_width: 0
+            shadow_width: 0
+            bg_color: 0x8B9099
+            bg_opa: COVER
+            ext_click_area: 4
+            widgets:
+              - label:
+                  id: wk_badge_lbl
+                  align: CENTER
+                  text: "?"
+                  text_font: pl_t30
+                  text_color: 0xFFFFFE
+            on_click:
+              - homeassistant.action:
+                  action: input_boolean.toggle
+                  data:
+                    entity_id: input_boolean.wekker_jip_aan
+        # wekkertijd groot
+        - obj:
+            x: 12
+            y: 112
+            width: 456
+            height: 120
+            radius: 14
+            pad_all: 0
+            border_width: 0
+            bg_color: ${c_tile}
+            bg_opa: COVER
+            shadow_ofs_y: 6
+            scrollable: false
+            clickable: false
+            widgets:
+              - label:
+                  x: 16
+                  y: 12
+                  text: "WEKKERTIJD"
+                  text_font: r_mono
+                  text_color: 0x8B9099
+              - label:
+                  id: wk_big
+                  align: CENTER
+                  y: 6
+                  text: "07:00"
+                  text_font: r_clock
+                  text_color: ${c_text}
+        # tijd -/+ per uur en per 5 minuten
+        - button:
+            x: 12
+            y: 240
+            width: 108
+            height: 56
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            gesture_bubble: false
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -9, text: "-1", text_font: pl_t24, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 15, text: "UUR", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - script.execute: {id: wkj_step, d: -60}
+        - button:
+            x: 128
+            y: 240
+            width: 108
+            height: 56
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            gesture_bubble: false
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -9, text: "+1", text_font: pl_t24, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 15, text: "UUR", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - script.execute: {id: wkj_step, d: 60}
+        - button:
+            x: 244
+            y: 240
+            width: 108
+            height: 56
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            gesture_bubble: false
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -9, text: "-5", text_font: pl_t24, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 15, text: "MIN", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - script.execute: {id: wkj_step, d: -5}
+        - button:
+            x: 360
+            y: 240
+            width: 108
+            height: 56
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            gesture_bubble: false
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -9, text: "+5", text_font: pl_t24, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 15, text: "MIN", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - script.execute: {id: wkj_step, d: 5}
+        # WERKDAGEN / ELKE DAG / WEEKEND
+        - button:
+            id: wk_d0
+            x: 12
+            y: 304
+            width: 148
+            height: 44
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_width: 0
+            border_width: 0
+            widgets:
+              - label: {id: wk_d0l, align: CENTER, text: "WERKDAGEN", text_font: r_mono, text_color: 0x2B2F36}
+            on_click:
+              - script.execute: {id: wkj_days, i: 0}
+        - button:
+            id: wk_d1
+            x: 166
+            y: 304
+            width: 148
+            height: 44
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_width: 0
+            border_width: 0
+            widgets:
+              - label: {id: wk_d1l, align: CENTER, text: "ELKE DAG", text_font: r_mono, text_color: 0x2B2F36}
+            on_click:
+              - script.execute: {id: wkj_days, i: 1}
+        - button:
+            id: wk_d2
+            x: 320
+            y: 304
+            width: 148
+            height: 44
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_width: 0
+            border_width: 0
+            widgets:
+              - label: {id: wk_d2l, align: CENTER, text: "WEEKEND", text_font: r_mono, text_color: 0x2B2F36}
+            on_click:
+              - script.execute: {id: wkj_days, i: 2}
+        # geluid kiezen (keuzevenster wk_keuze)
+        - button:
+            x: 12
+            y: 356
+            width: 456
+            height: 52
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: LEFT_MID, x: 10, text: "${mdi_music}", text_font: pl_icon28, text_color: "${c_accent}"}
+              - label: {align: LEFT_MID, x: 52, y: -11, text: "GELUID", text_font: r_mono, text_color: 0x8B9099}
+              - label: {id: wk_g_name, align: LEFT_MID, x: 52, y: 9, width: 300, long_mode: DOT, text: "–", text_font: pl_t20, text_color: 0x2B2F36}
+              - label: {align: RIGHT_MID, x: -12, text: "KIES >", text_font: r_mono, text_color: "${c_accent}"}
+            on_click:
+              - script.execute: wkj_render
+              - lvgl.widget.show: wk_keuze
+        # zonsopgang-licht aan/uit en nu testen
+        - button:
+            id: wk_lamp_btn
+            x: 12
+            y: 416
+            width: 224
+            height: 52
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            widgets:
+              - label: {align: LEFT_MID, x: 10, text: "${mdi_sun}", text_font: pl_icon28, text_color: 0x2B2F36}
+              - label: {id: wk_lamp_lbl, align: LEFT_MID, x: 48, text: "LICHT MEE: UIT", text_font: r_mono, text_color: 0x2B2F36}
+            on_click:
+              - homeassistant.action:
+                  action: input_boolean.toggle
+                  data:
+                    entity_id: input_boolean.wekker_jip_lampen
+        - button:
+            x: 244
+            y: 416
+            width: 224
+            height: 52
+            radius: 14
+            bg_color: 0xE8745C
+            shadow_ofs_y: 4
+            border_width: 0
+            pressed:
+              bg_color: 0xFFFFFF
+            widgets:
+              - label: {align: LEFT_MID, x: 10, text: "${mdi_play}", text_font: pl_icon28, text_color: 0x46201A}
+              - label: {align: LEFT_MID, x: 48, text: "PROBEER NU", text_font: r_mono, text_color: 0x46201A}
+            on_click:
+              - homeassistant.action:
+                  action: script.wekker_afgaan
+                  data:
+                    kamer: jip
+        # keuzevenster: wekkergeluid (tik ernaast = annuleren)
+        - obj:
+            id: wk_keuze
+            hidden: true
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            radius: 0
+            border_width: 0
+            pad_all: 0
+            bg_color: 0x000000
+            bg_opa: 60%
+            scrollable: false
+            on_click:
+              - lvgl.widget.hide: wk_keuze
+            widgets:
+              - obj:
+                  x: 20
+                  y: 36
+                  width: 440
+                  height: 408
+                  radius: 18
+                  border_width: 0
+                  pad_all: 0
+                  bg_color: ${c_bg}
+                  scrollable: false
+                  widgets:
+                    - label:
+                        align: TOP_MID
+                        y: 16
+                        text: "Wekkergeluid"
+                        text_font: pl_t30
+                        text_color: ${c_text}
+                    - button:
+                        id: wg_0
+                        x: 16
+                        y: 64
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n0, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Fluisterwekker", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s0, align: CENTER, y: 16, text: "ZACHTE STEM", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 0}
+                    - button:
+                        id: wg_1
+                        x: 154
+                        y: 64
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n1, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Wekkerbrigade", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s1, align: CENTER, y: 16, text: "BRANDWEER", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 1}
+                    - button:
+                        id: wg_2
+                        x: 292
+                        y: 64
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n2, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Zoemer", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s2, align: CENTER, y: 16, text: "BZZZ BZZZ", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 2}
+                    - button:
+                        id: wg_3
+                        x: 16
+                        y: 158
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n3, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Klassieke wekker", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s3, align: CENTER, y: 16, text: "TRING TRING", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 3}
+                    - button:
+                        id: wg_4
+                        x: 154
+                        y: 158
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n4, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Alarm", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s4, align: CENTER, y: 16, text: "METEEN 100%", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 4}
+                    - button:
+                        id: wg_5
+                        x: 292
+                        y: 158
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n5, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Rustig wekken", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s5, align: CENTER, y: 16, text: "ZACHT OPBOUWEN", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 5}
+                    - button:
+                        id: wg_6
+                        x: 16
+                        y: 252
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n6, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Muziek", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s6, align: CENTER, y: 16, text: "NPO RADIO 2", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 6}
+                    - button:
+                        id: wg_7
+                        x: 154
+                        y: 252
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n7, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Natuurgeluiden", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s7, align: CENTER, y: 16, text: "VOGELS EN BOS", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 7}
+                    - button:
+                        id: wg_8
+                        x: 292
+                        y: 252
+                        width: 132
+                        height: 88
+                        radius: 14
+                        bg_color: ${c_tile}
+                        shadow_width: 0
+                        border_width: 0
+                        widgets:
+                          - label: {id: wg_n8, align: CENTER, y: -10, width: 124, long_mode: DOT, text_align: CENTER, text: "Alleen licht", text_font: pl_t16, text_color: 0x2B2F36}
+                          - label: {id: wg_s8, align: CENTER, y: 16, text: "GEEN GELUID", text_font: r_mono, text_color: 0x8B9099}
+                        on_click:
+                          - script.execute: {id: wkj_pick, i: 8}
+                    - button:
+                        align: BOTTOM_MID
+                        y: -12
+                        width: 200
+                        height: 44
+                        radius: 22
+                        bg_opa: TRANSP
+                        shadow_opa: TRANSP
+                        border_width: 0
+                        widgets:
+                          - label:
+                              align: CENTER
+                              text: "ANNULEREN"
+                              text_font: r_mono
+                              text_color: 0x8B9099
+                        on_click:
+                          - lvgl.widget.hide: wk_keuze
+    # ================= de wekker gaat af (input_boolean.wekker_jip_gaat_af) =================
+    - id: page_wekker_af
+      skip: true
+      styles: pl_page
+      scrollable: false
+      widgets:
+        - label:
+            x: 18
+            y: 12
+            text: "DE WEKKER GAAT AF"
+            text_font: r_mono
+            text_color: 0xE8745C
+        - obj:
+            x: 18
+            y: 30
+            width: 120
+            height: 3
+            radius: 0
+            bg_color: 0xE8745C
+            bg_opa: COVER
+            border_width: 0
+            clickable: false
+        - label:
+            align: TOP_RIGHT
+            x: -18
+            y: 8
+            text: "${mdi_alarm}"
+            text_font: pl_icon28
+            text_color: 0xE8745C
+        - label:
+            id: wa_clock
+            align: TOP_MID
+            y: 52
+            text: "--:--"
+            text_font: pl_big
+            text_color: ${c_text}
+        - label:
+            id: wa_geluid
+            align: TOP_MID
+            y: 196
+            text: ""
+            text_font: pl_t20
+            text_color: ${c_sub}
+        # sluimertijd - / +  (stappen van 5 min, standaard 5) en SLUIMER
+        - button:
+            x: 12
+            y: 236
+            width: 92
+            height: 104
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -10, text: "-", text_font: pl_t30, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 20, text: "5 MIN", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - homeassistant.action:
+                  action: input_number.decrement
+                  data:
+                    entity_id: input_number.wekker_jip_sluimertijd
+        - button:
+            x: 112
+            y: 236
+            width: 256
+            height: 104
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 6
+            border_width: 2
+            border_color: ${c_accent}
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -18, text: "${mdi_alarm_snooze}", text_font: pl_icon40, text_color: "${c_accent}"}
+              - label: {id: wa_sl_lbl, align: CENTER, y: 24, text: "Sluimer 5 min", text_font: pl_t24, text_color: 0x2B2F36}
+            on_click:
+              - homeassistant.action:
+                  action: script.wekker_sluimer
+                  data:
+                    kamer: jip
+        - button:
+            x: 376
+            y: 236
+            width: 92
+            height: 104
+            radius: 14
+            bg_color: ${c_tile}
+            shadow_ofs_y: 4
+            border_width: 0
+            pressed:
+              bg_color: ${c_tile_on}
+            widgets:
+              - label: {align: CENTER, y: -10, text: "+", text_font: pl_t30, text_color: 0x2B2F36}
+              - label: {align: CENTER, y: 20, text: "5 MIN", text_font: r_mono, text_color: 0x8B9099}
+            on_click:
+              - homeassistant.action:
+                  action: input_number.increment
+                  data:
+                    entity_id: input_number.wekker_jip_sluimertijd
+        # STOP: geluid uit; muziek die al speelde gaat verder
+        - button:
+            x: 12
+            y: 352
+            width: 456
+            height: 116
+            radius: 14
+            bg_color: 0xD9534F
+            shadow_ofs_y: 6
+            border_width: 0
+            pressed:
+              bg_color: 0xF6B8B0
+            widgets:
+              - label: {align: CENTER, x: -70, text: "${mdi_alarm_off}", text_font: pl_icon72, text_color: 0xFFFFFE}
+              - label: {align: CENTER, x: 40, text: "STOP", text_font: r_title, text_color: 0xFFFFFE}
+            on_click:
+              - homeassistant.action:
+                  action: script.wekker_stop
+                  data:
+                    kamer: jip
     - id: page_favs
       # @nav-boven
       styles: pl_page
@@ -16291,6 +17211,13 @@ lvgl:
             y: 46
             text: ""
             text_font: pl_t20
+            text_color: 0x3E4550
+        - label:
+            id: nt_wekker
+            align: CENTER
+            y: 84
+            text: ""
+            text_font: pl_t16
             text_color: 0x3E4550
         # overal tikken = terug naar het beginscherm
         - button:

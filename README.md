@@ -10,7 +10,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 |---|---|---|
 | `display-woonkamer.yaml` | Woonkamer | TV-pagina, kachel-animatie, lampen woonkamer/keuken/eettafel, speler Yamaha woonkamer |
 | `display-studio.yaml` | Studio | ON AIR, PC-pagina (Studio aan/uit), lampen studio/zolder/burolamp, speler Studio mini |
-| `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
+| `display-jip.yaml` | Slaapkamer Jip | RACE-thema met finishvlag, Kachel-pagina (paneel aan met timerkeuze 15/30/60 min, uit met één tik, kamertemperatuur en gewenste temperatuur instellen, vonkjes/vlokjes op de kamertegel), NIET STOREN, **Wekker** (knop op Thuis; RACE-stijl, afgaan-scherm met SLUIMER -/+ en STOP, wekkerregel in de nachtstand), nieuw paneel met 1 relais (aanraakcalibratie 0..479), intercom naar de kijkpaal, speler kijkpaal |
 | `display-slaapkamer.yaml` | Slaapkamer Maartje en Jeroen | **Nieuwe stijl "Raster & Cirkel"** (v0.14): papierwit, Inter Tight + IBM Plex Mono, cirkels in vermiljoen en ultramarijn. Thuis (met LICHT UIT), Licht, Sfeer, Nu speelt (met hoes), Kamer, Weer, **Wekker** (+ wekkergeluid; afgaan-scherm met tijd, SLUIMER -/+ en STOP; volume 50% → 100%, Alarm 100%) en Menu. Spelerbalk bovenin, onderbalk met **LICHT** (lampen aan/gedimd/uit, scherm normaal/nachtstand/slapen, avondstand). Tikken: slapen → nachtstand (klok + wekkertijd) → normaal; 's nachts (21–6) na 1 min vanzelf slapen, avondstand en gedimd. Toont "geen verbinding met HA" als HA weg is. Paneel met 1 relais (aanraakcalibratie 0..479); relais niet ingesteld |
 
 ## Functies
@@ -33,6 +33,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 - Alle intercomschermen: kies de ontvanger (HIER of een andere kamer); PUSH TO TALK stuurt het kanaal van de draaischijf daarheen (`script.intercom_zend`, veld `naar`), het telefoonvak een oproep van Jeroen (`script.intercom_bel`). Berichten klinken op hetzelfde volume als de muziek op die speler
 - Woonkamer: dezelfde Intercom, maar alleen bereikbaar als woonkamer, woonkamer totaal of eettafel speelt of klaar staat (dan toont het LIVE-blok een satelliet); het bericht gaat naar de speler die speelt
 - Jip: muziek alleen van de kijkpaal (Music Assistant kent hem twee keer; beide spelers worden gevolgd); speelt de kijkpaal, dan na 30 s niets aanraken automatisch Nu speelt (een slapend scherm blijft tussen 23:00 en 07:00 uit), en 30 s na het stoppen terug naar Thuis
+- Jip: Wekker (knop op Thuis, met de wekkertijd als hij aan staat): tijd -/+ per uur en per 5 min, AAN/UIT, Werkdagen / Elke dag / Weekend, geluid kiezen, LICHT MEE (zonsopgang) en PROBEER NU. Gaat hij af: afgaan-scherm met de tijd, SLUIMER (-/+ per 5 min, standaard 5) en STOP, ook vanuit nachtstand en NIET STOREN; het scherm wisselt en dimt dan niet. In de nachtstand gedimd "Wekker gaat 07:00" of "Sluimert tot 07:05". Geluid op de kijkpaal
 - Jip: Kachel-pagina voor `climate.paneel_jip` (`script.paneel_jip_timer_starten`, `script.paneel_jip_uit`, `binary_sensor.paneel_jip_aan`, `sensor.paneel_jip_resterend`), NIET STOREN (`input_boolean.jip_niet_storen`), intercom op de kijkpaal (`script.intercom_zend` met `speler`)
 - Radio: bij reclame ('Advert') een eigen hoes "Commercial Break" (zet `www/robobooz/` uit deze repo in `/config/www/robobooz/`)
 - LIVE-ticker: AI-roast plus bijzonderheden van server (service uit, CPU heet/druk) en planten (dorst, te koud/warm, batterij bijna leeg)
@@ -88,6 +89,7 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Speler: `media_player.kijkpaal_woonkamer` (Music Assistant)
 - Kachel: `climate.paneel_jip`, `script.paneel_jip_timer_starten` (optioneel veld `minuten`; anders `input_number.paneel_jip_timerduur`), `script.paneel_jip_uit`, `binary_sensor.paneel_jip_aan`, `sensor.paneel_jip_resterend`
 - Kamer en rust: `sensor.thermo_slaapkamer_jip_temperatuur`, `sensor.thermo_slaapkamer_jip_luchtvochtigheid`, `input_boolean.jip_niet_storen`
+- Wekker: de helpers `wekker_jip_*` (zie *Wekker* hieronder), `automation.wekker_jip`; geluid op `input_text.wekker_jip_speaker` (`media_player.kijkpaal_woonkamer`), zonsopgang op `light.slaapkamer_jip_2`
 
 **Slaapkamer (Raster & Cirkel, `display-slaapkamer.yaml`)**
 - Lampen en sfeer: `light.slaapkamer_jeroen_maartje` (groep), `light.slaapkamer_jeroen_en_maartje`, `light.slaapkamer_lichtstrip`, `scene.slaapkamer_jeroen_maartje_helder` / `_gedimd` / `_lezen` / `_ontspannen` / `_nachtlampje` / `_lentebloesem` / `_savanne_zonsondergang`
@@ -95,11 +97,14 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Kamer: `sensor.thermo_slaapkamer_jeroen_maartje_temperatuur_3`, `sensor.thermo_slaapkamer_jeroen_maartje_luchtvochtigheid_3`
 - Weer: `weather.de_scholekster`, `input_text.weer_uren_display`, `sensor.neerslag_buienradar_regen_data`
 
-**Wekker (display slaapkamer)**
-- Helpers: `input_datetime.wekker_slaapkamer_tijd`, `input_boolean.wekker_slaapkamer_aan`, `input_boolean.wekker_slaapkamer_lampen`, `input_boolean.wekker_slaapkamer_gaat_af`, `input_select.wekker_slaapkamer_dagen` (Werkdagen / Elke dag / Weekend), `input_select.wekker_slaapkamer_geluid`, `input_text.wekker_slaapkamer_speaker`, `input_number.wekker_slaapkamer_sluimertijd` (5–30 min, standaard 5), `input_boolean.wekker_slaapkamer_muziek_hervatten` + `input_number.wekker_slaapkamer_oud_volume` (muziek van voor de wekker gaat na STOP verder)
-- Scripts en automatisering: `script.wekker_slaapkamer_afgaan`, `script.wekker_slaapkamer_stop`, `script.wekker_slaapkamer_sluimer`, `automation.wekker_slaapkamer`; Fluisterwekker en Wekkerbrigade via `script.intercom_zend` (kanaal 12 en 9)
-- Let op: de wekker gaat alleen af als Home Assistant draait; het display maakt zelf geen geluid. Is HA weg, dan staat dat op Thuis, op de wekkerpagina en in de nachtstand.
-- Geluiden in `www/robobooz/`: `wekker_zoemer.mp3`, `wekker_klassiek.mp3`, `wekker_alarm.mp3`, `wekker_rustig.mp3`; zonsopgang op `light.slaapkamer_jeroen_maartje`
+**Wekker (display slaapkamer en display Jip)**
+- Eén set gedeelde scripts met het veld `kamer` (`slaapkamer` of `jip`): `script.wekker_afgaan`, `script.wekker_stop`, `script.wekker_sluimer`. Elke kamer heeft eigen helpers `wekker_<kamer>_*`; de kamers storen elkaar niet. Een nieuwe kamer = de helpers aanmaken en de kamer (lampen + standaardspeaker) in de drie scripts toevoegen.
+- Helpers per kamer: `input_datetime.wekker_<kamer>_tijd`, `input_boolean.wekker_<kamer>_aan`, `_lampen`, `_gaat_af`, `_muziek_hervatten`, `input_select.wekker_<kamer>_dagen` (Werkdagen / Elke dag / Weekend), `input_select.wekker_<kamer>_geluid`, `input_text.wekker_<kamer>_speaker`, `input_text.wekker_<kamer>_sluimert_tot` (HH:MM of leeg), `input_number.wekker_<kamer>_sluimertijd` (5–30 min, standaard 5), `input_number.wekker_<kamer>_oud_volume` (muziek van voor de wekker gaat na STOP verder)
+- Slaapkamer: `automation.wekker_slaapkamer`; display slaapkamer roept nog `script.wekker_slaapkamer_afgaan` / `_stop` / `_sluimer` aan, die doorgeven aan de gedeelde scripts; zonsopgang op `light.slaapkamer_jeroen_maartje`, speaker voorlopig `media_player.yamaha_living_2`
+- Jip: `automation.wekker_jip`; display Jip roept de gedeelde scripts aan met `kamer: jip`; zonsopgang op `light.slaapkamer_jip_2`, speaker `media_player.kijkpaal_woonkamer`
+- Fluisterwekker en Wekkerbrigade via `script.intercom_zend` (kanaal 12 en 9)
+- Let op: de wekker gaat alleen af als Home Assistant draait; de displays maken zelf geen geluid. Is HA weg, dan staat dat op de wekkerpagina en in de nachtstand.
+- Geluiden in `www/robobooz/`: `wekker_zoemer.mp3`, `wekker_klassiek.mp3`, `wekker_alarm.mp3`, `wekker_rustig.mp3`
 
 **Optioneel**: Team Tracker-sensoren voor NEC/Oranje en een agenda voor NMHC (automatisch wedstrijdthema).
 
