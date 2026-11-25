@@ -5,6 +5,10 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   bedoeld voor de slaapkamer van Maartje en Jeroen (lampen/sfeer/muziek nu
 #   nog van de woonkamer).
+#   Versie 0.6 (25-11-2026): nacht (21-6): na 1 min niets aanraken scherm uit;
+#   eerste tik = nachtstand (alleen een donkere klok, 6%), volgende tik = gewone
+#   scherm in de avondstand, gedimd (35%); nachtstand gaat na 20 s weer uit.
+#   Avondstand vanzelf om 21:00 aan en om 06:00 uit; in de nachtstand nooit omgedraaid.
 #   Versie 0.5 (25-11-2026): wekkerscherm met sluimertijd - / + (5..30 min,
 #   standaard 5); volume begint op 50% (Alarm 100%) en gaat langzaam naar 100%.
 #   Versie 0.4 (25-11-2026): avondstand werkt: de SPI naar het scherm wordt
@@ -50,10 +54,12 @@
 #   en STOP. Volume begint op 50% (Alarm 100%) en gaat elke 30 s 5% omhoog tot
 #   100%, tot STOP of SLUIMER. Speelde er al muziek, dan pauzeert die en gaat
 #   na STOP verder op het oude volume (dat regelt HA, niet het display).
-# Nachtstand: zwart, gedimde klok in donkerrood en de wekkertijd, scherm op 12%.
-#   Tik = terug naar Thuis.
-# Scherm: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
-#   na 30 min uit (niet in de nachtstand).
+# Nachtstand: zwart met alleen een donkerrode klok, scherm op 6%. Tik = terug.
+# Nacht (21:00-06:00): na 1 min niets aanraken gaat het scherm uit (donker).
+#   Eerste tik = nachtstand, volgende tik = gewone scherm (avondstand, 35%);
+#   de nachtstand gaat na 20 s vanzelf weer uit.
+# Scherm overdag: eerste tik maakt alleen wakker; na 1 min 65%, na 2 min 35%,
+#   na 30 min uit. Avondstand vanzelf aan om 21:00, uit om 06:00.
 # Hardware: touch met vaste kalibratie 0..479 (zoals Jip: de touchchip van dit
 #   paneel meldt 1024x600). Relais niet in gebruik en bewust niet ingesteld.
 #   Avondstand stuurt INVON/INVOFF (0x21/0x20) naar de ST7701S.
@@ -93,6 +99,9 @@ esphome:
         - script.execute: clock_render
         - script.execute: {id: nav_mark, p: 0}
         - delay: 2s
+        - lambda: |-
+            auto t = id(system_time).now();
+            if (t.is_valid() && (t.hour >= 21 || t.hour < 6)) id(avond) = true;
         - script.execute: avond_apply
 
 external_components:
@@ -190,21 +199,39 @@ touchscreen:
     # scherm gedimd/uit: deze tik alleen om wakker te maken
     - lambda: |-
           auto &bl = id(display_backlight).current_values;
-          bool slaap = !bl.is_on() || bl.get_brightness() < 0.99f || id(lvgl_main)->is_paused();
+          auto t = id(system_time).now();
+          bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
+          float vol = nacht ? 0.35f : 1.0f;   // 's nachts is het gewone scherm gedimd
+          bool slaap = !bl.is_on() || bl.get_brightness() < vol - 0.01f || id(lvgl_main)->is_paused();
           if (slaap) {
             lv_indev_t *in = lv_indev_get_next(nullptr);
             if (in != nullptr) lv_indev_wait_release(in);
           }
-    # nachtstand: elke tik = terug naar Thuis
+    # 's nachts (21-6) en scherm uit: eerste tik = nachtstand (alleen de klok, gedimd)
     - if:
         condition:
-          lambda: 'return id(cur_page) == 9;'
+          lambda: |-
+            auto t = id(system_time).now();
+            bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
+            return nacht && !id(display_backlight).current_values.is_on() && id(wk_af).state != "on";
         then:
-          - lvgl.page.show: p_home
-    - lvgl.resume:
-    - light.turn_on:
-        id: display_backlight
-        brightness: 100%
+          - lvgl.resume:
+          - lvgl.widget.hide: qp
+          - lvgl.page.show: p_nacht
+          - light.turn_on: {id: display_backlight, brightness: 6%}
+        else:
+          # in de nachtstand: volgende tik = gewone scherm, 's nachts omgedraaid en gedimd (35%)
+          - if:
+              condition:
+                lambda: 'return id(cur_page) == 9;'
+              then:
+                - lvgl.page.show: p_home
+          - lvgl.resume:
+          - light.turn_on:
+              id: display_backlight
+              brightness: !lambda |-
+                auto t = id(system_time).now();
+                return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
 
 spi:
   - id: lcd_spi
@@ -254,6 +281,19 @@ time:
       - seconds: 0
         then:
           - script.execute: clock_render
+      # avondstand vanzelf: om 21:00 aan, om 06:00 uit (met DIM kan het altijd met de hand)
+      - seconds: 0
+        minutes: 0
+        hours: 21
+        then:
+          - lambda: 'id(avond) = true;'
+          - script.execute: avond_apply
+      - seconds: 0
+        minutes: 0
+        hours: 6
+        then:
+          - lambda: 'id(avond) = false;'
+          - script.execute: avond_apply
 
 # ---------------------------------------------------------------- kleuren en iconen
 
@@ -330,7 +370,7 @@ substitutions:
   ic_windy: "\U000F059D"
   ic_hail: "\U000F0592"
   ha_url: "http://192.168.1.100:8123"
-  c_night: "0x7A2A1C"    # klok in de nachtstand (donkerrood)
+  c_night: "0x5A2016"    # klok in de nachtstand (donkerrood)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"
   ic_snooze: "\U000F068E"
@@ -683,7 +723,9 @@ script:
       p: int
     then:
       - lambda: |-
+          bool wissel = (p == 9) != (id(cur_page) == 9);   // de nachtstand in of uit
           id(cur_page) = p;
+          if (wissel) id(avond_apply).execute();
           int dk = p == 0 ? 0 : ((p == 7 || p == 8) ? 1 : (p == 3 ? 2 : (p == 6 ? 3 : -1)));
           lv_obj_t *b[] = {id(dk_0), id(dk_1), id(dk_2), id(dk_3)};
           for (int k = 0; k < 4; k++) {
@@ -715,12 +757,13 @@ script:
           using SD = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST, esphome::spi::CLOCK_POLARITY_LOW,
                                              esphome::spi::CLOCK_PHASE_LEADING, esphome::spi::DATA_RATE_1MHZ>;
           SD *spi = id(my_display);
+          bool inv = id(avond) && id(cur_page) != 9;   // nachtstand blijft altijd zwart
           spi->spi_setup();
           spi->enable();
-          spi->write(id(avond) ? 0x21 : 0x20, 9);
+          spi->write(inv ? 0x21 : 0x20, 9);
           spi->disable();
           spi->spi_teardown();
-          ESP_LOGI("avond", "avondstand %s (INV%s)", id(avond) ? "aan" : "uit", id(avond) ? "ON" : "OFF");
+          ESP_LOGI("avond", "avondstand %s (INV%s)", id(avond) ? "aan" : "uit", inv ? "ON" : "OFF");
           if (id(avond)) lv_obj_add_state(id(qp_avond), LV_STATE_CHECKED); else lv_obj_clear_state(id(qp_avond), LV_STATE_CHECKED);
 
   # ---- wekker: tijd, aan/uit, dagen, geluid, zonsopgang + tegel en nachtstand
@@ -1139,13 +1182,34 @@ lvgl:
         bg_color: ${c_ink}
         text_color: ${c_paper}
   on_idle:
+    # 's nachts: nachtstand gaat na 20 s uit (donker)
+    - timeout: 20s
+      then:
+        - if:
+            condition:
+              lambda: |-
+                auto t = id(system_time).now();
+                return id(cur_page) == 9 && t.is_valid() && (t.hour >= 21 || t.hour < 6);
+            then:
+              - light.turn_off: display_backlight
+    # 's nachts: gewone scherm na 1 min uit (een tik geeft dan eerst de nachtstand); overdag 65%
     - timeout: 1min
       then:
         - if:
             condition:
-              lambda: 'return id(cur_page) != 9;'
+              lambda: |-
+                auto t = id(system_time).now();
+                return id(cur_page) != 9 && id(wk_af).state != "on" && t.is_valid() && (t.hour >= 21 || t.hour < 6);
             then:
-              - light.turn_on: {id: display_backlight, brightness: 65%}
+              - lvgl.widget.hide: qp
+              - light.turn_off: display_backlight
+              - lvgl.page.show: p_nacht
+            else:
+              - if:
+                  condition:
+                    lambda: 'return id(cur_page) != 9;'
+                  then:
+                    - light.turn_on: {id: display_backlight, brightness: 65%}
     - timeout: 2min
       then:
         - if:
@@ -1371,7 +1435,7 @@ lvgl:
                 on_click:
                   - lvgl.widget.hide: qp
                   - lvgl.page.show: p_nacht
-                  - light.turn_on: {id: display_backlight, brightness: 12%}
+                  - light.turn_on: {id: display_backlight, brightness: 6%}
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_night}", text_font: f_ic22}
                   - label: {x: 12, y: 40, styles: st_mono11, text: "NACHTSTAND"}
@@ -2519,7 +2583,7 @@ lvgl:
                   styles: st_tile
                   on_click:
                     - lvgl.page.show: p_nacht
-                    - light.turn_on: {id: display_backlight, brightness: 12%}
+                    - light.turn_on: {id: display_backlight, brightness: 6%}
                   widgets:
                     - obj:
                         x: 0
@@ -2972,7 +3036,7 @@ lvgl:
       on_load:
         - script.execute: {id: nav_mark, p: 9}
       widgets:
-        - label: {id: n_date, x: 0, y: 96, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: ""}
-        - label: {id: n_clock, x: 0, y: 150, width: 480, text_align: CENTER, text_font: f_clock, text_letter_space: -6, text_color: "${c_night}", text: "--:--"}
-        - label: {id: n_wekker, x: 0, y: 316, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: ""}
-        - label: {x: 0, y: 440, width: 480, text_align: CENTER, styles: st_mono11, text_color: 0x3A1810, text: "TIK = TERUG"}
+        # alleen de klok, donker (datum en wekkertijd verborgen)
+        - label: {id: n_date, x: 0, y: 96, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: "", hidden: true}
+        - label: {id: n_clock, x: 0, y: 166, width: 480, text_align: CENTER, text_font: f_clock, text_letter_space: -6, text_color: "${c_night}", text: "--:--"}
+        - label: {id: n_wekker, x: 0, y: 316, width: 480, text_align: CENTER, styles: st_mono12, text_color: "${c_night}", text: "", hidden: true}
