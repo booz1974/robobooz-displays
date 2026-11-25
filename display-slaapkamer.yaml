@@ -6,6 +6,8 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.25 (25-11-2026): vormen op Thuis wisselen meer in grootte (cirkel 100-340 px,
+#   kwartcirkel 60-200 px).
 #   Versie 0.24 (25-11-2026): tekst en klok in het donkere schema donker zand 0x94805F
 #   (grijze tekst 0x6E604E), minder fel dan het lichte zand.
 #   Versie 0.23 (25-11-2026): schuif FELHEID SCHERM in LAMPEN & SCHERM; in het donkere
@@ -1265,7 +1267,7 @@ script:
     then:
       - lambda: |-
           static int vorig = -1;
-          int d = 140 + random_uint32() % 151;          // cirkel 140..290 px
+          int d = 100 + random_uint32() % 241;          // cirkel 100..340 px
           int cx = random_uint32() % 481, cy = random_uint32() % 401;
           lv_obj_t *c = id(h_circ);
           lv_obj_set_size(c, d, d);
@@ -1275,7 +1277,7 @@ script:
           if (vorig >= 0 && q >= vorig) q++;
           if (vorig < 0) q = random_uint32() % 4;
           vorig = q;
-          int k = 70 + random_uint32() % 91;            // kwartcirkel 70..160 px
+          int k = 60 + random_uint32() % 141;           // kwartcirkel 60..200 px
           lv_obj_t *b = id(h_qbox), *r = id(h_qcirc);
           lv_obj_set_size(b, k, k);
           lv_obj_set_pos(b, random_uint32() % (481 - k), random_uint32() % (401 - k));
