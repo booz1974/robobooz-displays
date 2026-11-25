@@ -6,6 +6,8 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.21 (25-11-2026): klok onleesbaar in het donkere schema: gewone scherm 's nachts
+#   en gedimd in het donkere schema nu 60% (was 35%; door de gamma gaf dat bijna geen licht).
 #   Versie 0.20 (25-11-2026): donker schema werkte niet: het kleurfilter van LVGL staat
 #   standaard uit; nu aangezet met build_flags -DLV_USE_COLOR_FILTER=1.
 #   Versie 0.19 (25-11-2026): avondstand is nu een DONKER KLEURENSCHEMA ("warm donker":
@@ -281,7 +283,7 @@ touchscreen:
           auto &bl = id(display_backlight).current_values;
           auto t = id(system_time).now();
           bool nacht = t.is_valid() && (t.hour >= 21 || t.hour < 6);
-          float vol = nacht ? 0.35f : 1.0f;   // 's nachts is het gewone scherm gedimd
+          float vol = nacht ? ${nacht_hl}f : 1.0f;   // 's nachts is het gewone scherm gedimd
           bool wekker = id(wk_af).state == "on";
           bool slaap = !bl.is_on() || id(lvgl_main)->is_paused() ||
                        (!wekker && (bl.get_brightness() < vol - 0.01f || id(cur_page) == 9));
@@ -318,7 +320,7 @@ touchscreen:
                     id: display_backlight
                     brightness: !lambda |-
                       auto t = id(system_time).now();
-                      return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
+                      return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? ${nacht_hl}f : 1.0f;
 
 spi:
   - id: lcd_spi
@@ -409,7 +411,7 @@ time:
               condition:
                 lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
               then:
-                - light.turn_on: {id: display_backlight, brightness: 35%}
+                - light.turn_on: {id: display_backlight, brightness: !lambda 'return ${nacht_hl}f;'}
       - seconds: 0
         minutes: 0
         hours: 9
@@ -498,6 +500,7 @@ substitutions:
   ha_url: !secret ha_url   # in secrets.yaml, bv. "http://192.168.1.100:8123"
   ma_url: !secret ma_url   # Music Assistant, voor de favorieten
   ma_token: !secret ma_api_token
+  nacht_hl: "0.60"       # helderheid gewone scherm 's nachts / in het donkere schema (gamma: 35% was te donker)
   c_night: "0x9A3422"    # klok in de nachtstand (gedempt rood; donkerder was onzichtbaar)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"
@@ -1715,7 +1718,8 @@ lvgl:
             condition:
               lambda: 'return id(display_backlight).current_values.is_on() && id(cur_page) != 9 && id(wk_af).state != "on";'
             then:
-              - light.turn_on: {id: display_backlight, brightness: 35%}
+              # in het donkere schema niet lager dan de nachthelderheid (anders onleesbaar)
+              - light.turn_on: {id: display_backlight, brightness: !lambda 'return id(avond) ? ${nacht_hl}f : 0.35f;'}
     # overdag na 30 min SLAPEN
     - timeout: 30min
       then:
@@ -1929,12 +1933,12 @@ lvgl:
                 height: 64
                 styles: st_tile
                 on_click:
-                  # NORMAAL: overdag 100%, 's nachts 35% (de avondstand blijft dan aan)
+                  # NORMAAL: overdag 100%, 's nachts 60% (donker schema; 35% was onleesbaar)
                   - light.turn_on:
                       id: display_backlight
                       brightness: !lambda |-
                         auto t = id(system_time).now();
-                        return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? 0.35f : 1.0f;
+                        return (t.is_valid() && (t.hour >= 21 || t.hour < 6)) ? ${nacht_hl}f : 1.0f;
                   - lvgl.widget.hide: qp
                 widgets:
                   - label: {x: 12, y: 10, text: "${ic_brightness}", text_font: f_ic22}
