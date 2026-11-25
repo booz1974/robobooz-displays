@@ -41,7 +41,7 @@ Ontwerp en idee: **Jeroen van Sonsbeek**
 
 1. Zet de bestanden in je ESPHome-configmap (HA: `/config/esphome/`), inclusief de mappen `display/` en `components/`.
    `components/robobooz_build` is een klein lokaal component dat een compileroptie aanzet; zonder die optie faalt het linken van deze grote configuratie (`l32r: literal target out of range`).
-2. Kopieer `secrets.example.yaml` naar `secrets.yaml` en vul je waarden in (wifi, Music Assistant-token, API-/OTA-sleutels en de namen + `person.`-entiteiten van de huisgenoten).
+2. Kopieer `secrets.example.yaml` naar `secrets.yaml` en vul je waarden in (wifi, de adressen van HA en Music Assistant (`ha_url`, `ma_url`), Music Assistant-token, API-/OTA-sleutels en de namen + `person.`-entiteiten van de huisgenoten).
 3. De afbeeldingen in `display/` staan al in deze repo. `oranje.jpg` wordt lokaal gelezen; de kachelanimaties `vuur12.gif` en `sneeuw12.gif` (12 frames) haalt de build van GitHub. `vuur.gif` en `sneeuw.gif` zijn de oude, grote versies en worden niet meer gebruikt.
 4. Installeer via ESPHome Device Builder (draadloos). Bouw één display tegelijk: het compileren vraagt ~2,5 GB RAM.
 5. Een nieuw paneel de eerste keer via USB flashen ("Aansluiten op deze computer"); daarna kan het draadloos.

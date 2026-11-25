@@ -5,6 +5,7 @@
 # display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.12 (25-11-2026): adres van HA uit secrets.yaml (ha_url) i.p.v. in de code.
 #   Versie 0.11 (25-11-2026): na review tester/ontwikkelaar/gebruiker:
 #   - nachtstand-klok echt zichtbaar (40%; de schermverlichting heeft een
 #     gamma-curve, 15% was bijna uit) + kleine wekkertijd/sluimerregel; blijft staan
@@ -86,7 +87,7 @@
 # Hardware: touch met vaste kalibratie 0..479 (zoals Jip: de touchchip van dit
 #   paneel meldt 1024x600). Relais niet in gebruik en bewust niet ingesteld.
 #   Avondstand stuurt INVON/INVOFF (0x21/0x20) naar de ST7701S.
-# secrets.yaml: wifi_ssid, wifi_password, plate04_api_key,
+# secrets.yaml: wifi_ssid, wifi_password, ha_url, plate04_api_key,
 #   plate04_ota_password, plate04_ap_password (zie secrets.example.yaml).
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-test -> Configureren ->
@@ -380,7 +381,7 @@ image:
   # grote hoes op Nu speelt (url wordt gezet zodra er een hoes is)
   - platform: online_image
     id: cov_big
-    url: "http://192.168.1.100:8123/local/robobooz/commercial_break_200x200bb.jpg"
+    url: "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"
     format: AUTO
     type: RGB565
     resize: 176x176
@@ -432,7 +433,7 @@ substitutions:
   ic_lightning: "\U000F0593"
   ic_windy: "\U000F059D"
   ic_hail: "\U000F0592"
-  ha_url: "http://192.168.1.100:8123"
+  ha_url: !secret ha_url   # in secrets.yaml, bv. "http://192.168.1.100:8123"
   c_night: "0x9A3422"    # klok in de nachtstand (gedempt rood; donkerder was onzichtbaar)
   ic_alarm: "\U000F0020"
   ic_alarm_off: "\U000F0023"

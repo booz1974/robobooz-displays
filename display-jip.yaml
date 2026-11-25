@@ -64,7 +64,8 @@
 # Aanraken: de touchchip van het nieuwe paneel (1 relais) meldt zich als
 #   1024x600 scherm; met calibration 0..479 klopt de plek van elke tik weer.
 # Relais: het board heeft 1 relais; nog niet in gebruik.
-# secrets.yaml: wifi, ma_api_token, plate03_* (API-/OTA-/AP-sleutels) en de
+# secrets.yaml: wifi, ha_url, ma_url (adressen van HA en MA, sinds 25-11-2026 niet
+#   meer in de code), ma_api_token, plate03_* (API-/OTA-/AP-sleutels) en de
 #   huisgenoten persoon_1..3_naam en persoon_1..3_entity (zie secrets.example.yaml).
 #
 # Vereist in Home Assistant: ESPHome-integratie -> display-jip -> Configureren ->
@@ -290,8 +291,8 @@ substitutions:
   persoon_2_entity: !secret persoon_2_entity
   persoon_3_naam: !secret persoon_3_naam
   persoon_3_entity: !secret persoon_3_entity
-  ha_url: "http://192.168.1.100:8123"
-  ma_url: "http://192.168.1.100:8095"
+  ha_url: !secret ha_url   # in secrets.yaml, bv. "http://192.168.1.100:8123"
+  ma_url: !secret ma_url   # in secrets.yaml, bv. "http://192.168.1.100:8095"
   ma_token: !secret ma_api_token
   c_bg: "0xE6E8EC"
   c_tile: "0xECEEF1"
