@@ -7,7 +7,8 @@
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
 #   Versie 0.25 (25-11-2026): vormen op Thuis wisselen meer in grootte en mogen over de
-#   rand van het scherm (cirkel 100-420 px, kwartcirkel 60-260 px).
+#   rand van het scherm (cirkel 100-420 px, kwartcirkel 60-260 px); er blijft altijd een
+#   behoorlijk deel zichtbaar (midden cirkel op het scherm, kwartcirkel minstens 2/3).
 #   Versie 0.24 (25-11-2026): tekst en klok in het donkere schema donker zand 0x94805F
 #   (grijze tekst 0x6E604E), minder fel dan het lichte zand.
 #   Versie 0.23 (25-11-2026): schuif FELHEID SCHERM in LAMPEN & SCHERM; in het donkere
@@ -1268,7 +1269,7 @@ script:
       - lambda: |-
           static int vorig = -1;
           int d = 100 + random_uint32() % 321;          // cirkel 100..420 px (mag over de rand)
-          int cx = -60 + (int) (random_uint32() % 601), cy = -60 + (int) (random_uint32() % 521);
+          int cx = 20 + (int) (random_uint32() % 441), cy = 20 + (int) (random_uint32() % 377);   // midden altijd op het scherm
           lv_obj_t *c = id(h_circ);
           lv_obj_set_size(c, d, d);
           lv_obj_set_style_radius(c, d / 2, 0);
@@ -1277,10 +1278,10 @@ script:
           if (vorig >= 0 && q >= vorig) q++;
           if (vorig < 0) q = random_uint32() % 4;
           vorig = q;
-          int k = 60 + random_uint32() % 201;           // kwartcirkel 60..260 px (mag half buiten beeld)
+          int k = 60 + random_uint32() % 201;           // kwartcirkel 60..260 px
           lv_obj_t *b = id(h_qbox), *r = id(h_qcirc);
           lv_obj_set_size(b, k, k);
-          lv_obj_set_pos(b, -k / 2 + (int) (random_uint32() % 481), -k / 2 + (int) (random_uint32() % 401));
+          lv_obj_set_pos(b, -k / 3 + (int) (random_uint32() % (481 - k / 3)), -k / 3 + (int) (random_uint32() % (417 - k / 3)));   // minstens 2/3 in beeld
           lv_obj_set_size(r, 2 * k, 2 * k);
           lv_obj_set_style_radius(r, k, 0);
           // het vierkant laat één kwart van de cirkel zien: 0 linksboven, 1 rechtsboven, 2 linksonder, 3 rechtsonder
