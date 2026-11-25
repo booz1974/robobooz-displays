@@ -6,6 +6,11 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.18 (25-11-2026): BEDTIJD pas na 2 s vasthouden (het rondje loopt vol met
+#   zwart); DEURBEL (09): bij aanbellen vanzelf het camerabeeld van de voordeur
+#   (ververst elke 3 s), "Er wordt aangebeld" + tijd, LAMP HAL AAN en SLUITEN; ook via
+#   Menu -> Voordeur (vervangt Nachtstand, die zit in LICHT). GOEDEMORGEN: na STOP van
+#   de wekker datum, tijd, buiten en de afspraken van vandaag (sensor.agenda_vandaag_display).
 #   Versie 0.17 (25-11-2026): knop BEDTIJD op Thuis (onder LICHT UIT): lampen badkamer,
 #   hal, toilet, overloop, zolderoverloop, studio en deze slaapkamer uit, alleen de
 #   e-deken-smartplug uit (als hij aan staat), thermostaat woonkamer op 15 °C
@@ -64,7 +69,8 @@
 #   typemachineletter (IBM Plex Mono), vlakken en cirkels in vermiljoen en
 #   ultramarijn. Elk scherm: nummer + titel linksboven, tijd rechtsboven.
 # Pagina's: Thuis | 01 Licht | 02 Sfeer | 03 Nu speelt | 04 Kamer | 05 Weer |
-#   06 Wekker | 07 Wekkergeluid | 08 Favorieten | Nachtstand | 00 Menu.
+#   06 Wekker | 07 Wekkergeluid | 08 Favorieten | 09 Deurbel | Goedemorgen |
+#   Nachtstand | 00 Menu.
 # Favorieten: radio en playlists uit Music Assistant (${ma_url}, token ma_api_token),
 #   opgehaald 45 s na het opstarten en opnieuw als de lijst ouder is dan 15 min.
 # Onderbalk (op elk scherm, behalve nachtstand): THUIS / WEKKER / MUZIEK /
@@ -130,7 +136,8 @@
 #   input_boolean.wekker_slaapkamer_muziek_hervatten, input_number.wekker_slaapkamer_oud_volume,
 #   input_text.wekker_slaapkamer_speaker (nu media_player.yamaha_living_2),
 #   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
-#   script.bedtijd (knop BEDTIJD),
+#   script.bedtijd (knop BEDTIJD, 2 s vasthouden), camera.voordeur +
+#   binary_sensor.voordeur_ringing (deurbel), sensor.agenda_vandaag_display (goedemorgen),
 #   light.slaapkamer_jeroen_maartje (zonsopgang), script.intercom_zend,
 #   /config/www/robobooz/wekker_zoemer.mp3, wekker_klassiek.mp3,
 #   wekker_alarm.mp3, wekker_rustig.mp3.
@@ -390,6 +397,7 @@ time:
 # ---------------------------------------------------------------- kleuren en iconen
 
 # ---------------------------------------------------------------- hoes (album art)
+# (verderop ook het camerabeeld van de voordeur)
 http_request:
   verify_ssl: false
   timeout: 6s
@@ -397,6 +405,16 @@ http_request:
   buffer_size_tx: 2048
 
 image:
+  # camerabeeld voordeur (deurbelscherm); ververst elke 3 s zolang het scherm open is
+  - platform: online_image
+    id: cam_img
+    url: "${ha_url}/local/robobooz/commercial_break_200x200bb.jpg"
+    format: JPEG
+    type: RGB565
+    resize: 480x270
+    on_download_finished:
+      - lvgl.image.update: {id: dr_img, src: cam_img}
+      - lvgl.widget.show: dr_img
   # grote hoes op Nu speelt (url wordt gezet zodra er een hoes is)
   - platform: online_image
     id: cov_big
@@ -574,7 +592,7 @@ font:
     glyphs: *icons
 
 globals:
-  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 kamer, 5 weer, 6 menu, 7 wekker, 8 wekkergeluid, 9 nachtstand, 10 favorieten
+  - id: cur_page        # 0 thuis, 1 licht, 2 sfeer, 3 muziek, 4 kamer, 5 weer, 6 menu, 7 wekker, 8 wekkergeluid, 9 nachtstand, 10 favorieten, 11 deurbel, 12 goedemorgen
     type: int
     initial_value: '0'
   - id: sf_idx          # laatste sfeerkeuze (-1 = nog niets)
@@ -621,6 +639,8 @@ globals:
   - id: fav_ms          # wanneer de lijst voor het laatst is opgehaald
     type: uint32_t
     initial_value: '0'
+  - id: deur_tijd       # tijd van het laatste aanbellen (tekst), leeg = handmatig geopend
+    type: std::string
   - id: avond           # avondstand: kleuren omgedraaid
     type: bool
     restore_value: true
@@ -699,6 +719,27 @@ text_sensor:
                 url: !lambda 'return std::string("${ha_url}") + x;'
           else:
             - lvgl.widget.hide: [mu_cover, mi_cover]
+  # ---- deurbel: camerabeeld (token wisselt, dus het adres volgen)
+  - platform: homeassistant
+    id: cam_pic
+    entity_id: camera.voordeur
+    attribute: entity_picture
+    internal: true
+    on_value:
+      - if:
+          condition:
+            lambda: 'return x.size() > 5 && x[0] == ''/'';'
+          then:
+            - online_image.set_url:
+                id: cam_img
+                url: !lambda 'return std::string("${ha_url}") + x;'
+                update: false
+  # ---- goedemorgen: afspraken van vandaag "HH:MM|tekst;..." (template-helper in HA)
+  - platform: homeassistant
+    id: gm_agenda
+    entity_id: sensor.agenda_vandaag_display
+    internal: true
+    on_value: {script.execute: gm_render}
   # ---- wekker
   - platform: homeassistant
     id: wk_tijd
@@ -745,6 +786,26 @@ text_sensor:
             - script.execute: wk_render
           else:
             - lvgl.widget.hide: ring
+
+binary_sensor:
+  - platform: homeassistant
+    id: deur_bel
+    entity_id: binary_sensor.voordeur_ringing
+    internal: true
+    on_press:
+      - lambda: |-
+          auto t = id(system_time).now();
+          char b[8] = "";
+          if (t.is_valid()) snprintf(b, sizeof(b), "%02d:%02d", t.hour, t.minute);
+          id(deur_tijd) = b;
+      - if:
+          condition:
+            lambda: 'return id(wk_af).state != "on";'
+          then:
+            - lvgl.resume:
+            - lvgl.widget.hide: qp
+            - lvgl.page.show: p_deur
+            - light.turn_on: {id: display_backlight, brightness: 100%}
 
 sensor:
   - platform: homeassistant
@@ -812,8 +873,16 @@ sensor:
     on_value: {script.execute: cl_render}
 
 
-# elke 3 s: is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
 interval:
+  # elke 3 s: deurbelscherm open? camerabeeld verversen
+  - interval: 3s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(cur_page) == 11 && id(display_backlight).current_values.is_on();'
+          then:
+            - component.update: cam_img
+  # elke 3 s: is HA verbonden (met statusabonnement, dus echt HA en niet de logviewer)?
   - interval: 3s
     then:
       - lambda: |-
@@ -827,6 +896,52 @@ interval:
 
 # ---------------------------------------------------------------- scripts
 script:
+  # ---- deurbel: kop van het scherm
+  - id: deur_render
+    then:
+      - lambda: |-
+          bool bel = !id(deur_tijd).empty();
+          lv_label_set_text(id(dr_time), bel ? id(deur_tijd).c_str() : "");
+          lv_label_set_text(id(dr_title), bel ? "Er wordt aangebeld" : "Voordeur");
+  # ---- goedemorgen: datum, buiten, afspraken van vandaag
+  - id: gm_render
+    then:
+      - lambda: |-
+          lv_obj_t *tm[] = {id(gm_t0), id(gm_t1), id(gm_t2)};
+          lv_obj_t *tx[] = {id(gm_x0), id(gm_x1), id(gm_x2)};
+          lv_obj_t *rw[] = {id(gm_r0), id(gm_r1), id(gm_r2)};
+          std::string a = id(gm_agenda).state;
+          bool geen = a.empty() || a == "geen" || a == "unknown" || a == "unavailable";
+          size_t q = 0;
+          for (int k = 0; k < 3; k++) {
+            std::string part;
+            if (!geen && q != std::string::npos && q < a.size()) {
+              size_t r = a.find(';', q);
+              part = a.substr(q, r == std::string::npos ? std::string::npos : r - q);
+              q = r == std::string::npos ? std::string::npos : r + 1;
+            }
+            size_t bar = part.find('|');
+            if (bar == std::string::npos) { lv_obj_add_flag(rw[k], LV_OBJ_FLAG_HIDDEN); continue; }
+            lv_obj_clear_flag(rw[k], LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(tm[k], part.substr(0, bar).c_str());
+            lv_label_set_text(tx[k], part.substr(bar + 1).c_str());
+          }
+          lv_label_set_text(id(gm_none), geen ? "Geen afspraken vandaag" : "");
+  # ---- BEDTIJD: pas na 2 s vasthouden uitvoeren
+  - id: bd_hold
+    then:
+      - delay: 2s
+      - script.execute: bd_go
+  - id: bd_go
+    then:
+      - homeassistant.action:
+          action: script.turn_on
+          data:
+            entity_id: script.bedtijd
+      - lvgl.label.update: {id: h_ok, text: "BEDTIJD: HUIS UIT · TV UIT · THERMOSTAAT 15°"}
+      - lvgl.widget.show: h_ok
+      - delay: 6s
+      - lvgl.widget.hide: h_ok
   # ---- favorieten: lijsten ophalen uit Music Assistant (meest gespeeld bovenaan)
   - id: fav_fetch
     mode: single
@@ -997,7 +1112,7 @@ script:
           lv_label_set_text(id(h_clock), hm);
           lv_label_set_text(id(n_clock), hm);
           lv_label_set_text(id(r_clock), hm);
-          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6), id(hd_t7), id(hd_t8), id(hd_t9), id(hd_tq)};
+          lv_obj_t *hl[] = {id(hd_t1), id(hd_t2), id(hd_t3), id(hd_t4), id(hd_t5), id(hd_t6), id(hd_t7), id(hd_t8), id(hd_t9), id(hd_tq), id(dr_now)};
           for (auto *l : hl) lv_label_set_text(l, hm);
           static const char *dag[] = {"ZONDAG", "MAANDAG", "DINSDAG", "WOENSDAG", "DONDERDAG", "VRIJDAG", "ZATERDAG"};
           static const char *mnd[] = {"JANUARI", "FEBRUARI", "MAART", "APRIL", "MEI", "JUNI", "JULI",
@@ -1005,6 +1120,8 @@ script:
           char d[40]; snprintf(d, sizeof(d), "%s %d %s", dag[(t.day_of_week + 6) % 7], t.day_of_month, mnd[(t.month + 11) % 12]);
           lv_label_set_text(id(h_date), d);
           lv_label_set_text(id(n_date), d);
+          lv_label_set_text(id(gm_date), d);
+          lv_label_set_text(id(gm_now), hm);
 
   # onderbalk: zwart = huidige plek; spelerbalk bovenin als er muziek is
   - id: nav_mark
@@ -1031,13 +1148,13 @@ script:
     then:
       - lambda: |-
           std::string s = id(mp_st).state;
-          bool muziek = (s == "playing" || s == "paused") && id(cur_page) != 3 && id(cur_page) != 9;
+          bool muziek = (s == "playing" || s == "paused") && id(cur_page) != 3 && id(cur_page) != 9 && id(cur_page) != 11;
           static int laatst = -1;
           if (laatst == (int) muziek) return;
           laatst = muziek;
           if (muziek) lv_obj_clear_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
           else lv_obj_add_flag(id(mini), LV_OBJ_FLAG_HIDDEN);
-          lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid), id(pg_fav)};
+          lv_obj_t *pg[] = {id(pg_home), id(pg_licht), id(pg_sfeer), id(pg_klimaat), id(pg_weer), id(pg_menu), id(pg_wekker), id(pg_wgeluid), id(pg_fav), id(pg_gm)};
           for (auto *o : pg) lv_obj_set_y(o, muziek ? 68 : 0);
 
   # avondstand: het scherm zelf keert alle kleuren om (ST7701S INVON 0x21 / INVOFF 0x20)
@@ -1375,6 +1492,8 @@ script:
           if (*naam(cond)) regel += std::string(" · ") + naam(cond);
           regel += " · " + kort;
           lv_label_set_text(id(h_wx), regel.c_str());
+          std::string buiten = std::string(ts) + " · " + kort;
+          lv_label_set_text(id(gm_out), buiten.c_str());
           lv_label_set_text(id(h_wx_i), icoon(cond));
           std::string tegel = kort.rfind("regen over ", 0) == 0 ? "Regen " + kort.substr(11) : kort;
           if (!tegel.empty()) tegel[0] = toupper((unsigned char) tegel[0]);
@@ -1990,6 +2109,8 @@ lvgl:
                   - lambda: 'id(sluimer_tot) = -1;'
                   - lvgl.widget.hide: ring
                   - script.execute: wk_render
+                  # na de wekker: Goedemorgen
+                  - lvgl.page.show: p_gm
                 widgets:
                   - label: {align: CENTER, y: -14, text: "${ic_alarm_off}", text_font: f_ic30}
                   - label: {align: CENTER, y: 20, text_font: f_26, text: "Stop"}
@@ -2053,17 +2174,56 @@ lvgl:
                   bg_opa: COVER
                   text_color: ${c_paper}
                   pressed:
-                    bg_color: ${c_ink}
-                  on_click:
-                    - homeassistant.action:
-                        action: script.turn_on
-                        data:
-                          entity_id: script.bedtijd
-                    - lvgl.label.update: {id: h_ok, text: "BEDTIJD: HUIS UIT · THERMOSTAAT 15°"}
+                    bg_color: ${c_blue}
+                  # 2 seconden vasthouden: het rondje loopt vol met zwart, dan pas uitvoeren
+                  on_press:
+                    - lambda: |-
+                        lv_obj_t *arc = id(bd_arc);
+                        lv_anim_t a;
+                        lv_anim_init(&a);
+                        lv_anim_set_var(&a, arc);
+                        lv_anim_set_values(&a, 0, 100);
+                        lv_anim_set_duration(&a, 2000);
+                        lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_arc_set_value((lv_obj_t *) o, v); });
+                        lv_anim_start(&a);
+                    - lvgl.label.update: {id: h_ok, text: "BEDTIJD: 2 SECONDEN VASTHOUDEN..."}
                     - lvgl.widget.show: h_ok
-                    - delay: 6s
-                    - lvgl.widget.hide: h_ok
+                    - script.execute: bd_hold
+                  on_release:
+                    - lambda: |-
+                        lv_obj_t *arc = id(bd_arc);
+                        lv_anim_delete(arc, nullptr);
+                        lv_arc_set_value(arc, 0);
+                    - if:
+                        condition:
+                          script.is_running: bd_hold
+                        then:
+                          - script.stop: bd_hold
+                          - lvgl.widget.hide: h_ok
                   widgets:
+                    # vult zich in 2 s als een taartpunt (onder de tekst)
+                    - arc:
+                        id: bd_arc
+                        align: CENTER
+                        width: 80
+                        height: 80
+                        min_value: 0
+                        max_value: 100
+                        value: 0
+                        rotation: 270
+                        start_angle: 0
+                        end_angle: 360
+                        adjustable: false
+                        clickable: false
+                        arc_opa: TRANSP
+                        pad_all: 0
+                        indicator:
+                          arc_color: ${c_ink}
+                          arc_width: 40
+                          arc_rounded: false
+                        knob:
+                          bg_opa: TRANSP
+                          pad_all: 0
                     - label: {align: CENTER, y: -9, text: "${ic_sleep}", text_font: f_ic22}
                     - label: {align: CENTER, y: 16, styles: st_mono11, text: "BEDTIJD"}
               - label: {id: h_ok, x: 24, y: 214, width: 432, styles: st_mono11, text_color: "${c_blue}", text: "", hidden: true}
@@ -2919,8 +3079,8 @@ lvgl:
                   height: 64
                   styles: st_tile
                   on_click:
-                    - lvgl.page.show: p_nacht
-                    - light.turn_on: {id: display_backlight, brightness: 40%}
+                    - lambda: 'id(deur_tijd) = "";'
+                    - lvgl.page.show: p_deur
                   widgets:
                     - obj:
                         x: 0
@@ -2931,9 +3091,9 @@ lvgl:
                         bg_color: ${c_ink}
                         clickable: false
                         widgets:
-                          - label: {align: CENTER, text: "${ic_night}", text_font: f_ic30, text_color: "${c_paper}"}
-                    - label: {x: 78, y: 14, text_font: f_17, text: "Nachtstand"}
-                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "KLOK GEDIMD"}
+                          - label: {align: CENTER, text: "${ic_bell}", text_font: f_ic30, text_color: "${c_paper}"}
+                    - label: {x: 78, y: 14, text_font: f_17, text: "Voordeur"}
+                    - label: {x: 78, y: 38, styles: st_mono11, text_color: "${c_sub}", text: "CAMERA"}
               - button:
                   x: 244
                   y: 280
@@ -3440,6 +3600,131 @@ lvgl:
                   scrollable: true
                   scroll_dir: VER
                   scrollbar_mode: AUTO
+
+    # ================= 09 Deurbel =================
+    - id: p_deur
+      styles: st_page
+      on_load:
+        - script.execute: {id: nav_mark, p: 11}
+        - script.execute: deur_render
+        - component.update: cam_img
+      widgets:
+        - obj:
+            x: 0
+            y: 0
+            width: 480
+            height: 270
+            styles: st_deco
+            bg_color: 0x2A2F3A
+            clickable: false
+            widgets:
+              - label: {align: CENTER, styles: st_mono12, text_color: 0xC9CED8, text: "CAMERABEELD LADEN..."}
+        - image: {id: dr_img, x: 0, y: 0, src: cam_img, hidden: true, clickable: false}
+        - obj: {x: 24, y: 24, width: 10, height: 10, radius: 5, styles: st_deco, bg_color: "${c_red}", clickable: false}
+        - label: {x: 42, y: 21, styles: st_mono11, text_color: "${c_paper}", text: "LIVE · VOORDEUR"}
+        - label: {id: dr_now, x: 376, y: 21, width: 80, text_align: RIGHT, styles: st_mono11, text_color: "${c_paper}", text: "--:--"}
+        - label: {id: dr_time, x: 24, y: 284, styles: st_mono12, text_color: "${c_redt}", text: ""}
+        - label: {id: dr_title, x: 24, y: 302, text_font: f_26, text: "Voordeur"}
+        - button:
+            x: 24
+            y: 344
+            width: 212
+            height: 56
+            bg_color: ${c_ink}
+            bg_opa: COVER
+            text_color: ${c_paper}
+            pressed:
+              bg_color: ${c_red}
+            on_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: light.hal
+            widgets:
+              - label: {x: 16, y: 16, text: "${ic_bulb}", text_font: f_ic22}
+              - label: {x: 50, y: 21, styles: st_mono12, text: "LAMP HAL AAN"}
+        - button:
+            x: 244
+            y: 344
+            width: 212
+            height: 56
+            styles: st_outline
+            on_click:
+              - lvgl.page.show: p_home
+            widgets:
+              - label: {align: CENTER, styles: st_mono12, text: "SLUITEN"}
+
+    # ================= Goedemorgen (na STOP van de wekker) =================
+    - id: p_gm
+      styles: st_page
+      on_load:
+        - script.execute: {id: nav_mark, p: 12}
+        - script.execute: clock_render
+        - script.execute: gm_render
+      widgets:
+        - obj:
+            id: pg_gm
+            x: 0
+            y: 0
+            width: 480
+            height: 480
+            widgets:
+              # halve zon rechtsonder (boven de onderbalk)
+              - obj:
+                  x: 150
+                  y: 266
+                  width: 330
+                  height: 150
+                  clickable: false
+                  widgets:
+                    - obj: {x: 30, y: 0, width: 300, height: 300, radius: 150, styles: st_deco, bg_color: "${c_red}", clickable: false}
+              - label: {id: gm_date, x: 24, y: 28, styles: st_mono11, text_color: "${c_sub}", text: ""}
+              - label: {x: 22, y: 44, text_font: f_44, text_letter_space: -2, text: "Goedemorgen"}
+              - label: {x: 24, y: 112, styles: st_mono11, text_color: "${c_sub}", text: "NU"}
+              - label: {id: gm_now, x: 24, y: 128, text_font: f_26, text: "--:--"}
+              - label: {x: 136, y: 112, styles: st_mono11, text_color: "${c_sub}", text: "BUITEN"}
+              - label: {id: gm_out, x: 136, y: 128, width: 320, long_mode: DOT, text_font: f_26, text: "–"}
+              - label: {x: 24, y: 186, styles: st_mono11, text: "VANDAAG"}
+              - label: {id: gm_none, x: 24, y: 210, text_font: f_15, text_color: "${c_sub}", text: ""}
+              - obj:
+                  id: gm_r0
+                  x: 24
+                  y: 202
+                  width: 300
+                  height: 40
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  hidden: true
+                  widgets:
+                    - label: {id: gm_t0, x: 0, y: 13, width: 70, styles: st_mono11, text_color: "${c_redt}", text: ""}
+                    - label: {id: gm_x0, x: 76, y: 10, width: 224, long_mode: DOT, text_font: f_15, text: ""}
+              - obj:
+                  id: gm_r1
+                  x: 24
+                  y: 242
+                  width: 300
+                  height: 40
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  hidden: true
+                  widgets:
+                    - label: {id: gm_t1, x: 0, y: 13, width: 70, styles: st_mono11, text_color: "${c_redt}", text: ""}
+                    - label: {id: gm_x1, x: 76, y: 10, width: 224, long_mode: DOT, text_font: f_15, text: ""}
+              - obj:
+                  id: gm_r2
+                  x: 24
+                  y: 282
+                  width: 300
+                  height: 40
+                  border_width: 1
+                  border_side: [BOTTOM]
+                  border_color: ${c_line}
+                  hidden: true
+                  widgets:
+                    - label: {id: gm_t2, x: 0, y: 13, width: 70, styles: st_mono11, text_color: "${c_redt}", text: ""}
+                    - label: {id: gm_x2, x: 76, y: 10, width: 224, long_mode: DOT, text_font: f_15, text: ""}
 
     # ================= Nachtstand =================
     - id: p_nacht
