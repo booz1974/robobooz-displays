@@ -2,9 +2,13 @@
 # ROBOBOOZ - RASTER & CIRKEL (nieuwe stijl) voor ESPHome / LVGL
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
-# display-test - Guition ESP32-S3-4848S040 (480x480, 1 relais) - testpaneel,
+# display-slaapkamer (apparaat: display-test) - Guition ESP32-S3-4848S040
+#   (480x480, 1 relais) - slaapkamerpaneel (begonnen als testpaneel),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.13 (25-11-2026): bestand heet nu display-slaapkamer.yaml; het apparaat
+#   heet in ESPHome/HA nog display-test (zo blijven draadloos bijwerken en de
+#   entiteiten in HA gewoon werken). Zichtbare naam: Display slaapkamer.
 #   Versie 0.12 (25-11-2026): adres van HA uit secrets.yaml (ha_url) i.p.v. in de code.
 #   Versie 0.11 (25-11-2026): na review tester/ontwikkelaar/gebruiker:
 #   - nachtstand-klok echt zichtbaar (40%; de schermverlichting heeft een
@@ -112,8 +116,9 @@
 # =====================================================================
 
 esphome:
+  # apparaatnaam bewust nog display-test: een nieuwe naam = nieuw apparaat in HA
   name: display-test
-  friendly_name: display test
+  friendly_name: Display slaapkamer
   min_version: 2025.7.0
   platformio_options:
     board_build.flash_mode: dio
