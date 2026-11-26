@@ -3,7 +3,7 @@
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
 # display-studio - Guition ESP32-S3-4848S040 (480x480) - Studio
-# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, groep Studio_Stereo) |
+# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, Studio mini) |
 #           Sfeer | Studio en PC | Weer | Energie (+ Zonnestroom) | Info | Nachtstand |
 #           Home Assistant | Thema
 #           (+ verborgen: ON AIR, Wachtrij, Deurbel, Goedemorgen, Intercom)
@@ -18,7 +18,7 @@
 #   10 Keukenkazerne (eten), 11 Shampoo-Commando (douchen), 12 Fluisterwekker)
 #   en PUSH TO TALK: script.intercom_zend
 #   speelt ruis + een willekeurig bericht (ElevenLabs) als aankondiging op
-#   de studiospeakers (MA-groep Studio_Stereo; muziek gaat daarna verder);
+#   de studiospeaker (Studio mini; muziek gaat daarna verder);
 #   het groene scherm glitcht zolang er geluid speelt.
 #   Berichten met ElevenLabs-audiotags ([whispers], [laughs], ...); de tags
 #   staan niet in het log, lange logregels lopen door.
@@ -33,8 +33,11 @@
 # LIVE-balk: ROBOBOOZ-roast (AI), buiten, verbruik en deur.
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
-# Muziek: alle audio gaat naar de MA-groep Studio_Stereo (studio + studio2,
-#   substitutions studio_speler / studio_ma_id); volumeslider voor die groep; radio zoekt de hoes op via iTunes
+# Muziek: alle audio gaat naar de Studio mini (media_player.studio_mini_2;
+#   substitutions studio_speler / studio_ma_id). 26-11-2026 terug van de MA-groep
+#   Studio_Stereo: twee Cast-speakers in een MA-groep lopen niet synchroon.
+#   Later naar een Google Home-speakergroep = alleen de substitutions aanpassen.
+#   Volumeslider voor die speler; radio zoekt de hoes op via iTunes
 #   (onthouden per nummer, ook als er meer zenders tegelijk spelen);
 #   bij reclame ('Advert') de eigen hoes uit /config/www/robobooz/.
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
@@ -82,7 +85,7 @@
 #   script.studio_totaal_uit (ook de status en last_triggered, voor het
 #   aftellen), script.intercom_zend, script.intercom_bel,
 #   input_text.intercom_log,
-#   media_player.studio_stereo (MA-groep) en /config/www/robobooz/krrrcht_in.mp3 en
+#   media_player.studio_mini_2 (Studio mini) en /config/www/robobooz/krrrcht_in.mp3 en
 #   intro_5..8.mp3 (sfeergeluid kanaal 5-8) en intro_12.mp3
 #   (wakker-word-melodietje kanaal 12), als vooraankondiging.
 # Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
@@ -285,10 +288,11 @@ time:
 substitutions:
   # wachttijd in script.studio_totaal_uit tot de smartplug uitgaat (seconden)
   studio_uit_wacht: "180"
-  # speler voor alle muziek op dit display: Music Assistant-groep Studio_Stereo
-  # (studio + studio2); entity in HA en player_id in Music Assistant
-  studio_speler: "media_player.studio_stereo"
-  studio_ma_id: "ugp_4tkazmad"
+  # speler voor alle muziek op dit display: de Studio mini
+  # (entity in HA en player_id in Music Assistant). De MA-groep Studio_Stereo
+  # (media_player.studio_stereo / ugp_4tkazmad) liep niet synchroon.
+  studio_speler: "media_player.studio_mini_2"
+  studio_ma_id: "367153dc-cf46-f210-4086-53fa7637023f"
   # huisgenoten (namen en person-entiteiten staan in secrets.yaml)
   persoon_1_naam: !secret persoon_1_naam
   persoon_1_entity: !secret persoon_1_entity
@@ -3879,7 +3883,7 @@ script:
                       if (p["enabled"].is<bool>() && !p["enabled"].as<bool>()) continue;
                       if (p["available"].is<bool>() && !p["available"].as<bool>()) continue;
                       if (!p["synced_to"].isNull()) continue;
-                      if (std::string(p["player_id"] | "") != "${studio_ma_id}") continue;   // alleen de groep Studio_Stereo
+                      if (std::string(p["player_id"] | "") != "${studio_ma_id}") continue;   // alleen de Studio mini
                       std::string st = p["playback_state"] | (p["state"] | "");
                       bool playing = st == "playing";
                       if (pass == 0 && !playing) continue;
