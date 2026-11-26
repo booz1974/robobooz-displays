@@ -41,7 +41,8 @@
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: studio-scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
 # Studio en PC: Studio uit = 4 s vasthouden (script.studio_totaal_uit).
-#   Zolang dat script loopt telt het scherm af tot de smartplug uitgaat
+#   Zolang dat script loopt telt het scherm af tot de smartplug en de
+#   studiolampen (light.studio) uitgaan
 #   (status, knop, balk en badge; ook op de Menu-kaart). Wachttijd staat
 #   in substitution studio_uit_wacht (gelijk aan de delay in het script).
 # Weer: nu + temperatuur per uur, regen komende 2 uur met het weericoon van nu als watermerk (Buienradar, 12 balkjes
@@ -2407,7 +2408,7 @@ script:
           shown = true;
           char m[8]; snprintf(m, sizeof(m), "%d:%02d", left / 60, left % 60);
           char b[64];
-          snprintf(b, sizeof(b), "PC sluit af, studio uit over %s", m); lv_label_set_text(id(pc_state), b);
+          snprintf(b, sizeof(b), "PC sluit af, studio en lampen uit over %s", m); lv_label_set_text(id(pc_state), b);
           lv_label_set_text(id(pc_badge_lbl), m);
           lv_obj_set_style_text_color(id(pc_badge_lbl), lv_color_hex(0xFFFFFE), 0);
           lv_obj_set_style_bg_color(id(pc_badge), lv_color_hex(0xD9534F), 0);
