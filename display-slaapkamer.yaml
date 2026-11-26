@@ -6,6 +6,9 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.29 (26-11-2026): na SLUIMER blijft het wekkerscherm staan met de grote STOP
+#   (SLUIMER en - / + maken plaats voor "Sluimert tot HH:MM"); was weg, zodat STOP niet
+#   meer te vinden was. Volgt input_text.wekker_slaapkamer_sluimert_tot uit HA.
 #   Versie 0.28 (26-11-2026): speler is nu de speaker van de slaapkamer
 #   (media_player.slaapkamer_maartje_jeroen_2) in plaats van de woonkamer: Nu speelt,
 #   spelerbalk, Favorieten en volume. De wekker gebruikt hem via
@@ -724,6 +727,29 @@ globals:
     initial_value: 'false'
 
 text_sensor:
+  # sluimert tot (HH:MM, leeg = niet); STOP of wekker UIT maakt hem leeg
+  - platform: homeassistant
+    id: wk_slt
+    entity_id: input_text.wekker_slaapkamer_sluimert_tot
+    internal: true
+    on_value:
+      - lambda: |-
+          int h = -1, m = -1;
+          if (x.size() == 5 && sscanf(x.c_str(), "%d:%d", &h, &m) == 2) id(sluimer_tot) = h * 60 + m;
+          else id(sluimer_tot) = -1;
+      - if:
+          condition:
+            lambda: 'return id(sluimer_tot) >= 0;'
+          then:
+            - script.execute: {id: ring_mode, sl: true}
+            - lvgl.widget.show: ring
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(wk_af).state != "on";'
+                then:
+                  - lvgl.widget.hide: ring
+      - script.execute: wk_render
   - platform: homeassistant
     id: lt_s0
     entity_id: light.slaapkamer_jeroen_maartje
@@ -850,10 +876,16 @@ text_sensor:
             - lambda: 'id(sluimer_tot) = -1;'
             - lvgl.resume:
             - light.turn_on: {id: display_backlight, brightness: 100%}
+            - script.execute: {id: ring_mode, sl: false}
             - lvgl.widget.show: ring
             - script.execute: wk_render
           else:
-            - lvgl.widget.hide: ring
+            # niet meer afgaan: alleen het wekkerscherm weg als er ook niet gesluimerd wordt
+            - if:
+                condition:
+                  lambda: 'return id(sluimer_tot) < 0;'
+                then:
+                  - lvgl.widget.hide: ring
 
 binary_sensor:
   - platform: homeassistant
@@ -1346,6 +1378,24 @@ script:
           // het vierkant laat één kwart van de cirkel zien: 0 linksboven, 1 rechtsboven, 2 linksonder, 3 rechtsonder
           lv_obj_set_pos(r, (q == 1 || q == 3) ? -k : 0, (q == 2 || q == 3) ? -k : 0);
 
+  # ---- wekkerscherm: gewone stand (SLUIMER, - / +) of sluimerstand ("SLUIMERT TOT")
+  - id: ring_mode
+    parameters:
+      sl: bool
+    then:
+      - lambda: |-
+          lv_obj_t *knop[] = {id(r_min), id(r_slbtn), id(r_plus)};
+          for (auto *o : knop) { if (sl) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); else lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN); }
+          if (sl) {
+            char b[32] = "Sluimert...";
+            if (id(sluimer_tot) >= 0) snprintf(b, sizeof(b), "Sluimert tot %02d:%02d", id(sluimer_tot) / 60, id(sluimer_tot) % 60);
+            lv_label_set_text(id(r_slt), b);
+            lv_obj_clear_flag(id(r_slt), LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(id(r_sub), "SLUIMEREN - STOP ZET DE WEKKER UIT VOOR VANDAAG");
+          } else {
+            lv_obj_add_flag(id(r_slt), LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(id(r_sub), "DE WEKKER GAAT AF");
+          }
   # ---- wekker: tijd, aan/uit, dagen, geluid, zonsopgang + tegel en nachtstand
   - id: wk_render
     then:
@@ -2249,10 +2299,13 @@ lvgl:
                 widgets:
                   - obj: {x: -150, y: 0, width: 300, height: 300, radius: 150, styles: st_deco, bg_color: "${c_blue}", clickable: false}
             - label: {x: 24, y: 30, styles: st_mono12, text: "GOEDEMORGEN"}
-            - label: {x: 24, y: 50, styles: st_mono11, text_color: "${c_sub}", text: "DE WEKKER GAAT AF"}
+            - label: {id: r_sub, x: 24, y: 50, styles: st_mono11, text_color: "${c_sub}", text: "DE WEKKER GAAT AF"}
+            # tijdens sluimeren: in plaats van SLUIMER en - / + (STOP blijft altijd staan)
+            - label: {id: r_slt, x: 24, y: 252, text_font: f_26, text: "", hidden: true}
             - label: {id: r_clock, x: 18, y: 76, text_font: f_clock, text_letter_space: -6, text: "--:--"}
             # sluimertijd - / +  (stappen van 5 min, standaard 5)
             - button:
+                id: r_min
                 x: 24
                 y: 236
                 width: 80
@@ -2266,6 +2319,7 @@ lvgl:
                 widgets:
                   - label: {align: CENTER, text: "${ic_minus}", text_font: f_ic30}
             - button:
+                id: r_slbtn
                 x: 112
                 y: 236
                 width: 256
@@ -2284,12 +2338,14 @@ lvgl:
                       auto t = id(system_time).now();
                       int m = (int) lroundf(std::isnan(id(wk_sluimer).state) ? 5.0f : id(wk_sluimer).state);
                       if (t.is_valid()) id(sluimer_tot) = (t.hour * 60 + t.minute + m) % 1440;
-                  - lvgl.widget.hide: ring
+                  # wekkerscherm blijft staan (met STOP), alleen in sluimerstand
+                  - script.execute: {id: ring_mode, sl: true}
                   - script.execute: wk_render
                 widgets:
                   - label: {x: 16, y: 25, text: "${ic_snooze}", text_font: f_ic30}
                   - label: {id: r_sluimer, x: 56, y: 24, text_font: f_26, text: "Sluimer 5 min"}
             - button:
+                id: r_plus
                 x: 376
                 y: 236
                 width: 80
