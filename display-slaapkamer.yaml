@@ -6,11 +6,15 @@
 #   slaapkamerpaneel (begonnen als display-test),
 #   voor de slaapkamer van Maartje en Jeroen (licht en sfeer van de slaapkamer;
 #   muziek en klimaat nog van de woonkamer).
+#   Versie 0.30 (27-11-2026): speler is nu de Nest Mini die van de studio naar de
+#   slaapkamer is verhuisd (media_player.slaapkamer_jeroen_en_maartje_2); de oude zwarte
+#   Home Mini is studio-r in het stereopaar Studio Stereo. input_text.wekker_slaapkamer_speaker
+#   in HA ook omgezet.
 #   Versie 0.29 (26-11-2026): na SLUIMER blijft het wekkerscherm staan met de grote STOP
 #   (SLUIMER en - / + maken plaats voor "Sluimert tot HH:MM"); was weg, zodat STOP niet
 #   meer te vinden was. Volgt input_text.wekker_slaapkamer_sluimert_tot uit HA.
 #   Versie 0.28 (26-11-2026): speler is nu de speaker van de slaapkamer
-#   (media_player.slaapkamer_maartje_jeroen_2) in plaats van de woonkamer: Nu speelt,
+#   (toen media_player.slaapkamer_maartje_jeroen_2) in plaats van de woonkamer: Nu speelt,
 #   spelerbalk, Favorieten en volume. De wekker gebruikt hem via
 #   input_text.wekker_slaapkamer_speaker (in HA ook omgezet).
 #   script.bedtijd (in HA, 25-11-2026): zet nu ook woonkamer, eettafel en keuken uit.
@@ -129,7 +133,7 @@
 # Sfeer: 7 scènes van de slaapkamer (Helder, Gedimd, Lezen, Ontspannen, Nachtlampje,
 #   Lentebloesem, Savanne) en ALLES UIT.
 # Nu speelt: hoes, titel, artiest - album, vorige / pauze / volgende,
-#   volume - en +. Speler: media_player.slaapkamer_maartje_jeroen_2 (slaapkamer, MA).
+#   volume - en +. Speler: media_player.slaapkamer_jeroen_en_maartje_2 (slaapkamer, MA).
 # Kamer: temperatuur en vocht van de slaapkamer (thermometer), met een korte
 #   regel (fris / prima om te slapen / warm).
 # Weer: temperatuur, omschrijving, wind (Bft) en vocht, regen komende 2 uur
@@ -163,7 +167,7 @@
 # Gebruikt in Home Assistant: light.slaapkamer_jeroen_maartje (groep),
 #   light.slaapkamer_jeroen_en_maartje, light.slaapkamer_lichtstrip,
 #   scene.slaapkamer_jeroen_maartje_helder / _gedimd / _lezen / _ontspannen /
-#   _nachtlampje / _lentebloesem / _savanne_zonsondergang, media_player.slaapkamer_maartje_jeroen_2 (+ entity_picture_local),
+#   _nachtlampje / _lentebloesem / _savanne_zonsondergang, media_player.slaapkamer_jeroen_en_maartje_2 (+ entity_picture_local),
 #   sensor.thermo_slaapkamer_jeroen_maartje_temperatuur_3 / _luchtvochtigheid_3,
 #   weather.de_scholekster,
 #   sensor.neerslag_buienradar_regen_data, input_text.weer_uren_display.
@@ -172,7 +176,7 @@
 #   input_select.wekker_slaapkamer_dagen / _geluid,
 #   input_number.wekker_slaapkamer_sluimertijd (5..30 min, stap 5),
 #   input_boolean.wekker_slaapkamer_muziek_hervatten, input_number.wekker_slaapkamer_oud_volume,
-#   input_text.wekker_slaapkamer_speaker (nu media_player.slaapkamer_maartje_jeroen_2),
+#   input_text.wekker_slaapkamer_speaker (nu media_player.slaapkamer_jeroen_en_maartje_2),
 #   script.wekker_slaapkamer_afgaan / _stop / _sluimer, automation.wekker_slaapkamer,
 #   script.bedtijd (knop BEDTIJD, 2 s vasthouden), camera.voordeur +
 #   binary_sensor.voordeur_ringing (deurbel), sensor.agenda_vandaag_display (goedemorgen),
@@ -506,7 +510,7 @@ substitutions:
   c_grey: "0xB9B4AA"     # grijze tekst op zwart
   c_dline: "0x3A3936"    # lijntjes op zwart
   c_off: "0xC9C3B7"      # schakelaar uit
-  speler: "media_player.slaapkamer_maartje_jeroen_2"   # Music Assistant-speler slaapkamer
+  speler: "media_player.slaapkamer_jeroen_en_maartje_2"   # Music Assistant-speler slaapkamer
   ic_home: "\U000F02DC"
   ic_bulb: "\U000F0335"
   ic_palette: "\U000F03D8"
