@@ -3,7 +3,7 @@
 # Ontwerp en bouw: Jeroen van Sonsbeek
 #
 # display-studio - Guition ESP32-S3-4848S040 (480x480) - Studio
-# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, stereopaar Studio Stereo) |
+# Pagina's (Menu): Lampen | Favorieten | Muziek (Nu speelt, studio-l) |
 #           Sfeer | Studio en PC | Weer | Energie (+ Zonnestroom) | Info | Nachtstand |
 #           Home Assistant | Thema
 #           (+ verborgen: ON AIR, Wachtrij, Deurbel, Goedemorgen, Intercom)
@@ -18,7 +18,7 @@
 #   10 Keukenkazerne (eten), 11 Shampoo-Commando (douchen), 12 Fluisterwekker)
 #   en PUSH TO TALK: script.intercom_zend
 #   speelt ruis + een willekeurig bericht (ElevenLabs) als aankondiging op
-#   de studiospeakers (stereopaar Studio Stereo; muziek gaat daarna verder);
+#   de studiospeaker (studio-l; muziek gaat daarna verder);
 #   het groene scherm glitcht zolang er geluid speelt.
 #   Berichten met ElevenLabs-audiotags ([whispers], [laughs], ...); de tags
 #   staan niet in het log, lange logregels lopen door.
@@ -33,10 +33,12 @@
 # LIVE-balk: ROBOBOOZ-roast (AI), buiten, verbruik en deur.
 # Favorieten: alle radiozenders en playlists uit Music Assistant, meest
 #   gespeeld bovenaan, scrollbaar.
-# Muziek: alle audio gaat naar het Google Home-stereopaar Studio Stereo
-#   (studio-l + studio-r; in MA media_player.studio_stereo; substitutions
-#   studio_speler / studio_ma_id). Sinds 27-11-2026; daarvoor de Google-groep
-#   studio_groep (studio + studio2). De Nest Mini 'studio' staat nu in de
+# Muziek: alle audio gaat naar de Google Home Mini studio-l (in MA
+#   media_player.studio_l_2; substitutions studio_speler / studio_ma_id).
+#   Sinds 27-11-2026: geen groep of stereopaar meer in de studio (het
+#   stereopaar Studio Stereo werkte niet en is weg; studio-l is na een
+#   fabrieksreset opnieuw ingesteld en heeft een nieuw MA-ID). Daarvoor de
+#   Google-groep studio_groep. De Nest Mini 'studio' staat nu in de
 #   slaapkamer (media_player.slaapkamer_jeroen_en_maartje_2).
 #   Volumeslider voor die groep; radio zoekt de hoes op via iTunes
 #   (onthouden per nummer, ook als er meer zenders tegelijk spelen);
@@ -86,7 +88,7 @@
 #   script.studio_totaal_uit (ook de status en last_triggered, voor het
 #   aftellen), script.intercom_zend, script.intercom_bel,
 #   input_text.intercom_log,
-#   media_player.studio_stereo (stereopaar Studio Stereo, via MA) en /config/www/robobooz/krrrcht_in.mp3 en
+#   media_player.studio_l_2 (Google Home Mini studio-l, via MA) en /config/www/robobooz/krrrcht_in.mp3 en
 #   intro_5..8.mp3 (sfeergeluid kanaal 5-8) en intro_12.mp3
 #   (wakker-word-melodietje kanaal 12), als vooraankondiging.
 # Automatiseringen: 'Displays - NOS-nieuws bijwerken', 'Displays - agenda voor
@@ -289,11 +291,10 @@ time:
 substitutions:
   # wachttijd in script.studio_totaal_uit tot de smartplug uitgaat (seconden)
   studio_uit_wacht: "180"
-  # speler voor alle muziek op dit display: Google Home-stereopaar Studio Stereo
-  # (studio-l + studio-r) zoals Music Assistant hem kent
-  # (entity in HA en player_id in MA)
-  studio_speler: "media_player.studio_stereo"
-  studio_ma_id: "89e4dc8a-38c1-4900-b3ab-c220a4b725ed"
+  # speler voor alle muziek op dit display: Google Home Mini studio-l
+  # zoals Music Assistant hem kent (entity in HA en player_id in MA)
+  studio_speler: "media_player.studio_l_2"
+  studio_ma_id: "fc5da8f7-22f5-3243-8822-ac7877d606c5"
   # huisgenoten (namen en person-entiteiten staan in secrets.yaml)
   persoon_1_naam: !secret persoon_1_naam
   persoon_1_entity: !secret persoon_1_entity
@@ -3884,7 +3885,7 @@ script:
                       if (p["enabled"].is<bool>() && !p["enabled"].as<bool>()) continue;
                       if (p["available"].is<bool>() && !p["available"].as<bool>()) continue;
                       if (!p["synced_to"].isNull()) continue;
-                      if (std::string(p["player_id"] | "") != "${studio_ma_id}") continue;   // alleen het stereopaar Studio Stereo
+                      if (std::string(p["player_id"] | "") != "${studio_ma_id}") continue;   // alleen de studiospeaker studio-l
                       std::string st = p["playback_state"] | (p["state"] | "");
                       bool playing = st == "playing";
                       if (pass == 0 && !playing) continue;
