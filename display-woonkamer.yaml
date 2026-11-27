@@ -36,6 +36,9 @@
 # Lampen: tik op het icoontje = aan/uit, tik ernaast = details (helderheid,
 #   kleuren); tik op de blokjesbalk = helderheid.
 # Sfeer: scènes (vegen = dimmen), ALLES UIT en RANDOM KLEUREN.
+#   Tegel WOONKAMER = Hue-scène 'woonkamer eettafel' dynamisch
+#   (hue.activate_scene) + keuken totaal; tegel KEUKEN (was Fairfax) = keuken
+#   apart aan/uit, aan = scene.keuken_ontspannen (sinds 27-11-2026).
 # Weer: nu + temperatuur per uur, regen komende 2 uur (Buienradar, 12 balkjes
 #   van 10 min, met het weericoon van nu als watermerk), zonwering eettafel (OMHOOG / STOP / OMLAAG, stand in blokjes
 #   met woorden onder de knoppen, en een venstertje met het doek en de batterij;
@@ -939,8 +942,8 @@ image:
     type: RGB565
     resize: 222x84
   - platform: file
-    file: "https://images.unsplash.com/photo-1784302167097-6bd2fc8182bf?fm=jpg&q=85&w=222&h=84&fit=crop&crop=entropy&bri=-8"
-    id: scimg_fairfax
+    file: "https://images.unsplash.com/photo-1761662826410-3218852da3bf?fm=jpg&q=85&w=222&h=84&fit=crop&crop=entropy&bri=-8"
+    id: scimg_keuken
     type: RGB565
     resize: 222x84
   # animaties klimaatpagina: bestanden in /config/esphome/display/
@@ -4549,7 +4552,7 @@ script:
   # na het loslaten: nieuwe helderheid naar Home Assistant sturen
 
   # ---- sfeertegels: vegen in een tegel = dimmen van de lampen van die scène
-  # idx: 0 Woonkamer, 1 Wk + eettafel, 2 Oranje, 3 Tafel, 4 Concentreren, 5 Fairfax
+  # idx: 0 Woonkamer, 1 Wk + eettafel, 2 Oranje, 3 Tafel, 4 Concentreren, 5 Keuken (aan/uit)
   - id: sc_drag
     parameters:
       idx: int
@@ -4557,13 +4560,14 @@ script:
     then:
       - lambda: |-
           if (idx < 0 || idx > 5) return;
-          lv_obj_t *bar[] = {id(sc_woonkamer_bar), id(sc_wk_eettafel_bar), id(sc_oranje_bar), id(sc_tafel_bar), id(sc_concentreren_bar), id(sc_fairfax_bar)};
-          lv_obj_t *sub[] = {id(sc_woonkamer_sub), id(sc_wk_eettafel_sub), id(sc_oranje_sub), id(sc_tafel_sub), id(sc_concentreren_sub), id(sc_fairfax_sub)};
+          lv_obj_t *bar[] = {id(sc_woonkamer_bar), id(sc_wk_eettafel_bar), id(sc_oranje_bar), id(sc_tafel_bar), id(sc_concentreren_bar), id(sc_keuken_bar)};
+          lv_obj_t *sub[] = {id(sc_woonkamer_sub), id(sc_wk_eettafel_sub), id(sc_oranje_sub), id(sc_tafel_sub), id(sc_concentreren_sub), id(sc_keuken_sub)};
           if (phase == 2) {
             // loslaten: tegel weer normaal
             static const char *txt[] = {"Scène", "Scène", "Alle lampen", "Scène", "Scène", "Scène"};
             lv_obj_add_flag(bar[idx], LV_OBJ_FLAG_HIDDEN);
-            lv_label_set_text(sub[idx], txt[idx]);
+            if (idx == 5) lv_label_set_text(sub[idx], id(lt_keuken_on).state ? "Aan" : "Uit");
+            else lv_label_set_text(sub[idx], txt[idx]);
             return;
           }
           lv_indev_t *in = lv_indev_active();
@@ -4574,8 +4578,10 @@ script:
             id(dim_x0) = p.x;
             id(dim_dragged) = false;
             // beginwaarde: huidige helderheid van de woonkamer
-            float b = id(lt_all_bri).state;
-            id(dim_b0) = (id(lt_all_on).state && !std::isnan(b)) ? (int) b : 0;
+            // (keuken-tegel: helderheid van de keuken)
+            float b = idx == 5 ? id(lt_keuken_bri).state : id(lt_all_bri).state;
+            bool on = idx == 5 ? id(lt_keuken_on).state : id(lt_all_on).state;
+            id(dim_b0) = (on && !std::isnan(b)) ? (int) b : 0;
             id(dim_val) = id(dim_b0);
             return;
           }
@@ -4616,7 +4622,7 @@ script:
                 data:
                   entity_id: !lambda |-
                     static const char *e[] = {"light.woonkamer, light.keuken, light.eettafel", "light.woonkamer, light.eettafel",
-                        "light.woonkamer, light.keuken, light.eettafel", "light.woonkamer", "light.woonkamer", "light.woonkamer"};
+                        "light.woonkamer, light.keuken, light.eettafel", "light.woonkamer", "light.woonkamer", "light.keuken"};
                     return std::string(e[idx < 0 || idx > 5 ? 3 : idx]);
           else:
             - homeassistant.action:
@@ -4624,7 +4630,7 @@ script:
                 data:
                   entity_id: !lambda |-
                     static const char *e[] = {"light.woonkamer, light.keuken, light.eettafel", "light.woonkamer, light.eettafel",
-                        "light.woonkamer, light.keuken, light.eettafel", "light.woonkamer", "light.woonkamer", "light.woonkamer"};
+                        "light.woonkamer, light.keuken, light.eettafel", "light.woonkamer", "light.woonkamer", "light.keuken"};
                     return std::string(e[idx < 0 || idx > 5 ? 3 : idx]);
                   brightness: !lambda 'return id(dim_val);'
 
@@ -5105,6 +5111,11 @@ binary_sensor:
     entity_id: light.keuken
     internal: true
     trigger_on_initial_state: true
+    on_state:
+      # sfeertegel KEUKEN: Aan / Uit
+      - lvgl.label.update:
+          id: sc_keuken_sub
+          text: !lambda 'return std::string(x ? "Aan" : "Uit");'
   - platform: homeassistant
     id: lt_tv_on
     entity_id: media_player.bravia_tl2
@@ -15112,11 +15123,17 @@ lvgl:
                   condition:
                     lambda: 'return !id(dim_dragged);'
                   then:
+                    # Hue-scène 'woonkamer eettafel' dynamisch (lampen bewegen langzaam)
+                    - homeassistant.action:
+                        action: hue.activate_scene
+                        data:
+                          entity_id: scene.woonkamer_woonkamer_eettafel
+                          dynamic: "true"
+                    # keuken gaat mee aan (gewone scène)
                     - homeassistant.action:
                         action: scene.turn_on
                         data:
-                          # woonkamer inclusief keuken en eettafel
-                          entity_id: "scene.woonkamer_woonkamer, scene.keuken_keuken_totaal, scene.eettafel_tafel"
+                          entity_id: scene.keuken_keuken_totaal
             on_press:
               - script.execute: {id: sc_drag, idx: 0, phase: 0}
             on_pressing:
@@ -15505,7 +15522,7 @@ lvgl:
                     - script.execute: {id: sc_apply, idx: 4}
               - script.execute: {id: sc_drag, idx: 4, phase: 2}
         - button:
-            id: sc_fairfax
+            id: sc_keuken
             gesture_bubble: false   # vegen in de tegel = dimmen, niet van pagina wisselen
             scrollable: false
             x: 244
@@ -15522,7 +15539,7 @@ lvgl:
               bg_opa: 60%
             widgets:
               - image:
-                  src: scimg_fairfax
+                  src: scimg_keuken
                   align: CENTER
                   clickable: false
                   pressed:
@@ -15541,7 +15558,7 @@ lvgl:
               - label:
                   x: 12
                   y: 10
-                  text: "${mdi_sunset}"
+                  text: "${mdi_ceiling_light}"
                   text_font: pl_icon40
                   text_color: 0xFFFFFE
                   text_opa: 90%
@@ -15551,20 +15568,20 @@ lvgl:
                   y: -8
                   width: 196
                   long_mode: DOT
-                  text: "FAIRFAX"
+                  text: "KEUKEN"
                   text_font: r_mono
                   text_color: 0xFFFFFE
               - label:
-                  id: sc_fairfax_sub
+                  id: sc_keuken_sub
                   align: TOP_RIGHT
                   x: -12
                   y: 12
-                  text: "Scène"
+                  text: "Uit"
                   text_font: pl_t16
                   text_color: 0xF2F2F1
               # helderheidsbalkje onderin, alleen zichtbaar tijdens het vegen
               - obj:
-                  id: sc_fairfax_bar
+                  id: sc_keuken_bar
                   align: BOTTOM_LEFT
                   width: 0
                   height: 6
@@ -15582,10 +15599,20 @@ lvgl:
                   condition:
                     lambda: 'return !id(dim_dragged);'
                   then:
-                    - homeassistant.action:
-                        action: scene.turn_on
-                        data:
-                          entity_id: scene.woonkamer_fairfax
+                    # keuken apart aan/uit: aan = sfeervolle scène 'keuken Ontspannen'
+                    - if:
+                        condition:
+                          lambda: 'return id(lt_keuken_on).state;'
+                        then:
+                          - homeassistant.action:
+                              action: light.turn_off
+                              data:
+                                entity_id: light.keuken
+                        else:
+                          - homeassistant.action:
+                              action: scene.turn_on
+                              data:
+                                entity_id: scene.keuken_ontspannen
             on_press:
               - script.execute: {id: sc_drag, idx: 5, phase: 0}
             on_pressing:

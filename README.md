@@ -71,7 +71,7 @@ Zet bij elk display in HA de ESPHome-integratie op *Configureren → "Sta het ap
 - Huisgenoten: `persoon_1..3_entity` (person-entiteiten) via `secrets.yaml`
 
 **Woonkamer**
-- Lampen en sfeer: `light.woonkamer`, `light.keuken`, `light.eettafel`, `scene.woonkamer_*`
+- Lampen en sfeer: `light.woonkamer`, `light.keuken`, `light.eettafel`, `scene.woonkamer_*`, `scene.keuken_keuken_totaal`; tegel WOONKAMER start `scene.woonkamer_woonkamer_eettafel` dynamisch via `hue.activate_scene` (+ keuken totaal); tegel KEUKEN zet de keuken apart aan (`scene.keuken_ontspannen`) of uit
 - Spelers en TV: `media_player.yamaha_living_2`, `media_player.woonkamer_totaal`, `media_player.eettafel`, `media_player.bravia_tl2`, `remote.teevee`
 - Klimaat: `climate.living_room`, `sensor.shelly_blu_h_t_1e68_luchtvochtigheid`
 - Zonwering: `cover.eettafel_zonwering_eettafel` (met `current_position`), `sensor.eettafel_zonwering_eettafel_batterij`, `binary_sensor.eettafel_zonwering_eettafel_opladen`
